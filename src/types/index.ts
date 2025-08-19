@@ -5,7 +5,7 @@ export interface WebsiteContext {
   domain: string;
   category: WebsiteCategory;
   pageType: PageType;
-  extractedData: Record<string, any>;
+  extractedData: Record<string, unknown>;
 }
 
 export enum WebsiteCategory {

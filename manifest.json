@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Agentic Chrome Extension",
+  "name": "ChromeControl",
   "version": "1.0.0",
   "description": "Intelligent Chrome extension that provides contextual AI-powered suggestions based on website analysis",
   "permissions": [
@@ -24,7 +24,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Agentic Assistant"
+    "default_title": "ChromeControl"
   },
   "icons": {
     "16": "icons/icon16.png",

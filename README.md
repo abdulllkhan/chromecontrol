@@ -10,31 +10,23 @@ An intelligent Chrome extension that provides contextual AI-powered suggestions 
 - Automated web page interactions
 - Privacy-focused design
 
-## Development Setup
+## Quick Start
 
-### Prerequisites
+For a fast setup, see our [Quick Start Guide](docs/QUICK_START.md).
 
-- Node.js (v16 or higher)
-- npm or yarn
-- Chrome browser for testing
+For detailed developer setup instructions, see [Developer Setup Guide](docs/DEVELOPER_SETUP.md).
 
-### Installation
+### TL;DR
+```bash
+npm install && npm run build
+```
+Then load in Chrome: `chrome://extensions/` → Enable Developer mode → Load unpacked
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+## Documentation
 
-3. Build the extension:
-   ```bash
-   npm run build
-   ```
-
-4. Load the extension in Chrome:
-   - Open Chrome and navigate to `chrome://extensions/`
-   - Enable "Developer mode"
-   - Click "Load unpacked" and select the project directory
+- 📖 **[Documentation Hub](docs/README.md)** - Complete documentation index
+- 🚀 **[Quick Start](docs/QUICK_START.md)** - Get running in 5 minutes  
+- 🔧 **[Developer Setup](docs/DEVELOPER_SETUP.md)** - Detailed development guide
 
 ### Development
 
