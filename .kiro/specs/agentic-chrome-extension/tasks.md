@@ -14,7 +14,7 @@
   - Define extension popup HTML structure
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 3. Create core data models and TypeScript interfaces
+- [x] 3. Create core data models and TypeScript interfaces
   - Define WebsiteContext, CustomTask, and AIRequest interfaces
   - Implement storage schema types for Chrome storage APIs
   - Create enum definitions for WebsiteCategory and SecurityLevel
