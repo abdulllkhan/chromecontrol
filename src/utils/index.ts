@@ -236,3 +236,16 @@ export async function retryWithBackoff<T>(
   
   throw lastError!;
 }
+
+// ============================================================================
+// PATTERN ENGINE UTILITIES
+// ============================================================================
+
+// Re-export pattern engine components for easy access
+export {
+  PatternEngine,
+  UrlAnalyzer,
+  WebsiteCategorizer,
+  ContentExtractor,
+  CustomPatternMatcher
+} from '../services/patternEngine.js';
