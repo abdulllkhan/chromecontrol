@@ -13,6 +13,9 @@ export * from './patternEngine.js';
 // AI service
 export * from './aiService.js';
 
+// Task management service
+export * from './taskManager.js';
+
 // Migration service
 export * from './migrations.js';
 
