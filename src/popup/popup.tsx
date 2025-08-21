@@ -8,8 +8,21 @@ import {
   WebsiteContext, 
   TaskResult, 
   OutputFormat,
-  WebsiteCategory 
+  WebsiteCategory,
+  PageContent,
+  SecurityLevel,
+  PageType
 } from '../types';
+import { 
+  SuggestionEngine, 
+  type SuggestionContext, 
+  type SuggestionFilter,
+  type PrioritizedSuggestion 
+} from '../services/suggestionEngine';
+import { PatternEngine } from '../services/patternEngine';
+import { TaskManager } from '../services/taskManager';
+import { ChromeStorageService } from '../services/storage';
+import { AIService } from '../services/aiService';
 
 // ============================================================================
 // INTERFACES
@@ -18,19 +31,45 @@ import {
 interface PopupState {
   isLoading: boolean;
   error: string | null;
-  suggestions: Suggestion[];
+  suggestions: PrioritizedSuggestion[];
   websiteContext: WebsiteContext | null;
+  pageContent: PageContent | null;
   activeView: 'suggestions' | 'task-management' | 'add-task';
   customTasks: CustomTask[];
   selectedTask: CustomTask | null;
   taskResult: TaskResult | null;
   copiedText: string | null;
+  suggestionFilter: SuggestionFilter;
+  categorizedSuggestions: Record<string, PrioritizedSuggestion[]>;
+  filterOptions: {
+    categories: string[];
+    hasPermissionRequired: boolean;
+    hasCustomTasks: boolean;
+    timeRange: { min: number; max: number };
+  } | null;
 }
 
 interface SuggestionCardProps {
-  suggestion: Suggestion;
-  onExecute: (suggestion: Suggestion) => void;
+  suggestion: PrioritizedSuggestion;
+  onExecute: (suggestion: PrioritizedSuggestion) => void;
   isExecuting: boolean;
+}
+
+interface SuggestionFilterProps {
+  filter: SuggestionFilter;
+  filterOptions: {
+    categories: string[];
+    hasPermissionRequired: boolean;
+    hasCustomTasks: boolean;
+    timeRange: { min: number; max: number };
+  };
+  onFilterChange: (filter: SuggestionFilter) => void;
+}
+
+interface CategorizedSuggestionsProps {
+  categorizedSuggestions: Record<string, PrioritizedSuggestion[]>;
+  onExecute: (suggestion: PrioritizedSuggestion) => void;
+  executingTask: string | null;
 }
 
 interface TaskResultProps {
@@ -123,17 +162,25 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
           <h3 className="suggestion-title">{suggestion.title}</h3>
           <p className="suggestion-description">{suggestion.description}</p>
         </div>
+        <div className="suggestion-priority">
+          <span className="priority-score" title={`Priority: ${suggestion.priority.toFixed(1)}`}>
+            {suggestion.priority > 10 ? '🔥' : suggestion.priority > 5 ? '⭐' : '💡'}
+          </span>
+        </div>
       </div>
       
       <div className="suggestion-footer">
         <div className="suggestion-meta">
           <span className="suggestion-time">~{suggestion.estimatedTime}s</span>
           {suggestion.requiresPermission && (
-            <span className="suggestion-permission">🔒</span>
+            <span className="suggestion-permission" title="Requires permission">🔒</span>
           )}
           {suggestion.isCustom && (
-            <span className="suggestion-custom">Custom</span>
+            <span className="suggestion-custom" title="Custom task">Custom</span>
           )}
+          <span className="suggestion-source" title={`Source: ${suggestion.source}`}>
+            {suggestion.source === 'builtin' ? '🏠' : suggestion.source === 'custom' ? '⚙️' : '🔗'}
+          </span>
         </div>
         
         <button
@@ -144,6 +191,196 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
           {isExecuting ? 'Running...' : 'Execute'}
         </button>
       </div>
+    </div>
+  );
+};
+
+const SuggestionFilterComponent: React.FC<SuggestionFilterProps> = ({
+  filter,
+  filterOptions,
+  onFilterChange
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleCategoryToggle = (category: string) => {
+    const currentCategories = filter.categories || [];
+    const newCategories = currentCategories.includes(category)
+      ? currentCategories.filter(c => c !== category)
+      : [...currentCategories, category];
+    
+    onFilterChange({ ...filter, categories: newCategories });
+  };
+
+  const clearFilters = () => {
+    onFilterChange({});
+  };
+
+  const hasActiveFilters = Object.keys(filter).length > 0;
+
+  return (
+    <div className="suggestion-filter">
+      <div className="filter-header">
+        <button
+          className="filter-toggle"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          🔍 Filter {hasActiveFilters && '●'}
+        </button>
+        {hasActiveFilters && (
+          <button className="filter-clear" onClick={clearFilters}>
+            Clear
+          </button>
+        )}
+      </div>
+
+      {isExpanded && (
+        <div className="filter-content">
+          {/* Category Filter */}
+          <div className="filter-group">
+            <label>Categories:</label>
+            <div className="filter-options">
+              {filterOptions.categories.map(category => (
+                <label key={category} className="filter-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={filter.categories?.includes(category) || false}
+                    onChange={() => handleCategoryToggle(category)}
+                  />
+                  <span>{category}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Permission Filter */}
+          {filterOptions.hasPermissionRequired && (
+            <div className="filter-group">
+              <label className="filter-checkbox">
+                <input
+                  type="checkbox"
+                  checked={filter.requiresPermission === false}
+                  onChange={(e) => onFilterChange({
+                    ...filter,
+                    requiresPermission: e.target.checked ? false : undefined
+                  })}
+                />
+                <span>No permissions required</span>
+              </label>
+            </div>
+          )}
+
+          {/* Custom Tasks Filter */}
+          {filterOptions.hasCustomTasks && (
+            <div className="filter-group">
+              <label className="filter-checkbox">
+                <input
+                  type="checkbox"
+                  checked={filter.isCustom === true}
+                  onChange={(e) => onFilterChange({
+                    ...filter,
+                    isCustom: e.target.checked ? true : undefined
+                  })}
+                />
+                <span>Custom tasks only</span>
+              </label>
+            </div>
+          )}
+
+          {/* Time Filter */}
+          <div className="filter-group">
+            <label>Max time (seconds):</label>
+            <input
+              type="range"
+              min={filterOptions.timeRange.min}
+              max={filterOptions.timeRange.max}
+              value={filter.estimatedTimeMax || filterOptions.timeRange.max}
+              onChange={(e) => onFilterChange({
+                ...filter,
+                estimatedTimeMax: parseInt(e.target.value)
+              })}
+            />
+            <span>{filter.estimatedTimeMax || filterOptions.timeRange.max}s</span>
+          </div>
+
+          {/* Search Filter */}
+          <div className="filter-group">
+            <label>Search:</label>
+            <input
+              type="text"
+              placeholder="Search suggestions..."
+              value={filter.searchQuery || ''}
+              onChange={(e) => onFilterChange({
+                ...filter,
+                searchQuery: e.target.value || undefined
+              })}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CategorizedSuggestions: React.FC<CategorizedSuggestionsProps> = ({
+  categorizedSuggestions,
+  onExecute,
+  executingTask
+}) => {
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+  const toggleCategory = (category: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(category)) {
+      newExpanded.delete(category);
+    } else {
+      newExpanded.add(category);
+    }
+    setExpandedCategories(newExpanded);
+  };
+
+  const categories = Object.keys(categorizedSuggestions).sort();
+
+  if (categories.length === 0) {
+    return (
+      <div className="empty-state">
+        <p>No suggestions match your current filters.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="categorized-suggestions">
+      {categories.map(category => {
+        const suggestions = categorizedSuggestions[category];
+        const isExpanded = expandedCategories.has(category);
+        
+        return (
+          <div key={category} className="suggestion-category">
+            <div 
+              className="category-header"
+              onClick={() => toggleCategory(category)}
+            >
+              <span className="category-icon">{getCategoryIcon(category)}</span>
+              <h3 className="category-title">{category}</h3>
+              <span className="category-count">({suggestions.length})</span>
+              <span className="category-toggle">{isExpanded ? '▼' : '▶'}</span>
+            </div>
+            
+            {isExpanded && (
+              <div className="category-suggestions">
+                {suggestions.map(suggestion => (
+                  <SuggestionCard
+                    key={suggestion.id}
+                    suggestion={suggestion}
+                    onExecute={onExecute}
+                    isExecuting={executingTask === suggestion.id}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -491,14 +728,20 @@ export const PopupApp: React.FC = () => {
     error: null,
     suggestions: [],
     websiteContext: null,
+    pageContent: null,
     activeView: 'suggestions',
     customTasks: [],
     selectedTask: null,
     taskResult: null,
-    copiedText: null
+    copiedText: null,
+    suggestionFilter: {},
+    categorizedSuggestions: {},
+    filterOptions: null
   });
   
   const [executingTask, setExecutingTask] = useState<string | null>(null);
+  const [suggestionEngine, setSuggestionEngine] = useState<SuggestionEngine | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'categorized'>('list');
   
   // Initialize popup data
   useEffect(() => {
@@ -511,51 +754,91 @@ export const PopupApp: React.FC = () => {
         if (!tab?.url) {
           throw new Error('Unable to access current tab');
         }
-        
-        // Mock website context for now - will be replaced with actual pattern engine
-        const mockContext: WebsiteContext = {
-          domain: new URL(tab.url).hostname,
-          category: WebsiteCategory.CUSTOM,
-          pageType: 'other' as any,
-          extractedData: {},
-          securityLevel: 'public' as any,
-          timestamp: new Date()
-        };
-        
-        // Mock suggestions - will be replaced with actual suggestion engine
-        const mockSuggestions: Suggestion[] = [
-          {
-            id: 'suggest-1',
-            title: 'Summarize Page',
-            description: 'Generate a concise summary of the current page content',
-            category: 'content',
-            estimatedTime: 5,
-            requiresPermission: false,
-            isCustom: false,
-            icon: '📄'
-          },
-          {
-            id: 'suggest-2',
-            title: 'Extract Key Points',
-            description: 'Identify and list the main points from this page',
-            category: 'analysis',
-            estimatedTime: 8,
-            requiresPermission: false,
-            isCustom: false,
-            icon: '🎯'
+
+        // Initialize services
+        const storageService = new ChromeStorageService();
+        const aiService = new AIService({
+          apiKey: 'mock-key', // Will be replaced with actual configuration
+          baseUrl: 'https://api.openai.com/v1',
+          model: 'gpt-3.5-turbo',
+          timeout: 30000,
+          maxRetries: 3
+        });
+
+        const patternEngine = new PatternEngine();
+        const taskManager = new TaskManager({
+          storageService,
+          aiService,
+          enableValidation: true,
+          enableTesting: false,
+          maxExecutionTime: 60000,
+          defaultSecurityConstraints: {
+            allowSensitiveData: false,
+            maxContentLength: 5000,
+            allowedDomains: [],
+            restrictedSelectors: ['input[type="password"]', '[data-sensitive]']
           }
-        ];
+        });
+
+        const engine = new SuggestionEngine({
+          patternEngine,
+          taskManager,
+          maxSuggestions: 20,
+          enableBuiltInSuggestions: true,
+          enableCustomSuggestions: true,
+          priorityWeights: {
+            usage: 1.0,
+            recency: 0.8,
+            relevance: 1.2,
+            category: 0.6
+          }
+        });
+
+        setSuggestionEngine(engine);
+
+        // Extract page content (mock for now - will be replaced with content script)
+        const mockPageContent: PageContent = {
+          url: tab.url,
+          title: tab.title || '',
+          headings: ['Main Heading', 'Sub Heading'],
+          textContent: 'Sample page content for analysis',
+          forms: [],
+          links: [],
+          metadata: {},
+          extractedAt: new Date()
+        };
+
+        // Analyze website context
+        const websiteContext = patternEngine.analyzeWebsite(tab.url, mockPageContent);
         
+        // Create suggestion context
+        const suggestionContext: SuggestionContext = {
+          websiteContext,
+          userPreferences: {
+            enabledCategories: Object.values(WebsiteCategory),
+            disabledSuggestions: [],
+            preferredOutputFormats: ['plain_text']
+          },
+          recentUsage: [] // Will be loaded from storage
+        };
+
+        // Generate suggestions
+        const suggestions = await engine.getSuggestions(suggestionContext);
+        const categorizedSuggestions = await engine.getCategorizedSuggestions(suggestionContext);
+        const filterOptions = await engine.getFilterOptions(suggestionContext);
+
         // Load custom tasks from storage
-        const result = await chrome.storage.local.get(['customTasks']);
-        const customTasks: CustomTask[] = Object.values(result.customTasks || {});
+        const customTasks = await taskManager.getAllTasks();
         
         setState(prev => ({
           ...prev,
           isLoading: false,
-          websiteContext: mockContext,
-          suggestions: mockSuggestions,
-          customTasks
+          websiteContext,
+          pageContent: mockPageContent,
+          suggestions,
+          categorizedSuggestions,
+          filterOptions,
+          customTasks: Object.values(customTasks)
         }));
         
       } catch (error) {
@@ -581,20 +864,49 @@ export const PopupApp: React.FC = () => {
     }
   }, [state.copiedText]);
   
-  const handleExecuteSuggestion = useCallback(async (suggestion: Suggestion) => {
+  const handleFilterChange = useCallback(async (newFilter: SuggestionFilter) => {
+    setState(prev => ({ ...prev, suggestionFilter: newFilter }));
+    
+    if (suggestionEngine && state.websiteContext) {
+      try {
+        const suggestionContext: SuggestionContext = {
+          websiteContext: state.websiteContext,
+          userPreferences: {
+            enabledCategories: Object.values(WebsiteCategory),
+            disabledSuggestions: [],
+            preferredOutputFormats: ['plain_text']
+          },
+          recentUsage: []
+        };
+
+        const filteredSuggestions = await suggestionEngine.getSuggestions(suggestionContext, newFilter);
+        const categorizedSuggestions = await suggestionEngine.getCategorizedSuggestions(suggestionContext, newFilter);
+        
+        setState(prev => ({
+          ...prev,
+          suggestions: filteredSuggestions,
+          categorizedSuggestions
+        }));
+      } catch (error) {
+        console.error('Failed to apply filter:', error);
+      }
+    }
+  }, [suggestionEngine, state.websiteContext]);
+
+  const handleExecuteSuggestion = useCallback(async (suggestion: PrioritizedSuggestion) => {
     try {
       setExecutingTask(suggestion.id);
       setState(prev => ({ ...prev, error: null }));
       
-      // Mock task execution - will be replaced with actual AI service
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Mock task execution - will be replaced with actual task manager execution
+      await new Promise(resolve => setTimeout(resolve, suggestion.estimatedTime * 100));
       
       const mockResult: TaskResult = {
         success: true,
-        content: `This is a mock result for "${suggestion.title}". The actual implementation will integrate with the AI service to process the request and return real results.`,
+        content: `Result for "${suggestion.title}" (Priority: ${suggestion.priority.toFixed(1)}, Relevance: ${suggestion.relevanceScore.toFixed(1)})\n\nThis suggestion was generated from ${suggestion.source} source and matched patterns: ${suggestion.matchingPatterns.join(', ')}\n\nThe actual implementation will integrate with the task manager and AI service to process the request and return real results.`,
         format: OutputFormat.PLAIN_TEXT,
         timestamp: new Date(),
-        executionTime: 2000
+        executionTime: suggestion.estimatedTime * 100
       };
       
       setState(prev => ({ ...prev, taskResult: mockResult }));
@@ -773,36 +1085,70 @@ export const PopupApp: React.FC = () => {
                 <div className="suggestions-container">
                   <div className="suggestions-header">
                     <h2>Available Suggestions</h2>
-                    <button
-                      className="btn btn-secondary btn-small"
-                      onClick={() => setState(prev => ({ ...prev, activeView: 'add-task' }))}
-                    >
-                      + Add Task
-                    </button>
-                  </div>
-                  
-                  <div className="suggestions-list">
-                    {state.suggestions.length === 0 ? (
-                      <div className="empty-state">
-                        <p>No suggestions available for this website.</p>
+                    <div className="suggestions-controls">
+                      <div className="view-toggle">
                         <button
-                          className="btn btn-primary"
-                          onClick={() => setState(prev => ({ ...prev, activeView: 'add-task' }))}
+                          className={`btn btn-small ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
+                          onClick={() => setViewMode('list')}
                         >
-                          Create Custom Task
+                          📋 List
+                        </button>
+                        <button
+                          className={`btn btn-small ${viewMode === 'categorized' ? 'btn-primary' : 'btn-secondary'}`}
+                          onClick={() => setViewMode('categorized')}
+                        >
+                          📁 Categories
                         </button>
                       </div>
-                    ) : (
-                      state.suggestions.map(suggestion => (
-                        <SuggestionCard
-                          key={suggestion.id}
-                          suggestion={suggestion}
-                          onExecute={handleExecuteSuggestion}
-                          isExecuting={executingTask === suggestion.id}
-                        />
-                      ))
-                    )}
+                      <button
+                        className="btn btn-secondary btn-small"
+                        onClick={() => setState(prev => ({ ...prev, activeView: 'add-task' }))}
+                      >
+                        + Add Task
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Filter Component */}
+                  {state.filterOptions && (
+                    <SuggestionFilterComponent
+                      filter={state.suggestionFilter}
+                      filterOptions={state.filterOptions}
+                      onFilterChange={handleFilterChange}
+                    />
+                  )}
+                  
+                  {/* Suggestions Display */}
+                  {viewMode === 'list' ? (
+                    <div className="suggestions-list">
+                      {state.suggestions.length === 0 ? (
+                        <div className="empty-state">
+                          <p>No suggestions available for this website.</p>
+                          <button
+                            className="btn btn-primary"
+                            onClick={() => setState(prev => ({ ...prev, activeView: 'add-task' }))}
+                          >
+                            Create Custom Task
+                          </button>
+                        </div>
+                      ) : (
+                        state.suggestions.map(suggestion => (
+                          <SuggestionCard
+                            key={suggestion.id}
+                            suggestion={suggestion}
+                            onExecute={handleExecuteSuggestion}
+                            isExecuting={executingTask === suggestion.id}
+                          />
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <CategorizedSuggestions
+                      categorizedSuggestions={state.categorizedSuggestions}
+                      onExecute={handleExecuteSuggestion}
+                      executingTask={executingTask}
+                    />
+                  )}
                 </div>
               )}
             </>
