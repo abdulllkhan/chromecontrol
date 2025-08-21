@@ -15,6 +15,7 @@ import {
   CustomPattern,
   ValidationUtils
 } from '../types/index.js';
+import { securityManager } from './securityManager.js';
 
 // ============================================================================
 // BUILT-IN WEBSITE PATTERNS
@@ -558,18 +559,21 @@ export class PatternEngine {
     // Categorize website
     const categorization = WebsiteCategorizer.categorizeByDomain(urlAnalysis.domain);
     
+    // Use SecurityManager for more comprehensive security level detection
+    const securityLevel = securityManager.validateWebsitePermissions(urlAnalysis.domain);
+    
     // Check for custom pattern matches
     const customMatches = this.customPatternMatcher.findMatchingPatterns(url);
     
     // Use custom category if available and has higher confidence
     let finalCategory = categorization.category;
-    let finalSecurityLevel = categorization.securityLevel;
+    let finalSecurityLevel = securityLevel; // Use SecurityManager's assessment
     
     if (customMatches.length > 0) {
       // Use the first custom match (could be enhanced with priority system)
       finalCategory = customMatches[0].category;
-      // Keep the more restrictive security level
-      if (categorization.securityLevel === SecurityLevel.RESTRICTED) {
+      // Keep the more restrictive security level between SecurityManager and built-in patterns
+      if (securityLevel === SecurityLevel.RESTRICTED || categorization.securityLevel === SecurityLevel.RESTRICTED) {
         finalSecurityLevel = SecurityLevel.RESTRICTED;
       }
     }

@@ -14,6 +14,7 @@ import {
   WebsiteContext,
   ValidationUtils
 } from '../types/index.js';
+import { securityManager, SecurityWarning } from './securityManager.js';
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -106,6 +107,15 @@ export class AIService {
       throw new AIError('Invalid AI request format', 'INVALID_REQUEST');
     }
 
+    // Generate security warnings
+    const warnings = securityManager.generateSecurityWarnings(request.context, request);
+    
+    // Check if request should be blocked due to security concerns
+    const errorWarning = warnings.find(w => w.level === 'error');
+    if (errorWarning) {
+      throw new AIError(errorWarning.message, errorWarning.code);
+    }
+
     // Sanitize request content for security
     const sanitizedRequest = this.sanitizeRequest(request);
 
@@ -113,7 +123,13 @@ export class AIService {
       const queuedRequest: QueuedRequest = {
         id: this.generateRequestId(),
         request: sanitizedRequest,
-        resolve,
+        resolve: (response: AIResponse) => {
+          // Add security warnings to response metadata if any
+          if (warnings.length > 0) {
+            (response as any).securityWarnings = warnings;
+          }
+          resolve(response);
+        },
         reject,
         timestamp: new Date(),
         retryCount: 0
@@ -616,49 +632,64 @@ export class AIService {
   }
 
   /**
-   * Sanitize request to remove sensitive information
+   * Sanitize request to remove sensitive information using SecurityManager
    */
   private sanitizeRequest(request: AIRequest): AIRequest {
     const sanitized = { ...request };
     
-    // Remove sensitive data based on security constraints
-    if (!request.constraints.allowSensitiveData) {
-      // Remove potential passwords, credit cards, etc.
-      sanitized.prompt = this.removeSensitiveData(request.prompt);
-      
-      if (sanitized.userInput) {
-        sanitized.userInput = ValidationUtils.sanitizeUserInput(sanitized.userInput);
-      }
+    // Use SecurityManager for comprehensive sanitization
+    if (securityManager.containsSensitiveData(request.prompt)) {
+      // Apply security-level appropriate sanitization
+      const securityLevel = request.context.securityLevel;
+      sanitized.prompt = this.applySanitization(request.prompt, securityLevel);
     }
     
-    // Limit content length
-    if (sanitized.prompt.length > request.constraints.maxContentLength) {
-      sanitized.prompt = sanitized.prompt.slice(0, request.constraints.maxContentLength) + '...';
+    // Sanitize user input
+    if (sanitized.userInput) {
+      sanitized.userInput = ValidationUtils.sanitizeUserInput(sanitized.userInput);
+    }
+    
+    // Apply security constraints
+    const constraints = securityManager.createSecurityConstraints(request.context);
+    sanitized.constraints = { ...request.constraints, ...constraints };
+    
+    // Limit content length based on security constraints
+    if (sanitized.prompt.length > sanitized.constraints.maxContentLength) {
+      sanitized.prompt = sanitized.prompt.slice(0, sanitized.constraints.maxContentLength) + '... [TRUNCATED FOR SECURITY]';
     }
     
     return sanitized;
   }
 
   /**
-   * Remove sensitive data patterns from text
+   * Apply sanitization based on security level
    */
-  private removeSensitiveData(text: string): string {
+  private applySanitization(text: string, securityLevel: any): string {
+    // Use the same patterns as SecurityManager but simplified for AI service
     let sanitized = text;
     
-    // Remove potential credit card numbers
-    sanitized = sanitized.replace(/\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g, '[CREDIT_CARD]');
+    // Remove credit card numbers
+    sanitized = sanitized.replace(/\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g, '[CREDIT_CARD_REDACTED]');
     
-    // Remove potential SSNs
-    sanitized = sanitized.replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[SSN]');
+    // Remove SSNs
+    sanitized = sanitized.replace(/\b\d{3}-?\d{2}-?\d{4}\b/g, '[SSN_REDACTED]');
     
-    // Remove potential phone numbers
-    sanitized = sanitized.replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[PHONE]');
+    // Remove phone numbers
+    sanitized = sanitized.replace(/\b(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}\b/g, '[PHONE_REDACTED]');
     
-    // Remove potential email addresses (keep domain for context)
-    sanitized = sanitized.replace(/\b[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Z|a-z]{2,})\b/g, '[EMAIL]@$1');
+    // Remove email addresses (but keep domain for context)
+    sanitized = sanitized.replace(/\b[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Z|a-z]{2,})\b/g, '[EMAIL_REDACTED]@$1');
+    
+    // Remove API keys and tokens
+    sanitized = sanitized.replace(/\b(?:api[_-]?key|token|secret)[_-]?[:=]\s*['""]?[a-zA-Z0-9_-]{16,}['""]?\b/gi, '[API_KEY_REDACTED]');
+    
+    // Remove passwords
+    sanitized = sanitized.replace(/\b(?:password|passwd|pwd)[_-]?[:=]\s*['""]?[^\s'"",]{6,}['""]?\b/gi, '[PASSWORD_REDACTED]');
     
     return sanitized;
   }
+
+
 
   /**
    * Handle and categorize errors
