@@ -1,5 +1,6 @@
 // Content script for the Agentic Chrome Extension
-import type { PageContent, FormElement, LinkElement, AutomationStep, AutomationResult } from '../types';
+import type { PageContent, FormElement, LinkElement, AutomationStep, AutomationResult, SecurityLevel } from '../types';
+import { AutomationEngine, AutomationPermissions, PageContext } from '../services/automationEngine';
 
 console.log('Agentic Chrome Extension content script loaded on:', window.location.href);
 
@@ -456,66 +457,112 @@ function waitForCondition(condition: { type: string; value: string | number }): 
   });
 }
 
+// ============================================================================
+// AUTOMATION ENGINE INTEGRATION
+// ============================================================================
+
+// Initialize automation engine
+const automationEngine = new AutomationEngine();
+
 /**
- * Executes a series of automation steps
+ * Gets the current page context for automation
  */
-async function executeAutomationSteps(steps: AutomationStep[]): Promise<AutomationResult> {
-  const result: AutomationResult = {
-    success: false,
-    completedSteps: 0,
-    extractedData: {}
-  };
+function getPageContext(): PageContext {
+  const hasSensitive = detectSensitiveContent();
   
-  try {
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
-      let stepSuccess = false;
-      
-      switch (step.type) {
-        case 'click':
-          stepSuccess = clickElement(step.selector);
-          break;
-        case 'type':
-          if (step.value) {
-            stepSuccess = typeIntoElement(step.selector, step.value);
-          }
-          break;
-        case 'select':
-          if (step.value) {
-            stepSuccess = selectOption(step.selector, step.value);
-          }
-          break;
-        case 'wait':
-          if (step.waitCondition) {
-            stepSuccess = await waitForCondition(step.waitCondition);
-          }
-          break;
-        case 'extract':
-          const extractedValue = extractFromElement(step.selector);
-          if (extractedValue !== null) {
-            result.extractedData![step.selector] = extractedValue;
-            stepSuccess = true;
-          }
-          break;
-      }
-      
-      if (!stepSuccess) {
-        result.error = `Failed to execute step ${i + 1}: ${step.description}`;
-        return result;
-      }
-      
-      result.completedSteps++;
-      
-      // Small delay between steps to allow for page updates
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
-    result.success = true;
-  } catch (error) {
-    result.error = error instanceof Error ? error.message : 'Unknown error during automation';
+  // Determine security level based on page content and URL
+  let securityLevel: SecurityLevel = SecurityLevel.PUBLIC;
+  
+  if (hasSensitive) {
+    securityLevel = SecurityLevel.CAUTIOUS;
   }
   
-  return result;
+  // Check for high-security domains
+  const highSecurityDomains = ['bank', 'paypal', 'stripe', 'healthcare', 'medical'];
+  const domain = window.location.hostname.toLowerCase();
+  
+  if (highSecurityDomains.some(keyword => domain.includes(keyword))) {
+    securityLevel = SecurityLevel.RESTRICTED;
+  }
+  
+  // Get automation permissions (these would typically come from user settings)
+  const permissions: AutomationPermissions = {
+    allowDOMManipulation: true,
+    allowFormInteraction: !hasSensitive, // Restrict form interaction on sensitive pages
+    allowNavigation: true,
+    allowDataExtraction: true,
+    restrictedDomains: [], // Would be populated from user settings
+    maxExecutionTime: 30000
+  };
+  
+  return {
+    url: window.location.href,
+    domain: window.location.hostname,
+    securityLevel,
+    hasUserGesture: true, // Assume user gesture in content script context
+    permissions
+  };
+}
+
+/**
+ * Executes a series of automation steps using the automation engine
+ */
+async function executeAutomationSteps(steps: AutomationStep[]): Promise<AutomationResult> {
+  try {
+    const pageContext = getPageContext();
+    
+    // Set up progress callback to report to background script
+    automationEngine.setProgressCallback((progress) => {
+      chrome.runtime.sendMessage({
+        type: 'AUTOMATION_PROGRESS',
+        progress
+      }).catch(() => {
+        // Ignore errors if background script is not ready
+      });
+    });
+    
+    const result = await automationEngine.executeSteps(steps, pageContext);
+    
+    // Convert result format to match expected interface
+    return {
+      success: result.success,
+      completedSteps: result.completedSteps,
+      extractedData: result.extractedData,
+      error: result.error,
+      executionTime: result.executionTime,
+      stepResults: result.stepResults
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      completedSteps: 0,
+      extractedData: {},
+      error: error instanceof Error ? error.message : 'Unknown error during automation',
+      executionTime: 0,
+      stepResults: []
+    };
+  }
+}
+
+/**
+ * Aborts current automation execution
+ */
+function abortAutomation(): boolean {
+  try {
+    automationEngine.abortExecution();
+    return true;
+  } catch (error) {
+    console.error('Failed to abort automation:', error);
+    return false;
+  }
+}
+
+/**
+ * Checks if automation is currently running
+ */
+function isAutomationRunning(): boolean {
+  return automationEngine.isCurrentlyExecuting();
 }
 
 // ============================================================================
@@ -692,6 +739,56 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
           });
         return true; // Keep message channel open for async response
+      } else {
+        sendResponse({ success: false, error: 'Invalid automation steps' });
+      }
+      break;
+      
+    case 'ABORT_AUTOMATION':
+      try {
+        const success = abortAutomation();
+        sendResponse({ success });
+      } catch (error) {
+        sendResponse({ 
+          success: false, 
+          error: error instanceof Error ? error.message : 'Failed to abort automation' 
+        });
+      }
+      break;
+      
+    case 'CHECK_AUTOMATION_STATUS':
+      try {
+        const isRunning = isAutomationRunning();
+        sendResponse({ success: true, isRunning });
+      } catch (error) {
+        sendResponse({ 
+          success: false, 
+          error: error instanceof Error ? error.message : 'Failed to check automation status' 
+        });
+      }
+      break;
+      
+    case 'VALIDATE_AUTOMATION_PERMISSIONS':
+      if (request.steps && Array.isArray(request.steps)) {
+        try {
+          const pageContext = getPageContext();
+          automationEngine.validatePermissions(request.steps, pageContext)
+            .then(valid => {
+              sendResponse({ success: true, valid });
+            })
+            .catch(error => {
+              sendResponse({ 
+                success: false, 
+                error: error instanceof Error ? error.message : 'Permission validation failed' 
+              });
+            });
+          return true; // Keep message channel open for async response
+        } catch (error) {
+          sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to validate permissions' 
+          });
+        }
       } else {
         sendResponse({ success: false, error: 'Invalid automation steps' });
       }

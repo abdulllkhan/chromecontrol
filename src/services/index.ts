@@ -22,6 +22,10 @@ export * from './suggestionEngine.js';
 // Migration service
 export * from './migrations.js';
 
+// Automation engine service
+export * from './automationEngine.js';
+
 // Service examples (for development and testing)
 export * from './patternEngineExample.js';
 export * from './aiServiceExample.js';
+export * from './automationEngineExample.js';
