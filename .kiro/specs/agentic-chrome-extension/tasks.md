@@ -35,14 +35,14 @@
   - Add support for custom website pattern matching
   - _Requirements: 1.1, 1.2, 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 6. Create content script for page analysis and DOM interaction
+- [x] 6. Create content script for page analysis and DOM interaction
   - Implement page content extraction (headings, text, forms, links)
   - Add DOM manipulation utilities for automation
   - Create secure content sanitization functions
   - Implement page change detection using MutationObserver
   - _Requirements: 1.1, 1.4, 5.2, 5.3, 10.1_
 
-- [ ] 7. Build AI agent integration service
+- [-] 7. Build AI agent integration service
   - Implement OpenAI API client with error handling
   - Create request/response processing pipeline
   - Add support for streaming responses
