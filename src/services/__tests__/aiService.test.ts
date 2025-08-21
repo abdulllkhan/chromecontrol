@@ -179,8 +179,8 @@ describe('AIService', () => {
       const requestBody = JSON.parse(fetchCall[1].body);
       const sentPrompt = requestBody.messages[0].content;
       
-      expect(sentPrompt).toContain('[CREDIT_CARD]');
-      expect(sentPrompt).toContain('[SSN]');
+      expect(sentPrompt).toContain('[CREDIT_CARD_REDACTED]');
+      expect(sentPrompt).toContain('[SSN_REDACTED]');
     });
   });
 
