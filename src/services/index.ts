@@ -16,6 +16,9 @@ export * from './aiService.js';
 // Task management service
 export * from './taskManager.js';
 
+// Suggestion engine service
+export * from './suggestionEngine.js';
+
 // Migration service
 export * from './migrations.js';
 
