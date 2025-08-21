@@ -469,8 +469,13 @@ export const ValidationUtils = {
       throw new ValidationError('type must be one of: click, type, select, wait, extract', 'type');
     }
 
-    if (!s.selector || typeof s.selector !== 'string' || s.selector.trim().length === 0) {
+    // Selector can be empty for wait steps that use waitCondition
+    if (s.type !== 'wait' && (!s.selector || typeof s.selector !== 'string' || s.selector.trim().length === 0)) {
       throw new ValidationError('selector must be a non-empty string', 'selector');
+    }
+    
+    if (s.type === 'wait' && typeof s.selector !== 'string') {
+      throw new ValidationError('selector must be a string for wait steps', 'selector');
     }
 
     if (s.value !== undefined && typeof s.value !== 'string') {
