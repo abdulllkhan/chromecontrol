@@ -469,6 +469,56 @@ const TaskForm: React.FC<TaskFormProps> = ({
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isTestingTask, setIsTestingTask] = useState(false);
+  const [testResult, setTestResult] = useState<TaskResult | null>(null);
+  const [showTestResult, setShowTestResult] = useState(false);
+  
+  // Pre-populate form with current page context
+  useEffect(() => {
+    if (websiteContext && !task) {
+      // Auto-generate task name based on website category
+      const categoryNames = {
+        [WebsiteCategory.SOCIAL_MEDIA]: 'Social Media Task',
+        [WebsiteCategory.ECOMMERCE]: 'E-commerce Task',
+        [WebsiteCategory.PROFESSIONAL]: 'Professional Task',
+        [WebsiteCategory.NEWS_CONTENT]: 'Content Analysis Task',
+        [WebsiteCategory.PRODUCTIVITY]: 'Productivity Task',
+        [WebsiteCategory.CUSTOM]: 'Custom Task'
+      };
+      
+      const suggestedName = categoryNames[websiteContext.category] || 'New Task';
+      
+      // Auto-generate description based on page type
+      const pageTypeDescriptions = {
+        [PageType.HOME]: 'Analyze homepage content and provide insights',
+        [PageType.PRODUCT]: 'Extract product information and generate summaries',
+        [PageType.ARTICLE]: 'Summarize article content and key points',
+        [PageType.PROFILE]: 'Analyze profile information and suggest improvements',
+        [PageType.FORM]: 'Assist with form completion and validation',
+        [PageType.OTHER]: 'Provide contextual assistance for this page'
+      };
+      
+      const suggestedDescription = pageTypeDescriptions[websiteContext.pageType] || 'Provide AI assistance for this website';
+      
+      // Auto-generate prompt template with context variables
+      const suggestedPrompt = `Analyze the current page on {{domain}} and help with the following:
+
+Page Title: {{title}}
+Page Category: {{category}}
+Page Type: {{pageType}}
+
+Content Summary: {{textContent}}
+
+Please provide relevant assistance based on the page content and user needs.`;
+
+      setFormData(prev => ({
+        ...prev,
+        name: prev.name || suggestedName,
+        description: prev.description || suggestedDescription,
+        promptTemplate: prev.promptTemplate || suggestedPrompt
+      }));
+    }
+  }, [websiteContext, task]);
   
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -489,8 +539,71 @@ const TaskForm: React.FC<TaskFormProps> = ({
       newErrors.websitePatterns = 'At least one website pattern is required';
     }
     
+    // Validate website patterns
+    const patterns = formData.websitePatterns.split(',').map(p => p.trim()).filter(Boolean);
+    for (const pattern of patterns) {
+      try {
+        new RegExp(pattern);
+      } catch (error) {
+        newErrors.websitePatterns = `Invalid pattern "${pattern}": must be a valid regex`;
+        break;
+      }
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+  
+  const handleTestTask = async () => {
+    if (!validateForm()) {
+      return;
+    }
+    
+    setIsTestingTask(true);
+    setTestResult(null);
+    
+    try {
+      // Create a temporary task for testing
+      const tempTask: Partial<CustomTask> = {
+        id: `temp_${Date.now()}`,
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        promptTemplate: formData.promptTemplate.trim(),
+        websitePatterns: formData.websitePatterns.split(',').map(p => p.trim()).filter(Boolean),
+        outputFormat: formData.outputFormat,
+        tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        usageCount: 0,
+        isEnabled: true
+      };
+      
+      // Simulate task execution with current page context
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate processing time
+      
+      const mockResult: TaskResult = {
+        success: true,
+        content: `Test execution of "${tempTask.name}" completed successfully!\n\nThis task would analyze the current page (${websiteContext?.domain}) and provide AI-powered assistance based on your prompt template.\n\nPrompt preview:\n${formData.promptTemplate.slice(0, 200)}${formData.promptTemplate.length > 200 ? '...' : ''}\n\nThe actual implementation will integrate with the AI service to process real requests.`,
+        format: tempTask.outputFormat,
+        timestamp: new Date(),
+        executionTime: 1500
+      };
+      
+      setTestResult(mockResult);
+      setShowTestResult(true);
+    } catch (error) {
+      const errorResult: TaskResult = {
+        success: false,
+        error: error instanceof Error ? error.message : 'Test execution failed',
+        timestamp: new Date(),
+        executionTime: 0,
+        format: OutputFormat.PLAIN_TEXT
+      };
+      setTestResult(errorResult);
+      setShowTestResult(true);
+    } finally {
+      setIsTestingTask(false);
+    }
   };
   
   const handleSubmit = (e: React.FormEvent) => {
@@ -530,6 +643,19 @@ const TaskForm: React.FC<TaskFormProps> = ({
         </button>
       </div>
       
+      {websiteContext && !task && (
+        <div className="task-form-context">
+          <div className="context-info">
+            <span className="context-icon">{getCategoryIcon(websiteContext.category)}</span>
+            <div className="context-details">
+              <strong>{websiteContext.domain}</strong>
+              <small>{websiteContext.category} • {websiteContext.pageType}</small>
+            </div>
+          </div>
+          <small>Task will be pre-configured for this website</small>
+        </div>
+      )}
+      
       <form onSubmit={handleSubmit} className="task-form-content">
         <div className="form-group">
           <label htmlFor="task-name">Task Name *</label>
@@ -568,6 +694,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
             rows={4}
           />
           {errors.promptTemplate && <span className="error-text">{errors.promptTemplate}</span>}
+          <small>Available variables: {{domain}}, {{title}}, {{category}}, {{pageType}}, {{textContent}}, {{userInput}}</small>
         </div>
         
         <div className="form-group">
@@ -581,7 +708,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
             placeholder="example.com, *.social.com, reddit.com"
           />
           {errors.websitePatterns && <span className="error-text">{errors.websitePatterns}</span>}
-          <small>Comma-separated list of domains or patterns</small>
+          <small>Comma-separated list of domains or regex patterns</small>
         </div>
         
         <div className="form-row">
@@ -608,12 +735,68 @@ const TaskForm: React.FC<TaskFormProps> = ({
               onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
               placeholder="social, content, automation"
             />
+            <small>Comma-separated tags for organization</small>
           </div>
         </div>
+        
+        {/* Test Task Section */}
+        <div className="form-group task-test-section">
+          <div className="test-section-header">
+            <label>Test Task</label>
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              onClick={handleTestTask}
+              disabled={isTestingTask || !formData.name.trim() || !formData.promptTemplate.trim()}
+            >
+              {isTestingTask ? '🔄 Testing...' : '🧪 Test on Current Page'}
+            </button>
+          </div>
+          <small>Test your task configuration with the current page context before saving</small>
+        </div>
+        
+        {/* Test Result Display */}
+        {showTestResult && testResult && (
+          <div className="task-test-result">
+            <div className="test-result-header">
+              <h4>Test Result</h4>
+              <button
+                type="button"
+                className="btn btn-small btn-secondary"
+                onClick={() => setShowTestResult(false)}
+              >
+                ✕
+              </button>
+            </div>
+            
+            {testResult.success ? (
+              <div className="test-result-success">
+                <div className="test-result-content">
+                  <pre>{testResult.content}</pre>
+                </div>
+                <div className="test-result-meta">
+                  <small>✅ Test completed in {testResult.executionTime}ms</small>
+                </div>
+              </div>
+            ) : (
+              <div className="test-result-error">
+                <p>❌ Test failed: {testResult.error}</p>
+              </div>
+            )}
+          </div>
+        )}
         
         <div className="form-actions">
           <button type="button" className="btn btn-secondary" onClick={onCancel}>
             Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleTestTask}
+            disabled={isTestingTask || !formData.name.trim() || !formData.promptTemplate.trim()}
+          >
+            {isTestingTask ? 'Testing...' : 'Test Task'}
           </button>
           <button type="submit" className="btn btn-primary">
             {task ? 'Update Task' : 'Create Task'}

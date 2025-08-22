@@ -603,6 +603,42 @@
       color: #111827;
     }
     
+    .task-form-context {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+    
+    .context-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    
+    .context-icon {
+      font-size: 16px;
+    }
+    
+    .context-details strong {
+      display: block;
+      font-size: 14px;
+      color: #0c4a6e;
+    }
+    
+    .context-details small {
+      font-size: 12px;
+      color: #0369a1;
+      text-transform: capitalize;
+    }
+    
+    .task-form-context > small {
+      font-size: 12px;
+      color: #0369a1;
+    }
+    
     .task-form-content {
       display: flex;
       flex-direction: column;
@@ -670,6 +706,86 @@
       font-weight: 500;
     }
     
+    .task-test-section {
+      border-top: 1px solid #e5e7eb;
+      padding-top: 16px;
+      margin-top: 16px;
+    }
+    
+    .test-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    
+    .test-section-header label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+    }
+    
+    .task-test-result {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+    
+    .test-result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background: #f3f4f6;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .test-result-header h4 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: #111827;
+    }
+    
+    .test-result-success {
+      padding: 12px;
+    }
+    
+    .test-result-content {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    
+    .test-result-content pre {
+      margin: 0;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #374151;
+    }
+    
+    .test-result-meta {
+      font-size: 12px;
+      color: #059669;
+    }
+    
+    .test-result-error {
+      padding: 12px;
+      color: #dc2626;
+    }
+    
+    .test-result-error p {
+      margin: 0;
+      font-size: 13px;
+    }
+    
     .form-actions {
       display: flex;
       gap: 8px;
@@ -723,6 +839,6 @@
       <div class="loading-text">Loading Agentic Extension...</div>
     </div>
   </div>
-  <script src="dist/popup.js"></script>
+  <script type="module" src="dist/popup.js"></script>
 </body>
 </html>

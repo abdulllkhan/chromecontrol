@@ -298,7 +298,7 @@ export class ChromeStorageService {
     
     const result = await storageArea.get(key);
     
-    if (!result[key]) {
+    if (!result || result[key] === undefined) {
       return null;
     }
 

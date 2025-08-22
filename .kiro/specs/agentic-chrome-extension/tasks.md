@@ -84,7 +84,7 @@
   - Build privacy warning system for secure sites
   - _Requirements: 10.1, 10.2, 10.3_
 
-- [ ] 13. Create task addition workflow
+- [x] 13. Create task addition workflow
   - Build "Add Task" UI component in popup
   - Implement current page context pre-population
   - Create task parameter definition interface

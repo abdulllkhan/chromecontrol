@@ -622,11 +622,21 @@ describe('TaskManager', () => {
       });
 
       it('should handle individual task test failures', async () => {
+        const validTask = createMockTask({ id: 'valid-task' });
+        const invalidTask = createMockTask({ id: 'invalid-task', name: '' });
         const tasks = {
-          'valid-task': createMockTask({ id: 'valid-task' }),
-          'invalid-task': createMockTask({ id: 'invalid-task', name: '' })
+          'valid-task': validTask,
+          'invalid-task': invalidTask
         };
         vi.spyOn(mockStorageService, 'getAllCustomTasks').mockResolvedValue(tasks);
+        
+        // Mock individual task retrieval for validation
+        vi.spyOn(mockStorageService, 'getCustomTask')
+          .mockImplementation((taskId: string) => {
+            if (taskId === 'valid-task') return Promise.resolve(validTask);
+            if (taskId === 'invalid-task') return Promise.resolve(invalidTask);
+            return Promise.resolve(null);
+          });
 
         const results = await taskManager.testAllTasks();
 
