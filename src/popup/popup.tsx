@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import ErrorBoundary from '../components/ErrorBoundary';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { FullTaskManagement } from '../components/TaskManagement';
 import { 
   Suggestion, 
   CustomTask, 
@@ -23,6 +24,7 @@ import { PatternEngine } from '../services/patternEngine';
 import { TaskManager } from '../services/taskManager';
 import { ChromeStorageService } from '../services/storage';
 import { AIService } from '../services/aiService';
+import '../styles/TaskManagement.css';
 
 // ============================================================================
 // INTERFACES
@@ -34,7 +36,7 @@ interface PopupState {
   suggestions: PrioritizedSuggestion[];
   websiteContext: WebsiteContext | null;
   pageContent: PageContent | null;
-  activeView: 'suggestions' | 'task-management' | 'add-task';
+  activeView: 'suggestions' | 'task-management' | 'add-task' | 'full-task-management';
   customTasks: CustomTask[];
   selectedTask: CustomTask | null;
   taskResult: TaskResult | null;
@@ -924,6 +926,8 @@ export const PopupApp: React.FC = () => {
   
   const [executingTask, setExecutingTask] = useState<string | null>(null);
   const [suggestionEngine, setSuggestionEngine] = useState<SuggestionEngine | null>(null);
+  const [taskManager, setTaskManager] = useState<TaskManager | null>(null);
+  const [storageService, setStorageService] = useState<ChromeStorageService | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'categorized'>('list');
   
   // Initialize popup data
@@ -978,6 +982,8 @@ export const PopupApp: React.FC = () => {
         });
 
         setSuggestionEngine(engine);
+        setTaskManager(taskManager);
+        setStorageService(storageService);
 
         // Extract page content (mock for now - will be replaced with content script)
         const mockPageContent: PageContent = {
@@ -1338,12 +1344,31 @@ export const PopupApp: React.FC = () => {
           )}
           
           {state.activeView === 'task-management' && (
-            <TaskManagement
-              tasks={state.customTasks}
-              onEdit={(task) => setState(prev => ({ ...prev, selectedTask: task, activeView: 'add-task' }))}
-              onDelete={handleDeleteTask}
-              onToggle={handleToggleTask}
-              onAddNew={() => setState(prev => ({ ...prev, activeView: 'add-task', selectedTask: null }))}
+            <div className="simple-task-management">
+              <div className="task-management-header">
+                <h3>Quick Task Management</h3>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setState(prev => ({ ...prev, activeView: 'full-task-management' }))}
+                >
+                  📚 Full Library
+                </button>
+              </div>
+              <TaskManagement
+                tasks={state.customTasks}
+                onEdit={(task) => setState(prev => ({ ...prev, selectedTask: task, activeView: 'add-task' }))}
+                onDelete={handleDeleteTask}
+                onToggle={handleToggleTask}
+                onAddNew={() => setState(prev => ({ ...prev, activeView: 'add-task', selectedTask: null }))}
+              />
+            </div>
+          )}
+
+          {state.activeView === 'full-task-management' && taskManager && storageService && (
+            <FullTaskManagement
+              taskManager={taskManager}
+              storageService={storageService}
+              onClose={() => setState(prev => ({ ...prev, activeView: 'suggestions' }))}
             />
           )}
           
