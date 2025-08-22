@@ -4,8 +4,9 @@
   "description": "Intelligent Chrome extension that provides contextual AI-powered suggestions",
   "type": "module",
   "scripts": {
-    "dev": "vite build --watch",
-    "build": "vite build",
+    "dev": "vite build --watch && npm run copy-content",
+    "build": "vite build && npm run copy-content",
+    "copy-content": "cp src/content/content-simple.js dist/content.js",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",

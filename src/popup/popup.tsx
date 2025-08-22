@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import ErrorBoundary from '../components/ErrorBoundary';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { FullTaskManagement } from '../components/TaskManagement';
+import UserPreferencesComponent from '../components/UserPreferences';
 import { 
   Suggestion, 
   CustomTask, 
@@ -25,6 +26,7 @@ import { TaskManager } from '../services/taskManager';
 import { ChromeStorageService } from '../services/storage';
 import { AIService } from '../services/aiService';
 import '../styles/TaskManagement.css';
+import '../styles/UserPreferences.css';
 
 // ============================================================================
 // INTERFACES
@@ -36,7 +38,7 @@ interface PopupState {
   suggestions: PrioritizedSuggestion[];
   websiteContext: WebsiteContext | null;
   pageContent: PageContent | null;
-  activeView: 'suggestions' | 'task-management' | 'add-task' | 'full-task-management';
+  activeView: 'suggestions' | 'task-management' | 'add-task' | 'full-task-management' | 'settings';
   customTasks: CustomTask[];
   selectedTask: CustomTask | null;
   taskResult: TaskResult | null;
@@ -1257,6 +1259,12 @@ export const PopupApp: React.FC = () => {
           >
             Tasks ({state.customTasks.length})
           </button>
+          <button
+            className={`nav-btn ${state.activeView === 'settings' ? 'active' : ''}`}
+            onClick={() => setState(prev => ({ ...prev, activeView: 'settings', selectedTask: null }))}
+          >
+            ⚙️ Settings
+          </button>
         </div>
         
         {/* Content */}
@@ -1382,6 +1390,12 @@ export const PopupApp: React.FC = () => {
                 activeView: state.selectedTask ? 'task-management' : 'suggestions',
                 selectedTask: null 
               }))}
+            />
+          )}
+
+          {state.activeView === 'settings' && (
+            <UserPreferencesComponent
+              onClose={() => setState(prev => ({ ...prev, activeView: 'suggestions' }))}
             />
           )}
         </div>

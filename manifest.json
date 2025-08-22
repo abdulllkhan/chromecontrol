@@ -45,7 +45,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["dist/*"],
+      "resources": ["dist/*", "dist/chunks/*"],
       "matches": ["<all_urls>"]
     }
   ],

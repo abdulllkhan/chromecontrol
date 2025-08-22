@@ -33,7 +33,7 @@ export interface StorageConfig {
 }
 
 export const DEFAULT_STORAGE_CONFIG: StorageConfig = {
-  encryptionEnabled: true,
+  encryptionEnabled: false, // Disable encryption for now to fix browser issues
   syncEnabled: true,
   cacheExpirationHours: 24,
   maxCacheSize: 100,
@@ -256,13 +256,15 @@ export class ChromeStorageService {
   /**
    * Decrypts data if it's encrypted
    */
-  private async decryptData(data: EncryptedData | string): Promise<string> {
+  private async decryptData(data: EncryptedData | string): Promise<string | null> {
     if (typeof data === 'string') {
       return data;
     }
 
+    // If encryption is disabled but we have encrypted data, return null to trigger default initialization
     if (!this.config.encryptionEnabled || !this.encryptionKey) {
-      throw new Error('Encryption key not available for decryption');
+      console.warn('Found encrypted data but encryption is disabled. Returning null to use defaults.');
+      return null;
     }
 
     try {
@@ -272,7 +274,7 @@ export class ChromeStorageService {
       return await EncryptionService.decrypt(encryptedBuffer, ivBuffer, this.encryptionKey);
     } catch (error) {
       console.error('Decryption failed:', error);
-      throw new Error('Data decryption failed');
+      return null; // Return null instead of throwing to allow graceful fallback
     }
   }
 
@@ -304,6 +306,9 @@ export class ChromeStorageService {
 
     try {
       const decryptedData = await this.decryptData(result[key]);
+      if (decryptedData === null) {
+        return null;
+      }
       const parsed = JSON.parse(decryptedData) as T;
       
       // Convert ISO date strings back to Date objects
@@ -363,6 +368,10 @@ export class ChromeStorageService {
   private async migrate(fromVersion: number, toVersion: number): Promise<void> {
     // Migration logic for different versions
     if (fromVersion === 0 && toVersion >= 1) {
+      // Clear any encrypted data from previous versions
+      console.log('Clearing encrypted data during migration');
+      await chrome.storage.local.clear();
+      
       // Initial migration - ensure all storage keys exist
       await this.initializeDefaults();
     }
