@@ -16,14 +16,13 @@ export default defineConfig(({ command, mode }) => {
         input: {
           popup: resolve(__dirname, 'src/popup/popup.tsx'),
           background: resolve(__dirname, 'src/background/background.ts'),
-          content: resolve(__dirname, 'src/content/content.ts'),
+          // Skip content script from Vite build - use simple JS version
         },
         output: {
           entryFileNames: '[name].js',
-          chunkFileNames: '[name].js',
           assetFileNames: '[name].[ext]',
-          format: 'es', // Use ES modules
-        },
+          format: 'es',
+        }
       },
       target: 'es2020',
       minify: false, // Keep readable for development

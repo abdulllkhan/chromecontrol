@@ -28,6 +28,9 @@ export * from './automationEngine.js';
 // Security manager service
 export * from './securityManager.js';
 
+// Preferences service
+export * from './preferencesService.js';
+
 // Service examples (for development and testing)
 export * from './patternEngineExample.js';
 export * from './aiServiceExample.js';
