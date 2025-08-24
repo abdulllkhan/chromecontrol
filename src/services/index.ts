@@ -37,6 +37,13 @@ export * from './errorHandler.js';
 // Fallback suggestions service
 export * from './fallbackSuggestions.js';
 
+// Performance optimization services
+export * from './cacheService.js';
+export * from './performanceMonitor.js';
+export * from './lazyLoader.js';
+export * from './optimizedDOMService.js';
+export * from './performanceOptimizer.js';
+
 // Service examples (for development and testing)
 export * from './patternEngineExample.js';
 export * from './aiServiceExample.js';
