@@ -18,6 +18,7 @@ import {
 
 import { PatternEngine } from './patternEngine.js';
 import { TaskManager } from './taskManager.js';
+import { fallbackSuggestions, FallbackSuggestionsService } from './fallbackSuggestions.js';
 
 // ============================================================================
 // SUGGESTION ENGINE INTERFACES
@@ -129,7 +130,9 @@ export class SuggestionGenerator {
 
     } catch (error) {
       console.error('Failed to generate suggestions:', error);
-      return [];
+      
+      // Return fallback suggestions if available
+      return this.getFallbackSuggestions(context);
     }
   }
 
@@ -669,10 +672,12 @@ export class SuggestionFilter {
 export class SuggestionEngine {
   private generator: SuggestionGenerator;
   private filter: typeof SuggestionFilter;
+  private fallbackService: FallbackSuggestionsService;
 
   constructor(config: SuggestionEngineConfig) {
     this.generator = new SuggestionGenerator(config);
     this.filter = SuggestionFilter;
+    this.fallbackService = fallbackSuggestions;
   }
 
   /**
@@ -713,6 +718,35 @@ export class SuggestionEngine {
   }> {
     const suggestions = await this.generator.generateSuggestions(context);
     return this.filter.getFilterOptions(suggestions);
+  }
+
+  /**
+   * Get fallback suggestions when AI is unavailable
+   */
+  private getFallbackSuggestions(context: SuggestionContext): PrioritizedSuggestion[] {
+    const fallbackSuggestions = this.fallbackService.getFallbackSuggestions(context.websiteContext);
+    
+    return fallbackSuggestions.map(suggestion => ({
+      ...suggestion,
+      priority: 0.5, // Lower priority than AI suggestions
+      relevanceScore: this.calculateRelevanceScore(suggestion, context.websiteContext),
+      source: 'fallback' as const,
+      matchingPatterns: []
+    }));
+  }
+
+  /**
+   * Check if AI service is available
+   */
+  async checkAIAvailability(): Promise<boolean> {
+    return this.fallbackService.checkAIAvailability();
+  }
+
+  /**
+   * Get offline status
+   */
+  getOfflineStatus() {
+    return this.fallbackService.getOfflineStatus();
   }
 
   /**

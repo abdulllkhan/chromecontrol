@@ -307,18 +307,16 @@ export class AIService {
   }
 
   /**
-   * Execute individual AI request
+   * Execute individual AI request with retry logic
    */
   private async executeRequest(request: AIRequest): Promise<AIResponse> {
     const prompt = this.buildPrompt(request);
     const apiRequest = this.buildAPIRequest(prompt, request);
 
-    try {
+    return this.retryWithBackoff(async () => {
       const response = await this.makeAPICall(apiRequest);
       return this.parseAPIResponse(response, request);
-    } catch (error) {
-      throw this.handleError(error);
-    }
+    });
   }
 
   /**
@@ -692,7 +690,7 @@ export class AIService {
 
 
   /**
-   * Handle and categorize errors
+   * Handle and categorize errors with enhanced retry logic
    */
   private handleError(error: unknown): AIError {
     if (error instanceof AIError) {
@@ -700,25 +698,101 @@ export class AIService {
     }
 
     if (error instanceof Error) {
-      // Network errors
+      // Network errors - retryable
       if (error.message.includes('fetch') || error.message.includes('network')) {
         return new AIError(`Network error: ${error.message}`, 'NETWORK_ERROR', undefined, true);
       }
 
-      // Timeout errors
+      // Timeout errors - retryable
       if (error.name === 'AbortError' || error.message.includes('timeout')) {
         return new AIError('Request timeout', 'TIMEOUT', undefined, true);
       }
 
-      // Parse errors
+      // Rate limit errors - retryable with delay
+      if (error.message.includes('429') || error.message.includes('rate limit')) {
+        return new AIError('Rate limit exceeded', 'RATE_LIMIT', 429, true);
+      }
+
+      // Server errors (5xx) - retryable
+      if (error.message.includes('500') || error.message.includes('502') || 
+          error.message.includes('503') || error.message.includes('504')) {
+        return new AIError(`Server error: ${error.message}`, 'SERVER_ERROR', undefined, true);
+      }
+
+      // Parse errors - not retryable
       if (error.message.includes('JSON') || error.message.includes('parse')) {
         return new AIError(`Parse error: ${error.message}`, 'PARSE_ERROR');
+      }
+
+      // Authentication errors - not retryable
+      if (error.message.includes('401') || error.message.includes('unauthorized')) {
+        return new AIError('Authentication failed', 'AUTH_ERROR', 401, false);
+      }
+
+      // Client errors (4xx except 429) - not retryable
+      if (error.message.includes('400') || error.message.includes('403') || error.message.includes('404')) {
+        return new AIError(`Client error: ${error.message}`, 'CLIENT_ERROR', undefined, false);
       }
 
       return new AIError(`Unknown error: ${error.message}`, 'UNKNOWN_ERROR');
     }
 
     return new AIError('Unknown error occurred', 'UNKNOWN_ERROR');
+  }
+
+  /**
+   * Enhanced retry logic with exponential backoff and jitter
+   */
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = this.config.maxRetries,
+    baseDelay: number = 1000
+  ): Promise<T> {
+    let lastError: AIError;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = this.handleError(error);
+
+        // Don't retry if error is not retryable
+        if (!lastError.retryable) {
+          throw lastError;
+        }
+
+        // Don't retry if we've reached max attempts
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+
+        // Calculate delay with exponential backoff and jitter
+        const exponentialDelay = baseDelay * Math.pow(2, attempt);
+        const jitter = Math.random() * 0.1 * exponentialDelay; // 10% jitter
+        const delay = exponentialDelay + jitter;
+
+        // Special handling for rate limit errors
+        if (lastError.code === 'RATE_LIMIT') {
+          const rateLimitDelay = this.getRateLimitDelay();
+          await this.sleep(Math.max(delay, rateLimitDelay));
+        } else {
+          await this.sleep(delay);
+        }
+
+        console.log(`Retrying AI request (attempt ${attempt + 1}/${maxRetries}) after ${Math.round(delay)}ms delay`);
+      }
+    }
+
+    throw lastError!;
+  }
+
+  /**
+   * Get appropriate delay for rate limit errors
+   */
+  private getRateLimitDelay(): number {
+    const rateLimitStatus = this.getRateLimitStatus();
+    const resetTime = rateLimitStatus.resetTime.getTime() - Date.now();
+    return Math.max(resetTime, 5000); // At least 5 seconds
   }
 
   /**

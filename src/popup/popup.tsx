@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import ErrorBoundary from '../components/ErrorBoundary';
+import ErrorDisplay from '../components/ErrorDisplay';
 import LoadingSpinner from '../components/LoadingSpinner';
+import useErrorHandler from '../components/useErrorHandler';
 import { FullTaskManagement } from '../components/TaskManagement';
 import UserPreferencesComponent from '../components/UserPreferences';
 import { 
@@ -932,10 +934,20 @@ export const PopupApp: React.FC = () => {
   const [storageService, setStorageService] = useState<ChromeStorageService | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'categorized'>('list');
   
+  // Enhanced error handling
+  const { error: globalError, isRetrying, handleError, retry, clearError, executeWithErrorHandling } = useErrorHandler({
+    onError: (errorReport) => {
+      console.error('Popup error:', errorReport);
+      setState(prev => ({ ...prev, error: errorReport.userFriendlyMessage }));
+    },
+    autoRetry: true,
+    maxRetries: 2
+  });
+  
   // Initialize popup data
   useEffect(() => {
     const initializePopup = async () => {
-      try {
+      return executeWithErrorHandling(async () => {
         setState(prev => ({ ...prev, isLoading: true, error: null }));
         
         // Get current tab info
@@ -1085,10 +1097,9 @@ export const PopupApp: React.FC = () => {
   }, [suggestionEngine, state.websiteContext]);
 
   const handleExecuteSuggestion = useCallback(async (suggestion: PrioritizedSuggestion) => {
-    try {
-      setExecutingTask(suggestion.id);
-      setState(prev => ({ ...prev, error: null }));
-      
+    setExecutingTask(suggestion.id);
+    
+    const result = await executeWithErrorHandling(async () => {
       // Mock task execution - will be replaced with actual task manager execution
       await new Promise(resolve => setTimeout(resolve, suggestion.estimatedTime * 100));
       
@@ -1101,17 +1112,15 @@ export const PopupApp: React.FC = () => {
       };
       
       setState(prev => ({ ...prev, taskResult: mockResult }));
-      
-    } catch (error) {
-      console.error('Failed to execute suggestion:', error);
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to execute task'
-      }));
-    } finally {
-      setExecutingTask(null);
-    }
-  }, []);
+      return mockResult;
+    }, { 
+      component: 'PopupApp', 
+      action: 'executeSuggestion',
+      suggestionId: suggestion.id 
+    });
+    
+    setExecutingTask(null);
+  }, [executeWithErrorHandling]);
   
   const handleCopyContent = useCallback(async (content: string) => {
     const success = await copyToClipboard(content);
@@ -1210,20 +1219,32 @@ export const PopupApp: React.FC = () => {
   }
   
   // Render error state
-  if (state.error) {
+  if (state.error || globalError) {
     return (
       <ErrorBoundary>
         <div className="popup-container">
-          <div className="error-container">
-            <h3>Error</h3>
-            <p>{state.error}</p>
-            <button 
-              className="btn btn-primary"
-              onClick={() => window.location.reload()}
-            >
-              Retry
-            </button>
-          </div>
+          {globalError ? (
+            <ErrorDisplay
+              error={globalError.userFriendlyMessage}
+              type={globalError.type as any}
+              onRetry={globalError.isRetryable ? retry : undefined}
+              onDismiss={clearError}
+              showDetails={true}
+              retryCount={globalError.retryCount}
+              maxRetries={globalError.maxRetries}
+            />
+          ) : (
+            <div className="error-container">
+              <h3>Error</h3>
+              <p>{state.error}</p>
+              <button 
+                className="btn btn-primary"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
       </ErrorBoundary>
     );
