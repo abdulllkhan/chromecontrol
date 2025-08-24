@@ -19,6 +19,8 @@ import {
 import { PatternEngine } from './patternEngine.js';
 import { TaskManager } from './taskManager.js';
 import { fallbackSuggestions, FallbackSuggestionsService } from './fallbackSuggestions.js';
+import { CacheService } from './cacheService.js';
+import { PerformanceMonitor } from './performanceMonitor.js';
 
 // ============================================================================
 // SUGGESTION ENGINE INTERFACES
@@ -30,6 +32,9 @@ export interface SuggestionEngineConfig {
   maxSuggestions: number;
   enableBuiltInSuggestions: boolean;
   enableCustomSuggestions: boolean;
+  enableCaching: boolean;
+  cacheService?: CacheService;
+  performanceMonitor?: PerformanceMonitor;
   priorityWeights: {
     usage: number;
     recency: number;
@@ -84,13 +89,39 @@ export class SuggestionGenerator {
    * Generates suggestions for the current website context
    */
   async generateSuggestions(context: SuggestionContext): Promise<PrioritizedSuggestion[]> {
+    let operationId = '';
+    
+    if (this.config.performanceMonitor) {
+      operationId = this.config.performanceMonitor.startOperation('generate-suggestions', {
+        domain: context.websiteContext.domain,
+        category: context.websiteContext.category
+      });
+    }
+
     try {
-      // Check cache first
-      const cacheKey = this.generateCacheKey(context);
-      if (this.isCacheValid(cacheKey)) {
-        const cached = this.suggestionCache.get(cacheKey);
+      // Check external cache first
+      if (this.config.enableCaching && this.config.cacheService) {
+        const cacheKey = this.config.cacheService.generateContextKey(context.websiteContext, 'suggestions');
+        const cached = await this.config.cacheService.getCachedSuggestions<PrioritizedSuggestion>(cacheKey);
+        
         if (cached) {
-          console.log('Returning cached suggestions');
+          if (this.config.performanceMonitor) {
+            this.config.performanceMonitor.endOperation(operationId, true);
+          }
+          console.log('Returning cached suggestions from external cache');
+          return cached;
+        }
+      }
+
+      // Check local cache
+      const localCacheKey = this.generateCacheKey(context);
+      if (this.isCacheValid(localCacheKey)) {
+        const cached = this.suggestionCache.get(localCacheKey);
+        if (cached) {
+          if (this.config.performanceMonitor) {
+            this.config.performanceMonitor.endOperation(operationId, true);
+          }
+          console.log('Returning cached suggestions from local cache');
           return cached;
         }
       }
@@ -122,13 +153,28 @@ export class SuggestionGenerator {
       // Limit to max suggestions
       const finalSuggestions = filteredSuggestions.slice(0, this.config.maxSuggestions);
 
-      // Cache the results
-      this.cacheResults(cacheKey, finalSuggestions);
+      // Cache the results locally
+      this.cacheResults(localCacheKey, finalSuggestions);
+
+      // Cache the results externally
+      if (this.config.enableCaching && this.config.cacheService) {
+        const cacheKey = this.config.cacheService.generateContextKey(context.websiteContext, 'suggestions');
+        await this.config.cacheService.cacheSuggestions(cacheKey, finalSuggestions);
+      }
+
+      if (this.config.performanceMonitor) {
+        this.config.performanceMonitor.endOperation(operationId, true);
+      }
 
       console.log(`Generated ${finalSuggestions.length} suggestions for ${context.websiteContext.domain}`);
       return finalSuggestions;
 
     } catch (error) {
+      if (this.config.performanceMonitor) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.config.performanceMonitor.endOperation(operationId, false, errorMessage);
+      }
+
       console.error('Failed to generate suggestions:', error);
       
       // Return fallback suggestions if available

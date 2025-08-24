@@ -15,6 +15,8 @@ import {
   ValidationUtils
 } from '../types/index.js';
 import { securityManager, SecurityWarning } from './securityManager.js';
+import { CacheService } from './cacheService.js';
+import { PerformanceMonitor } from './performanceMonitor.js';
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -74,6 +76,8 @@ export class AIService {
   private rateLimitState: RateLimitState;
   private requestQueue: QueuedRequest[] = [];
   private isProcessingQueue = false;
+  private cacheService?: CacheService;
+  private performanceMonitor?: PerformanceMonitor;
 
   constructor(config: AIServiceConfig) {
     this.config = {
@@ -99,44 +103,109 @@ export class AIService {
   }
 
   /**
+   * Sets the cache service for response caching
+   */
+  setCacheService(cacheService: CacheService): void {
+    this.cacheService = cacheService;
+  }
+
+  /**
+   * Sets the performance monitor for tracking metrics
+   */
+  setPerformanceMonitor(performanceMonitor: PerformanceMonitor): void {
+    this.performanceMonitor = performanceMonitor;
+  }
+
+  /**
    * Process an AI request with rate limiting and error handling
    */
   async processRequest(request: AIRequest): Promise<AIResponse> {
-    // Validate request
-    if (!ValidationUtils.validateAIRequest(request)) {
-      throw new AIError('Invalid AI request format', 'INVALID_REQUEST');
-    }
-
-    // Generate security warnings
-    const warnings = securityManager.generateSecurityWarnings(request.context, request);
+    let operationId = '';
     
-    // Check if request should be blocked due to security concerns
-    const errorWarning = warnings.find(w => w.level === 'error');
-    if (errorWarning) {
-      throw new AIError(errorWarning.message, errorWarning.code);
+    if (this.performanceMonitor) {
+      operationId = this.performanceMonitor.startOperation('ai-request', {
+        taskType: request.taskType,
+        outputFormat: request.outputFormat,
+        domain: request.context.domain
+      });
     }
 
-    // Sanitize request content for security
-    const sanitizedRequest = this.sanitizeRequest(request);
+    try {
+      // Validate request
+      if (!ValidationUtils.validateAIRequest(request)) {
+        throw new AIError('Invalid AI request format', 'INVALID_REQUEST');
+      }
 
-    return new Promise<AIResponse>((resolve, reject) => {
-      const queuedRequest: QueuedRequest = {
-        id: this.generateRequestId(),
-        request: sanitizedRequest,
-        resolve: (response: AIResponse) => {
-          // Add security warnings to response metadata if any
-          if (warnings.length > 0) {
-            (response as any).securityWarnings = warnings;
+      // Check cache first
+      if (this.cacheService) {
+        const cacheKey = this.cacheService.generateAIRequestKey(request, {
+          includeUserContext: true,
+          includeTimestamp: false
+        });
+        
+        const cachedResponse = await this.cacheService.getCachedAIResponse(cacheKey);
+        if (cachedResponse) {
+          if (this.performanceMonitor) {
+            this.performanceMonitor.endOperation(operationId, true);
           }
-          resolve(response);
-        },
-        reject,
-        timestamp: new Date(),
-        retryCount: 0
-      };
+          return cachedResponse;
+        }
+      }
 
-      this.addToQueue(queuedRequest);
-    });
+      // Generate security warnings
+      const warnings = securityManager.generateSecurityWarnings(request.context, request);
+      
+      // Check if request should be blocked due to security concerns
+      const errorWarning = warnings.find(w => w.level === 'error');
+      if (errorWarning) {
+        throw new AIError(errorWarning.message, errorWarning.code);
+      }
+
+      // Sanitize request content for security
+      const sanitizedRequest = this.sanitizeRequest(request);
+
+      const response = await new Promise<AIResponse>((resolve, reject) => {
+        const queuedRequest: QueuedRequest = {
+          id: this.generateRequestId(),
+          request: sanitizedRequest,
+          resolve: async (response: AIResponse) => {
+            // Add security warnings to response metadata if any
+            if (warnings.length > 0) {
+              (response as any).securityWarnings = warnings;
+            }
+
+            // Cache the response
+            if (this.cacheService) {
+              const cacheKey = this.cacheService.generateAIRequestKey(request, {
+                includeUserContext: true,
+                includeTimestamp: false
+              });
+              await this.cacheService.cacheAIResponse(cacheKey, response);
+            }
+
+            resolve(response);
+          },
+          reject,
+          timestamp: new Date(),
+          retryCount: 0
+        };
+
+        this.addToQueue(queuedRequest);
+      });
+
+      if (this.performanceMonitor) {
+        this.performanceMonitor.endOperation(operationId, true);
+      }
+
+      return response;
+
+    } catch (error) {
+      if (this.performanceMonitor) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.performanceMonitor.endOperation(operationId, false, errorMessage);
+      }
+      throw error;
+    }
   }
 
   /**

@@ -1,8 +1,17 @@
 // Content script for the Agentic Chrome Extension
 import type { PageContent, FormElement, LinkElement, AutomationStep, AutomationResult, SecurityLevel } from '../types';
 import { AutomationEngine, AutomationPermissions, PageContext } from '../services/automationEngine';
+import { OptimizedDOMService, createOptimizedDOMService, DOM_CONFIGS } from '../services/optimizedDOMService';
+import { PerformanceMonitor, createPerformanceMonitor, PERFORMANCE_CONFIGS } from '../services/performanceMonitor';
 
 console.log('Agentic Chrome Extension content script loaded on:', window.location.href);
+
+// Initialize performance monitoring and optimized DOM service
+const performanceMonitor = createPerformanceMonitor(PERFORMANCE_CONFIGS.PRODUCTION);
+const optimizedDOM = createOptimizedDOMService(DOM_CONFIGS.BALANCED);
+
+// Connect services
+optimizedDOM.setPerformanceMonitor(performanceMonitor);
 
 // ============================================================================
 // PAGE CONTENT EXTRACTION
@@ -11,183 +20,247 @@ console.log('Agentic Chrome Extension content script loaded on:', window.locatio
 /**
  * Extracts comprehensive page content for analysis
  */
-function extractPageContent(): PageContent {
-  const headings = extractHeadings();
-  const textContent = extractTextContent();
-  const forms = extractForms();
-  const links = extractLinks();
-  const metadata = extractMetadata();
+async function extractPageContent(): Promise<PageContent> {
+  const operationId = performanceMonitor.startOperation('extract-page-content');
+  
+  try {
+    const [headings, textContent, forms, links, metadata] = await Promise.all([
+      extractHeadings(),
+      extractTextContent(),
+      extractForms(),
+      extractLinks(),
+      extractMetadata()
+    ]);
 
-  return {
-    url: window.location.href,
-    title: document.title,
-    headings,
-    textContent,
-    forms,
-    links,
-    metadata,
-    extractedAt: new Date()
-  };
+    const content: PageContent = {
+      url: window.location.href,
+      title: document.title,
+      headings,
+      textContent,
+      forms,
+      links,
+      metadata,
+      extractedAt: new Date()
+    };
+
+    performanceMonitor.endOperation(operationId, true);
+    return content;
+  } catch (error) {
+    performanceMonitor.endOperation(operationId, false, error instanceof Error ? error.message : 'Unknown error');
+    throw error;
+  }
 }
 
 /**
- * Extracts all headings from the page
+ * Extracts all headings from the page using optimized DOM service
  */
-function extractHeadings(): string[] {
-  const headingSelectors = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
-  const headings: string[] = [];
-  
-  headingSelectors.forEach(selector => {
-    const elements = document.querySelectorAll(selector);
-    elements.forEach(element => {
-      const text = element.textContent?.trim();
-      if (text && text.length > 0) {
-        headings.push(text);
-      }
-    });
+async function extractHeadings(): Promise<string[]> {
+  const result = await optimizedDOM.extractText('h1, h2, h3, h4, h5, h6', {
+    includeHidden: false,
+    maxLength: 200,
+    sanitize: true
   });
   
-  return headings;
+  return result.success ? result.data || [] : [];
 }
 
 /**
  * Extracts main text content from the page, excluding navigation and ads
  */
-function extractTextContent(): string {
-  // Remove script, style, nav, header, footer, and ad elements
-  const excludeSelectors = [
-    'script', 'style', 'nav', 'header', 'footer', 
-    '[class*="ad"]', '[class*="advertisement"]', '[id*="ad"]',
-    '[class*="sidebar"]', '[class*="menu"]', '[role="navigation"]'
-  ];
+async function extractTextContent(): Promise<string> {
+  const operationId = performanceMonitor.startOperation('extract-text-content');
   
-  const clone = document.cloneNode(true) as Document;
-  
-  // Remove excluded elements
-  excludeSelectors.forEach(selector => {
-    const elements = clone.querySelectorAll(selector);
-    elements.forEach(el => el.remove());
-  });
-  
-  // Extract text from main content areas
-  const contentSelectors = [
-    'main', 'article', '[role="main"]', '.content', '#content',
-    '.post', '.article', '.entry-content', '.page-content'
-  ];
-  
-  let textContent = '';
-  
-  for (const selector of contentSelectors) {
-    const element = clone.querySelector(selector);
-    if (element) {
-      textContent = element.textContent?.trim() || '';
-      if (textContent.length > 100) {
-        break;
+  try {
+    // Try main content areas first
+    const contentSelectors = [
+      'main', 'article', '[role="main"]', '.content', '#content',
+      '.post', '.article', '.entry-content', '.page-content'
+    ];
+    
+    for (const selector of contentSelectors) {
+      const result = await optimizedDOM.extractText(selector, {
+        includeHidden: false,
+        maxLength: 5000,
+        sanitize: true
+      });
+      
+      if (result.success && result.data && result.data.length > 0) {
+        const text = result.data.join(' ');
+        if (text.length > 100) {
+          performanceMonitor.endOperation(operationId, true);
+          return text;
+        }
       }
     }
-  }
-  
-  // Fallback to body content if no main content found
-  if (!textContent || textContent.length < 100) {
-    textContent = clone.body?.textContent?.trim() || '';
-  }
-  
-  // Limit content length and clean up whitespace
-  return textContent
-    .replace(/\s+/g, ' ')
-    .slice(0, 5000)
-    .trim();
-}
-
-/**
- * Extracts form information from the page
- */
-function extractForms(): FormElement[] {
-  const forms: FormElement[] = [];
-  const formElements = document.querySelectorAll('form');
-  
-  formElements.forEach(form => {
-    const inputs = form.querySelectorAll('input, textarea, select');
     
-    inputs.forEach(input => {
-      const element = input as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-      
-      forms.push({
-        id: element.id || undefined,
-        name: element.name || undefined,
-        type: element.type || element.tagName.toLowerCase(),
-        placeholder: (element as HTMLInputElement).placeholder || undefined,
-        required: element.required,
-        value: element.value || undefined
-      });
+    // Fallback to body content, excluding unwanted elements
+    const excludeSelectors = [
+      'script', 'style', 'nav', 'header', 'footer', 
+      '[class*="ad"]', '[class*="advertisement"]', '[id*="ad"]',
+      '[class*="sidebar"]', '[class*="menu"]', '[role="navigation"]'
+    ].join(', ');
+    
+    const bodyResult = await optimizedDOM.extractText(`body *:not(${excludeSelectors})`, {
+      includeHidden: false,
+      maxLength: 5000,
+      sanitize: true
     });
-  });
-  
-  return forms;
+    
+    const textContent = bodyResult.success && bodyResult.data 
+      ? bodyResult.data.join(' ').slice(0, 5000)
+      : '';
+    
+    performanceMonitor.endOperation(operationId, true);
+    return textContent;
+  } catch (error) {
+    performanceMonitor.endOperation(operationId, false, error instanceof Error ? error.message : 'Unknown error');
+    return '';
+  }
 }
 
 /**
- * Extracts links from the page
+ * Extracts form information from the page using optimized DOM service
  */
-function extractLinks(): LinkElement[] {
-  const links: LinkElement[] = [];
-  const linkElements = document.querySelectorAll('a[href]');
+async function extractForms(): Promise<FormElement[]> {
+  const operationId = performanceMonitor.startOperation('extract-forms');
   
-  // Limit to first 50 links to avoid overwhelming data
-  Array.from(linkElements).slice(0, 50).forEach(link => {
-    const href = link.getAttribute('href');
-    const text = link.textContent?.trim();
-    const title = link.getAttribute('title');
+  try {
+    const result = await optimizedDOM.extractFormData();
     
-    if (href && text) {
-      links.push({
-        href,
-        text,
-        title: title || undefined
-      });
+    if (!result.success || !result.data) {
+      performanceMonitor.endOperation(operationId, true);
+      return [];
     }
-  });
-  
-  return links;
+    
+    const forms: FormElement[] = [];
+    
+    // Also get form element attributes
+    const attributeResult = await optimizedDOM.extractAttributes(
+      'form input, form textarea, form select',
+      ['id', 'name', 'type', 'placeholder', 'required']
+    );
+    
+    if (attributeResult.success && attributeResult.data) {
+      for (const attrs of attributeResult.data) {
+        forms.push({
+          id: attrs.id || undefined,
+          name: attrs.name || undefined,
+          type: attrs.type || 'text',
+          placeholder: attrs.placeholder || undefined,
+          required: attrs.required === 'true' || attrs.required === '',
+          value: undefined // Don't extract values for security
+        });
+      }
+    }
+    
+    performanceMonitor.endOperation(operationId, true);
+    return forms;
+  } catch (error) {
+    performanceMonitor.endOperation(operationId, false, error instanceof Error ? error.message : 'Unknown error');
+    return [];
+  }
 }
 
 /**
- * Extracts metadata from the page
+ * Extracts links from the page using optimized DOM service
  */
-function extractMetadata(): Record<string, string> {
-  const metadata: Record<string, string> = {};
+async function extractLinks(): Promise<LinkElement[]> {
+  const operationId = performanceMonitor.startOperation('extract-links');
   
-  // Extract meta tags
-  const metaTags = document.querySelectorAll('meta');
-  metaTags.forEach(meta => {
-    const name = meta.getAttribute('name') || meta.getAttribute('property');
-    const content = meta.getAttribute('content');
+  try {
+    // Extract link attributes and text in parallel
+    const [attributeResult, textResult] = await Promise.all([
+      optimizedDOM.extractAttributes('a[href]', ['href', 'title']),
+      optimizedDOM.extractText('a[href]', { includeHidden: false, maxLength: 100, sanitize: true })
+    ]);
     
-    if (name && content) {
-      metadata[name] = content;
-    }
-  });
-  
-  // Extract Open Graph and Twitter Card data
-  const ogTags = document.querySelectorAll('meta[property^="og:"], meta[name^="twitter:"]');
-  ogTags.forEach(meta => {
-    const property = meta.getAttribute('property') || meta.getAttribute('name');
-    const content = meta.getAttribute('content');
+    const links: LinkElement[] = [];
     
-    if (property && content) {
-      metadata[property] = content;
+    if (attributeResult.success && attributeResult.data && textResult.success && textResult.data) {
+      const maxLinks = Math.min(50, attributeResult.data.length, textResult.data.length);
+      
+      for (let i = 0; i < maxLinks; i++) {
+        const attrs = attributeResult.data[i];
+        const text = textResult.data[i];
+        
+        if (attrs.href && text) {
+          links.push({
+            href: attrs.href,
+            text: text.trim(),
+            title: attrs.title || undefined
+          });
+        }
+      }
     }
-  });
+    
+    performanceMonitor.endOperation(operationId, true);
+    return links;
+  } catch (error) {
+    performanceMonitor.endOperation(operationId, false, error instanceof Error ? error.message : 'Unknown error');
+    return [];
+  }
+}
+
+/**
+ * Extracts metadata from the page using optimized DOM service
+ */
+async function extractMetadata(): Promise<Record<string, string>> {
+  const operationId = performanceMonitor.startOperation('extract-metadata');
   
-  // Add page-specific metadata
-  metadata.url = window.location.href;
-  metadata.domain = window.location.hostname;
-  metadata.pathname = window.location.pathname;
-  metadata.title = document.title;
-  metadata.lang = document.documentElement.lang || 'en';
-  metadata.charset = document.characterSet;
-  
-  return metadata;
+  try {
+    const metadata: Record<string, string> = {};
+    
+    // Extract meta tags in parallel
+    const [metaResult, ogResult] = await Promise.all([
+      optimizedDOM.extractAttributes('meta[name][content], meta[property][content]', ['name', 'property', 'content']),
+      optimizedDOM.extractAttributes('meta[property^="og:"], meta[name^="twitter:"]', ['property', 'name', 'content'])
+    ]);
+    
+    // Process regular meta tags
+    if (metaResult.success && metaResult.data) {
+      for (const attrs of metaResult.data) {
+        const name = attrs.name || attrs.property;
+        const content = attrs.content;
+        
+        if (name && content) {
+          metadata[name] = content;
+        }
+      }
+    }
+    
+    // Process Open Graph and Twitter Card data
+    if (ogResult.success && ogResult.data) {
+      for (const attrs of ogResult.data) {
+        const property = attrs.property || attrs.name;
+        const content = attrs.content;
+        
+        if (property && content) {
+          metadata[property] = content;
+        }
+      }
+    }
+    
+    // Add page-specific metadata
+    metadata.url = window.location.href;
+    metadata.domain = window.location.hostname;
+    metadata.pathname = window.location.pathname;
+    metadata.title = document.title;
+    metadata.lang = document.documentElement.lang || 'en';
+    metadata.charset = document.characterSet;
+    
+    performanceMonitor.endOperation(operationId, true);
+    return metadata;
+  } catch (error) {
+    performanceMonitor.endOperation(operationId, false, error instanceof Error ? error.message : 'Unknown error');
+    return {
+      url: window.location.href,
+      domain: window.location.hostname,
+      pathname: window.location.pathname,
+      title: document.title,
+      lang: document.documentElement.lang || 'en',
+      charset: document.characterSet
+    };
+  }
 }
 
 // ============================================================================
@@ -695,17 +768,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   switch (request.type) {
     case 'GET_PAGE_CONTENT':
-      try {
-        const content = extractPageContent();
-        const sanitized = request.sanitize ? sanitizePageContent(content) : content;
-        sendResponse({ success: true, content: sanitized });
-      } catch (error) {
-        sendResponse({ 
-          success: false, 
-          error: error instanceof Error ? error.message : 'Failed to extract page content' 
+      extractPageContent()
+        .then(content => {
+          const sanitized = request.sanitize ? sanitizePageContent(content) : content;
+          sendResponse({ success: true, content: sanitized });
+        })
+        .catch(error => {
+          sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to extract page content' 
+          });
         });
-      }
-      break;
+      return true; // Keep message channel open for async response
       
     case 'GET_PAGE_INFO':
       try {
