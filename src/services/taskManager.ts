@@ -1057,3 +1057,215 @@ export function createTaskTemplate(
     tags: []
   };
 }
+
+// ============================================================================
+// TASK ADDITION WORKFLOW
+// ============================================================================
+
+export class TaskAdditionWorkflow {
+  private websiteContext?: WebsiteContext;
+  private pageContent?: any;
+  private suggestedPatterns: string[] = [];
+  private existingTasks: CustomTask[] = [];
+
+  constructor(
+    private storageService: ChromeStorageService,
+    private patternEngine: any
+  ) {}
+
+  async initializeFromCurrentPage(pageContent: any): Promise<{
+    success: boolean;
+    websiteContext?: WebsiteContext;
+    suggestedPatterns?: string[];
+    existingTasks?: CustomTask[];
+    privacyWarnings?: string[];
+    error?: string;
+  }> {
+    try {
+      this.pageContent = pageContent;
+      this.websiteContext = await this.patternEngine.analyzeWebsite(pageContent.url, pageContent);
+      this.suggestedPatterns = this.patternEngine.generateSuggestedPatterns(this.websiteContext.domain);
+      this.existingTasks = await this.storageService.getTasksForWebsite(this.websiteContext.domain);
+
+      const privacyWarnings = [];
+      if (this.websiteContext.securityLevel === SecurityLevel.RESTRICTED) {
+        privacyWarnings.push('This appears to be a sensitive website');
+      }
+
+      return {
+        success: true,
+        websiteContext: this.websiteContext,
+        suggestedPatterns: this.suggestedPatterns,
+        existingTasks: this.existingTasks,
+        privacyWarnings
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  async generateTaskSuggestions(context: WebsiteContext): Promise<any[]> {
+    const suggestions = [];
+    
+    switch (context.category) {
+      case 'social_media':
+        suggestions.push(
+          { name: 'Generate Social Media Post', description: 'Create engaging social media content', promptTemplate: 'Create a social media post about: {{title}}' },
+          { name: 'Generate Hashtag Suggestions', description: 'Suggest relevant hashtags', promptTemplate: 'Suggest hashtags for: {{title}}' },
+          { name: 'Analyze Content Analysis', description: 'Analyze social media content', promptTemplate: 'Analyze the content: {{title}}' }
+        );
+        break;
+      case 'ecommerce':
+        suggestions.push(
+          { name: 'Analyze Product Analysis', description: 'Analyze product details', promptTemplate: 'Analyze product: {{title}}' },
+          { name: 'Compare Price Comparison', description: 'Compare product prices', promptTemplate: 'Compare prices for: {{title}}' },
+          { name: 'Summarize Review Summary', description: 'Summarize product reviews', promptTemplate: 'Summarize reviews for: {{title}}' }
+        );
+        break;
+      case 'professional':
+        suggestions.push(
+          { name: 'Optimize Profile Optimization', description: 'Optimize professional profile', promptTemplate: 'Optimize profile for: {{title}}' },
+          { name: 'Generate Connection Message', description: 'Generate connection message', promptTemplate: 'Generate connection message for: {{title}}' },
+          { name: 'Create Job Application', description: 'Create job application', promptTemplate: 'Create application for: {{title}}' }
+        );
+        break;
+      default:
+        suggestions.push(
+          { name: 'Summarize Content Summary', description: 'Summarize page content', promptTemplate: 'Summarize: {{title}}' },
+          { name: 'Extract Key Points', description: 'Extract key points', promptTemplate: 'Extract key points from: {{title}}' },
+          { name: 'Generate Action Items', description: 'Generate action items', promptTemplate: 'Generate action items for: {{title}}' }
+        );
+    }
+    
+    return suggestions;
+  }
+
+  async createTaskFromTemplate(template: any): Promise<string> {
+    if (!this.websiteContext) {
+      throw new Error('Workflow not initialized');
+    }
+
+    const taskData = {
+      name: template.name,
+      description: template.description,
+      promptTemplate: template.promptTemplate,
+      websitePatterns: this.suggestedPatterns,
+      outputFormat: OutputFormat.PLAIN_TEXT,
+      isEnabled: true,
+      tags: []
+    };
+
+    return await this.storageService.createCustomTask(taskData);
+  }
+
+  async createCustomTask(taskData: any): Promise<string> {
+    if (!this.websiteContext) {
+      throw new Error('Workflow not initialized');
+    }
+
+    const validation = this.validateTaskData(taskData);
+    if (!validation.isValid) {
+      throw new ValidationError(validation.errors[0].message);
+    }
+
+    const fullTaskData = {
+      ...taskData,
+      websitePatterns: taskData.websitePatterns || this.suggestedPatterns,
+      isEnabled: true
+    };
+
+    return await this.storageService.createCustomTask(fullTaskData);
+  }
+
+  validateTaskData(taskData: any): { isValid: boolean; errors: ValidationError[]; warnings: string[]; suggestions: string[] } {
+    const errors: ValidationError[] = [];
+    const warnings: string[] = [];
+    const suggestions: string[] = [];
+
+    if (!taskData.name || taskData.name.trim() === '') {
+      errors.push(new ValidationError('Task name is required'));
+    }
+
+    if (!taskData.description || taskData.description.trim() === '') {
+      errors.push(new ValidationError('Task description is required'));
+    }
+
+    if (!taskData.promptTemplate || taskData.promptTemplate.trim() === '') {
+      errors.push(new ValidationError('Prompt template is required'));
+    }
+
+    if (taskData.websitePatterns) {
+      for (const pattern of taskData.websitePatterns) {
+        if (!this.patternEngine.validatePattern(pattern)) {
+          errors.push(new ValidationError(`Invalid website pattern: ${pattern}`));
+        }
+      }
+    }
+
+    if (taskData.description && taskData.description.length < 10) {
+      warnings.push('Description is quite short');
+    }
+
+    if (taskData.promptTemplate && taskData.promptTemplate.length < 20) {
+      warnings.push('Prompt template is quite short');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      suggestions
+    };
+  }
+
+  getContextVariables(): Record<string, string> {
+    if (!this.websiteContext || !this.pageContent) {
+      throw new Error('Workflow not initialized');
+    }
+
+    return {
+      domain: this.websiteContext.domain,
+      url: this.pageContent.url,
+      title: this.pageContent.title,
+      description: this.pageContent.metadata?.description || '',
+      keywords: this.pageContent.metadata?.keywords || '',
+      headings: this.pageContent.headings || [],
+      pageType: this.websiteContext.pageType,
+      category: this.websiteContext.category
+    };
+  }
+
+  previewTask(taskData: any): { processedPrompt: string; contextVariables: Record<string, string>; estimatedTokens: number; warnings: string[] } {
+    const contextVariables = this.getContextVariables();
+    const warnings: string[] = [];
+    
+    let processedPrompt = taskData.promptTemplate;
+    const templateVars = processedPrompt.match(/\{\{([^}]+)\}\}/g) || [];
+    
+    for (const templateVar of templateVars) {
+      const varName = templateVar.slice(2, -2).trim();
+      if (contextVariables[varName]) {
+        processedPrompt = processedPrompt.replace(templateVar, contextVariables[varName]);
+      } else {
+        warnings.push(`Unknown template variable: ${varName}`);
+      }
+    }
+
+    return {
+      processedPrompt,
+      contextVariables,
+      estimatedTokens: Math.ceil(processedPrompt.length / 4),
+      warnings
+    };
+  }
+
+  reset(): void {
+    this.websiteContext = undefined;
+    this.pageContent = undefined;
+    this.suggestedPatterns = [];
+    this.existingTasks = [];
+  }
+}

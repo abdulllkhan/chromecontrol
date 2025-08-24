@@ -23,8 +23,9 @@ export function isValidUrl(url: string): boolean {
   } catch {
     return false;
   }
-}// ===
-=========================================================================
+}
+
+// ============================================================================
 // STORAGE UTILITIES
 // ============================================================================
 
@@ -241,11 +242,225 @@ export async function retryWithBackoff<T>(
 // PATTERN ENGINE UTILITIES
 // ============================================================================
 
-// Re-export pattern engine components for easy access
-export {
-  PatternEngine,
-  UrlAnalyzer,
-  WebsiteCategorizer,
-  ContentExtractor,
-  CustomPatternMatcher
-} from '../services/patternEngine.js';
+// ============================================================================
+// STRING UTILITIES
+// ============================================================================
+
+export function sanitizeHTML(html: string): string {
+  // Remove script tags and dangerous attributes
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/javascript:/gi, '');
+}
+
+export function truncateText(text: string, maxLength: number, suffix: string = '...'): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  if (maxLength <= 0) {
+    return suffix;
+  }
+  // Trim the text to avoid trailing spaces before suffix
+  return text.substring(0, maxLength).trim() + suffix;
+}
+
+export function generateSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .trim();
+}
+
+// ============================================================================
+// VALIDATION UTILITIES
+// ============================================================================
+
+export function validateURL(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+export function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+
+export function validateEmail(email: string): boolean {
+  // More flexible email regex that allows localhost and single-word domains
+  const emailRegex = /^[^\s@]+@[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+export function isValidRegex(pattern: string): boolean {
+  try {
+    new RegExp(pattern);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function escapeRegex(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ============================================================================
+// OBJECT UTILITIES
+// ============================================================================
+
+export function mergeObjects<T extends Record<string, any>>(target: T, source: Partial<T>): T {
+  const result = { ...target };
+  
+  for (const key in source) {
+    if (source.hasOwnProperty(key)) {
+      const sourceValue = source[key];
+      const targetValue = result[key];
+      
+      if (sourceValue && typeof sourceValue === 'object' && !Array.isArray(sourceValue) &&
+          targetValue && typeof targetValue === 'object' && !Array.isArray(targetValue)) {
+        result[key] = mergeObjects(targetValue, sourceValue);
+      } else {
+        result[key] = sourceValue as T[Extract<keyof T, string>];
+      }
+    }
+  }
+  
+  return result;
+}
+
+// ============================================================================
+// TEMPLATE UTILITIES
+// ============================================================================
+
+export function parseTemplateVariables(template: string): string[] {
+  const matches = template.match(/\{\{([^}]+)\}\}/g);
+  if (!matches) return [];
+  
+  return [...new Set(matches.map(match => match.slice(2, -2).trim()))];
+}
+
+export function replaceTemplateVariables(template: string, variables: Record<string, string>): string {
+  return template.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
+    const trimmedKey = key.trim();
+    return variables[trimmedKey] !== undefined ? variables[trimmedKey] : match;
+  });
+}
+
+// ============================================================================
+// FORMATTING UTILITIES
+// ============================================================================
+
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  const value = (bytes / Math.pow(k, i)).toFixed(1);
+  return value + ' ' + sizes[i];
+}
+
+export function formatTimestamp(date: Date, format: 'short' | 'long' | 'time' | 'relative'): string {
+  switch (format) {
+    case 'short':
+      return date.toLocaleDateString('en-US');
+    case 'long':
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    case 'time':
+      return date.toLocaleTimeString('en-US', { 
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    case 'relative':
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      const minutes = Math.floor(diff / 60000);
+      
+      if (minutes < 1) return 'just now';
+      if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+      
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+      
+      const days = Math.floor(hours / 24);
+      return `${days} day${days > 1 ? 's' : ''} ago`;
+    default:
+      return date.toISOString();
+  }
+}
+
+export function calculateReadingTime(text: string, wordsPerMinute: number = 200): number {
+  if (!text || text.trim() === '') return 0;
+  
+  const words = text.trim().split(/\s+/).length;
+  const minutes = Math.ceil(words / wordsPerMinute);
+  return Math.max(1, minutes);
+}
+
+// ============================================================================
+// CRYPTO AND HASHING UTILITIES
+// ============================================================================
+
+export function generateHash(input: string): string {
+  // Simple hash function for non-cryptographic purposes
+  let hash = 0;
+  if (input.length === 0) return '0'.repeat(64);
+  
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  
+  // Convert to hex and pad to 64 characters
+  return Math.abs(hash).toString(16).padStart(64, '0');
+}
+
+export function estimateTokenCount(text: string): number {
+  if (!text) return 0;
+  
+  // More accurate estimation: count words and divide by ~0.75 (average tokens per word)
+  const words = text.trim().split(/\s+/).length;
+  return Math.ceil(words / 0.75);
+}
+
+// ============================================================================
+// COMPRESSION UTILITIES
+// ============================================================================
+
+export async function compressData(data: any): Promise<string> {
+  try {
+    const jsonString = JSON.stringify(data);
+    // Simple base64 encoding as compression placeholder
+    return btoa(jsonString);
+  } catch (error) {
+    throw new Error(`Compression failed: ${error}`);
+  }
+}
+
+export async function decompressData(compressedData: string): Promise<any> {
+  try {
+    const jsonString = atob(compressedData);
+    return JSON.parse(jsonString);
+  } catch (error) {
+    throw new Error(`Decompression failed: ${error}`);
+  }
+}

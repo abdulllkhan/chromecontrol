@@ -1,450 +1,528 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { TaskManager } from '../taskManager';
+/**
+ * Task Addition Workflow Tests
+ * 
+ * Tests for the task addition workflow that handles creating tasks
+ * from the current page context with pre-population and validation.
+ */
+
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { TaskAdditionWorkflow } from '../taskManager';
 import { ChromeStorageService } from '../storage';
-import { AIService } from '../aiService';
-import { WebsiteContext, CustomTask, ExecutionContext, OutputFormat, WebsiteCategory, PageContent, FormElement, LinkElement } from '../../types';
+import { PatternEngine } from '../patternEngine';
+import {
+  WebsiteContext,
+  PageContent,
+  CustomTask,
+  OutputFormat,
+  WebsiteCategory,
+  PageType,
+  SecurityLevel,
+  ValidationError
+} from '../../types/index';
 
-// ============================================================================
-// TEST FIXTURES
-// ============================================================================
+// Mock dependencies
+const mockStorageService = {
+  createCustomTask: vi.fn(),
+  getTasksForWebsite: vi.fn(),
+  getUserPreferences: vi.fn()
+} as unknown as ChromeStorageService;
 
-const createMockWebsiteContext = (overrides: Partial<WebsiteContext> = {}): WebsiteContext => ({
-  domain: 'example.com',
-  url: 'https://example.com/page',
-  title: 'Example Page',
-  headings: ['Main Heading', 'Sub Heading'],
-  pageText: 'Sample page content with useful information.',
-  links: [
-    { text: 'Home', url: 'https://example.com', title: 'Home page' },
-    { text: 'About', url: 'https://example.com/about', title: 'About page' }
-  ],
-  forms: [
-    { action: '/submit', method: 'POST', fields: [{ name: 'email', type: 'email', value: '', placeholder: 'Enter email', required: true }] }
-  ],
-  category: WebsiteCategory.BUSINESS,
-  securityLevel: 'standard',
-  ...overrides
-});
+const mockPatternEngine = {
+  analyzeWebsite: vi.fn(),
+  generateSuggestedPatterns: vi.fn(),
+  validatePattern: vi.fn()
+} as unknown as PatternEngine;
 
+// Test fixtures
 const createMockPageContent = (overrides: Partial<PageContent> = {}): PageContent => ({
-  url: 'https://example.com/page',
-  title: 'Example Page',
+  url: 'https://example.com/test-page',
+  title: 'Test Page Title',
   headings: ['Main Heading', 'Sub Heading'],
-  textContent: 'Sample page content with useful information.',
+  textContent: 'This is the main content of the test page with important information.',
   forms: [
-    { action: '/submit', method: 'POST', fields: [{ name: 'email', type: 'email', value: '', placeholder: 'Enter email', required: true }] }
+    {
+      id: 'contact-form',
+      action: '/submit',
+      method: 'POST',
+      fields: [
+        { name: 'email', type: 'email', label: 'Email Address' },
+        { name: 'message', type: 'textarea', label: 'Message' }
+      ]
+    }
   ],
   links: [
-    { text: 'Home', url: 'https://example.com', title: 'Home page' },
-    { text: 'About', url: 'https://example.com/about', title: 'About page' }
+    { href: '/about', text: 'About Us' },
+    { href: '/contact', text: 'Contact' }
   ],
-  metadata: { description: 'Sample page' },
+  metadata: {
+    description: 'Test page description',
+    keywords: 'test, example, page'
+  },
   extractedAt: new Date(),
   ...overrides
 });
 
-const createMockExecutionContext = (overrides: Partial<ExecutionContext> = {}): ExecutionContext => ({
-  websiteContext: createMockWebsiteContext(),
-  pageContent: createMockPageContent(),
-  userInput: {},
-  taskId: 'test-task-1',
+const createMockWebsiteContext = (overrides: Partial<WebsiteContext> = {}): WebsiteContext => ({
+  domain: 'example.com',
+  category: WebsiteCategory.PRODUCTIVITY,
+  pageType: PageType.OTHER,
+  extractedData: {
+    title: 'Test Page Title',
+    description: 'Test page description'
+  },
+  securityLevel: SecurityLevel.PUBLIC,
+  timestamp: new Date(),
   ...overrides
 });
 
-const createMockTask = (overrides: Partial<CustomTask> = {}): CustomTask => ({
-  id: 'test-task-1',
-  name: 'Test Task',
-  description: 'A test task for task addition workflow',
-  websitePatterns: ['example\\.com'],
-  promptTemplate: 'Generate content for {{domain}} with title: {{title}}',
-  outputFormat: OutputFormat.PLAIN_TEXT,
-  createdAt: new Date('2024-01-01'),
-  updatedAt: new Date('2024-01-01'),
-  usageCount: 0,
-  isEnabled: true,
-  tags: ['test'],
-  ...overrides
-});
-
-// ============================================================================
-// TEST SETUP
-// ============================================================================
-
-describe('Task Addition Workflow', () => {
-  let taskManager: TaskManager;
-  let mockStorageService: ChromeStorageService;
-  let mockAIService: AIService;
+describe('TaskAdditionWorkflow', () => {
+  let workflow: TaskAdditionWorkflow;
 
   beforeEach(() => {
     vi.clearAllMocks();
     
-    // Setup storage service mock
-    mockStorageService = new ChromeStorageService();
-    vi.spyOn(mockStorageService, 'createCustomTask').mockResolvedValue('new-task-id');
-    vi.spyOn(mockStorageService, 'getCustomTask').mockResolvedValue(null);
-    vi.spyOn(mockStorageService, 'updateCustomTask').mockResolvedValue(true);
-    vi.spyOn(mockStorageService, 'getAllCustomTasks').mockResolvedValue({});
-    
-    // Setup AI service mock
-    mockAIService = new AIService({ apiKey: 'test-key' });
-    vi.spyOn(mockAIService, 'processRequest').mockResolvedValue({
-      text: 'Generated content for example.com',
-      usage: { promptTokens: 50, completionTokens: 30, totalTokens: 80 },
-      metadata: { model: 'test-model', timestamp: new Date() }
+    // Setup default mock implementations
+    (mockStorageService.createCustomTask as any).mockResolvedValue('new-task-id');
+    (mockStorageService.getTasksForWebsite as any).mockResolvedValue([]);
+    (mockStorageService.getUserPreferences as any).mockResolvedValue({
+      enabledCategories: [WebsiteCategory.PRODUCTIVITY],
+      customPatterns: [],
+      privacySettings: {
+        sharePageContent: true,
+        shareFormData: false,
+        allowAutomation: true,
+        securityLevel: SecurityLevel.CAUTIOUS,
+        excludedDomains: []
+      }
     });
-    vi.spyOn(mockAIService, 'validateResponse').mockReturnValue(true);
-    
-    // Create task manager
-    taskManager = new TaskManager({
-      storageService: mockStorageService,
-      aiService: mockAIService,
-      enableValidation: true,
-      enableCaching: false,
-      maxCacheSize: 100
-    });
+
+    (mockPatternEngine.analyzeWebsite as any).mockResolvedValue(createMockWebsiteContext());
+    (mockPatternEngine.generateSuggestedPatterns as any).mockReturnValue(['example\\.com']);
+    (mockPatternEngine.validatePattern as any).mockReturnValue(true);
+
+    workflow = new TaskAdditionWorkflow(mockStorageService, mockPatternEngine);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  // ============================================================================
-  // TASK CREATION WORKFLOW TESTS
-  // ============================================================================
+  describe('initializeFromCurrentPage', () => {
+    it('should initialize workflow with current page context', async () => {
+      const pageContent = createMockPageContent();
+      
+      const result = await workflow.initializeFromCurrentPage(pageContent);
 
-  describe('Task Creation Workflow', () => {
-    it('should create a new task with current page context pre-population', async () => {
-      const websiteContext = createMockWebsiteContext({
-        domain: 'example.com',
-        title: 'Example Page',
-        category: WebsiteCategory.BUSINESS
-      });
+      expect(result.success).toBe(true);
+      expect(result.websiteContext).toBeDefined();
+      expect(result.suggestedPatterns).toContain('example\\.com');
+      expect(result.existingTasks).toEqual([]);
+      expect(mockPatternEngine.analyzeWebsite).toHaveBeenCalledWith(
+        pageContent.url,
+        pageContent
+      );
+    });
 
-      // Create task data based on current page context
-      const taskData = {
-        name: 'Extract Key Information',
-        description: 'Extract key information from business websites',
-        websitePatterns: [websiteContext.domain.replace('.', '\\.')],
-        promptTemplate: `Extract key information from {{title}} on {{domain}}. Focus on: {{headings}}`,
-        outputFormat: OutputFormat.MARKDOWN,
-        tags: ['extraction', 'business']
+    it('should handle analysis errors gracefully', async () => {
+      (mockPatternEngine.analyzeWebsite as any).mockRejectedValue(new Error('Analysis failed'));
+      
+      const pageContent = createMockPageContent();
+      const result = await workflow.initializeFromCurrentPage(pageContent);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Analysis failed');
+    });
+
+    it('should detect existing tasks for the website', async () => {
+      const existingTask: CustomTask = {
+        id: 'existing-task',
+        name: 'Existing Task',
+        description: 'An existing task',
+        websitePatterns: ['example\\.com'],
+        promptTemplate: 'Existing prompt',
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        usageCount: 0,
+        isEnabled: true,
+        tags: []
       };
 
-      const taskId = await taskManager.createTask(taskData);
+      (mockStorageService.getTasksForWebsite as any).mockResolvedValue([existingTask]);
+      
+      const pageContent = createMockPageContent();
+      const result = await workflow.initializeFromCurrentPage(pageContent);
+
+      expect(result.success).toBe(true);
+      expect(result.existingTasks).toHaveLength(1);
+      expect(result.existingTasks[0].id).toBe('existing-task');
+    });
+  });
+
+  describe('generateTaskSuggestions', () => {
+    it('should generate task suggestions based on website category', async () => {
+      const context = createMockWebsiteContext({ category: WebsiteCategory.SOCIAL_MEDIA });
+      
+      const suggestions = await workflow.generateTaskSuggestions(context);
+
+      expect(suggestions).toHaveLength(3);
+      expect(suggestions[0].name).toContain('Social Media Post');
+      expect(suggestions[1].name).toContain('Hashtag Suggestions');
+      expect(suggestions[2].name).toContain('Content Analysis');
+    });
+
+    it('should generate e-commerce specific suggestions', async () => {
+      const context = createMockWebsiteContext({ category: WebsiteCategory.ECOMMERCE });
+      
+      const suggestions = await workflow.generateTaskSuggestions(context);
+
+      expect(suggestions).toHaveLength(3);
+      expect(suggestions[0].name).toContain('Product Analysis');
+      expect(suggestions[1].name).toContain('Price Comparison');
+      expect(suggestions[2].name).toContain('Review Summary');
+    });
+
+    it('should generate professional platform suggestions', async () => {
+      const context = createMockWebsiteContext({ category: WebsiteCategory.PROFESSIONAL });
+      
+      const suggestions = await workflow.generateTaskSuggestions(context);
+
+      expect(suggestions).toHaveLength(3);
+      expect(suggestions[0].name).toContain('Profile Optimization');
+      expect(suggestions[1].name).toContain('Connection Message');
+      expect(suggestions[2].name).toContain('Job Application');
+    });
+
+    it('should generate generic suggestions for unknown categories', async () => {
+      const context = createMockWebsiteContext({ category: WebsiteCategory.CUSTOM });
+      
+      const suggestions = await workflow.generateTaskSuggestions(context);
+
+      expect(suggestions).toHaveLength(3);
+      expect(suggestions[0].name).toContain('Content Summary');
+      expect(suggestions[1].name).toContain('Key Points');
+      expect(suggestions[2].name).toContain('Action Items');
+    });
+  });
+
+  describe('createTaskFromTemplate', () => {
+    it('should create task from suggestion template', async () => {
+      const pageContent = createMockPageContent();
+      await workflow.initializeFromCurrentPage(pageContent);
+
+      const context = createMockWebsiteContext();
+      const suggestions = await workflow.generateTaskSuggestions(context);
+      
+      const taskId = await workflow.createTaskFromTemplate(suggestions[0]);
 
       expect(taskId).toBe('new-task-id');
       expect(mockStorageService.createCustomTask).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: 'Extract Key Information',
-          description: 'Extract key information from business websites',
-          websitePatterns: ['example\\.com'],
-          promptTemplate: expect.stringContaining('{{title}}'),
-          tags: ['extraction', 'business']
+          name: suggestions[0].name,
+          description: suggestions[0].description,
+          promptTemplate: suggestions[0].promptTemplate,
+          websitePatterns: ['example\\.com']
         })
       );
     });
 
-    it('should validate task data before creation', async () => {
+    it('should handle creation errors', async () => {
+      (mockStorageService.createCustomTask as any).mockRejectedValue(new Error('Creation failed'));
+      
+      const pageContent = createMockPageContent();
+      await workflow.initializeFromCurrentPage(pageContent);
+
+      const context = createMockWebsiteContext();
+      const suggestions = await workflow.generateTaskSuggestions(context);
+      
+      await expect(workflow.createTaskFromTemplate(suggestions[0])).rejects.toThrow('Creation failed');
+    });
+
+    it('should throw error if workflow not initialized', async () => {
+      const context = createMockWebsiteContext();
+      const suggestions = await workflow.generateTaskSuggestions(context);
+      
+      await expect(workflow.createTaskFromTemplate(suggestions[0])).rejects.toThrow('not initialized');
+    });
+  });
+
+  describe('createCustomTask', () => {
+    it('should create custom task with user input', async () => {
+      const pageContent = createMockPageContent();
+      await workflow.initializeFromCurrentPage(pageContent);
+
+      const taskData = {
+        name: 'Custom Task',
+        description: 'A custom task created by user',
+        promptTemplate: 'Custom prompt for {{domain}}',
+        outputFormat: OutputFormat.MARKDOWN,
+        tags: ['custom', 'user-created']
+      };
+
+      const taskId = await workflow.createCustomTask(taskData);
+
+      expect(taskId).toBe('new-task-id');
+      expect(mockStorageService.createCustomTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...taskData,
+          websitePatterns: ['example\\.com'],
+          isEnabled: true
+        })
+      );
+    });
+
+    it('should validate custom task data', async () => {
+      const pageContent = createMockPageContent();
+      await workflow.initializeFromCurrentPage(pageContent);
+
       const invalidTaskData = {
         name: '', // Invalid: empty name
-        description: 'Test description',
-        websitePatterns: ['example\\.com'],
-        promptTemplate: 'Test template',
-        outputFormat: OutputFormat.PLAIN_TEXT
+        description: 'Description',
+        promptTemplate: 'Prompt',
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        tags: []
       };
 
-      await expect(taskManager.createTask(invalidTaskData)).rejects.toThrow('Task validation failed');
-      expect(mockStorageService.createCustomTask).not.toHaveBeenCalled();
+      await expect(workflow.createCustomTask(invalidTaskData)).rejects.toThrow(ValidationError);
     });
 
-    it('should handle task creation with website pattern auto-generation', async () => {
-      const websiteContext = createMockWebsiteContext({
-        domain: 'special-site.co.uk',
-        url: 'https://special-site.co.uk/category/item'
-      });
+    it('should allow custom website patterns', async () => {
+      const pageContent = createMockPageContent();
+      await workflow.initializeFromCurrentPage(pageContent);
 
       const taskData = {
-        name: 'Process Special Site',
-        description: 'Process content from special site',
-        websitePatterns: [], // Empty initially
-        promptTemplate: 'Process content from {{domain}}',
-        outputFormat: OutputFormat.JSON
+        name: 'Custom Task',
+        description: 'Description',
+        promptTemplate: 'Prompt',
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        tags: [],
+        websitePatterns: ['custom\\.site\\.com', 'another\\.domain\\.org']
       };
 
-      // Simulate auto-generation of patterns based on current context
-      const generatedPatterns = [
-        websiteContext.domain.replace(/\./g, '\\.'),
-        websiteContext.url.split('/')[2].replace(/\./g, '\\.')
-      ];
+      const taskId = await workflow.createCustomTask(taskData);
 
-      const taskDataWithPatterns = {
-        ...taskData,
-        websitePatterns: generatedPatterns
-      };
-
-      const taskId = await taskManager.createTask(taskDataWithPatterns);
-
-      expect(taskId).toBe('new-task-id');
       expect(mockStorageService.createCustomTask).toHaveBeenCalledWith(
         expect.objectContaining({
-          websitePatterns: ['special-site\\.co\\.uk', 'special-site\\.co\\.uk']
+          websitePatterns: ['custom\\.site\\.com', 'another\\.domain\\.org']
         })
       );
     });
   });
 
-  // ============================================================================
-  // IMMEDIATE TASK TESTING WORKFLOW
-  // ============================================================================
-
-  describe('Immediate Task Testing Workflow', () => {
-    it('should test newly created task immediately on current page', async () => {
-      const taskData = {
-        name: 'Test Task',
-        description: 'A task to test immediately',
-        websitePatterns: ['example\\.com'],
-        promptTemplate: 'Analyze {{title}} on {{domain}}',
-        outputFormat: OutputFormat.PLAIN_TEXT
+  describe('validateTaskData', () => {
+    it('should validate valid task data', () => {
+      const validData = {
+        name: 'Valid Task',
+        description: 'A valid task description',
+        promptTemplate: 'Valid prompt template',
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        tags: ['valid']
       };
 
-      // Mock the created task for testing
-      const createdTask = createMockTask({
-        id: 'new-task-id',
-        ...taskData
-      });
-      
-      vi.spyOn(mockStorageService, 'getCustomTask').mockResolvedValue(createdTask);
+      const result = workflow.validateTaskData(validData);
 
-      // Create the task
-      const taskId = await taskManager.createTask(taskData);
-      
-      // Test the task immediately with current page context
-      const executionContext = createMockExecutionContext();
-      const testResult = await taskManager.testTask(taskId, executionContext);
-
-      expect(testResult.success).toBe(true);
-      expect(testResult.result).toBeDefined();
-      expect(testResult.validationResult.isValid).toBe(true);
-      expect(testResult.result?.content).toContain('SIMULATED');
-      // In dry run mode, AI service is not actually called
-      expect(mockAIService.processRequest).not.toHaveBeenCalled();
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
 
-    it('should handle test failures gracefully and provide feedback', async () => {
-      const taskData = {
-        name: 'Failing Task',
-        description: 'A task that will fail testing',
-        websitePatterns: ['example\\.com'],
-        promptTemplate: 'Invalid template with {{nonexistent}}',
-        outputFormat: OutputFormat.PLAIN_TEXT
+    it('should detect missing required fields', () => {
+      const invalidData = {
+        name: '',
+        description: '',
+        promptTemplate: '',
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        tags: []
       };
 
-      const createdTask = createMockTask({
-        id: 'new-task-id',
-        ...taskData
-      });
-      
-      vi.spyOn(mockStorageService, 'getCustomTask').mockResolvedValue(createdTask);
-      vi.spyOn(mockAIService, 'processRequest').mockRejectedValue(new Error('Template error'));
+      const result = workflow.validateTaskData(invalidData);
 
-      const taskId = await taskManager.createTask(taskData);
-      const executionContext = createMockExecutionContext();
-      const testResult = await taskManager.testTask(taskId, executionContext);
-
-      // In dry run mode, tasks always succeed even with AI errors, since it's simulated
-      expect(testResult.success).toBe(true);
-      expect(testResult.result?.content).toContain('SIMULATED');
-      expect(testResult.validationResult.isValid).toBe(true);
+      expect(result.isValid).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(result.errors.some(e => e.message.includes('name'))).toBe(true);
+      expect(result.errors.some(e => e.message.includes('description'))).toBe(true);
+      expect(result.errors.some(e => e.message.includes('prompt'))).toBe(true);
     });
 
-    it('should provide immediate feedback on task effectiveness', async () => {
-      const taskData = {
-        name: 'Content Extractor',
-        description: 'Extract main content from pages',
-        websitePatterns: ['.*'], // Works on all sites
-        promptTemplate: 'Extract the main content from: {{pageText}}',
-        outputFormat: OutputFormat.MARKDOWN
+    it('should validate website patterns', () => {
+      const dataWithInvalidPatterns = {
+        name: 'Task',
+        description: 'Description',
+        promptTemplate: 'Prompt',
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        tags: [],
+        websitePatterns: ['[invalid-regex', 'valid\\.pattern']
       };
 
-      const createdTask = createMockTask({
-        id: 'new-task-id',
-        ...taskData
-      });
-      
-      vi.spyOn(mockStorageService, 'getCustomTask').mockResolvedValue(createdTask);
-
-      const taskId = await taskManager.createTask(taskData);
-      const executionContext = createMockExecutionContext({
-        websiteContext: createMockWebsiteContext({
-          pageText: 'This is the main content of the page with important information.'
-        })
+      (mockPatternEngine.validatePattern as any).mockImplementation((pattern: string) => {
+        return !pattern.includes('[invalid-regex');
       });
 
-      const testResult = await taskManager.testTask(taskId, executionContext);
+      const result = workflow.validateTaskData(dataWithInvalidPatterns);
 
-      expect(testResult.success).toBe(true);
-      expect(testResult.result?.content).toContain('SIMULATED');
-      expect(testResult.result?.content).toContain('Content Extractor');
-      expect(testResult.executionTime).toBeGreaterThan(0);
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some(e => e.message.includes('pattern'))).toBe(true);
+    });
+
+    it('should provide warnings for potential issues', () => {
+      const dataWithWarnings = {
+        name: 'Task',
+        description: 'Short', // Too short
+        promptTemplate: 'Very short prompt', // Too short
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        tags: []
+      };
+
+      const result = workflow.validateTaskData(dataWithWarnings);
+
+      expect(result.isValid).toBe(true); // Still valid but has warnings
+      expect(result.warnings.length).toBeGreaterThan(0);
     });
   });
 
-  // ============================================================================
-  // TASK PARAMETER DEFINITION WORKFLOW
-  // ============================================================================
-
-  describe('Task Parameter Definition Workflow', () => {
-    it('should support custom parameters in task templates', async () => {
-      const taskData = {
-        name: 'Custom Parameter Task',
-        description: 'Task with custom parameters',
-        websitePatterns: ['example\\.com'],
-        promptTemplate: 'Analyze {{title}} for {{customParam}} and generate {{outputType}}',
-        outputFormat: OutputFormat.JSON,
-        customParameters: {
-          customParam: 'sentiment analysis',
-          outputType: 'summary report'
+  describe('getContextVariables', () => {
+    it('should extract context variables from page content', async () => {
+      const pageContent = createMockPageContent({
+        title: 'Product Review: Amazing Widget',
+        headings: ['Overview', 'Features', 'Pricing'],
+        metadata: {
+          description: 'Comprehensive review of the amazing widget',
+          keywords: 'widget, review, product'
         }
-      };
+      });
 
-      const taskId = await taskManager.createTask(taskData);
+      await workflow.initializeFromCurrentPage(pageContent);
+      const variables = workflow.getContextVariables();
 
-      expect(mockStorageService.createCustomTask).toHaveBeenCalledWith(
-        expect.objectContaining({
-          promptTemplate: expect.stringContaining('{{customParam}}'),
-          customParameters: expect.objectContaining({
-            customParam: 'sentiment analysis',
-            outputType: 'summary report'
-          })
-        })
-      );
+      expect(variables).toEqual({
+        domain: 'example.com',
+        url: 'https://example.com/test-page',
+        title: 'Product Review: Amazing Widget',
+        description: 'Comprehensive review of the amazing widget',
+        headings: ['Overview', 'Features', 'Pricing'],
+        keywords: 'widget, review, product',
+        pageType: 'other',
+        category: 'productivity'
+      });
     });
 
-    it('should validate template parameters against available context', async () => {
-      const taskData = {
-        name: 'Parameter Validation Task',
-        description: 'Task to validate parameter usage',
-        websitePatterns: ['example\\.com'],
-        promptTemplate: 'Process {{title}}, {{domain}}, and {{pageText}} for {{validParam}}',
-        outputFormat: OutputFormat.PLAIN_TEXT
-      };
+    it('should handle missing metadata gracefully', async () => {
+      const pageContent = createMockPageContent({
+        metadata: {}
+      });
 
-      // This should succeed as all parameters are valid
-      const taskId = await taskManager.createTask(taskData);
-      expect(taskId).toBe('new-task-id');
+      await workflow.initializeFromCurrentPage(pageContent);
+      const variables = workflow.getContextVariables();
+
+      expect(variables.description).toBe('');
+      expect(variables.keywords).toBe('');
     });
 
-    it('should suggest available parameters for template completion', async () => {
-      const websiteContext = createMockWebsiteContext();
-      
-      // Get available parameters from context
-      const availableParams = [
-        'domain', 'url', 'title', 'headings', 'pageText', 'links', 'forms'
-      ];
-
-      // Simulate parameter suggestion logic
-      const taskData = {
-        name: 'Parameter Suggestion Task',
-        description: 'Task to demonstrate parameter suggestions',
-        websitePatterns: ['example\\.com'],
-        promptTemplate: 'Available parameters: {{domain}}, {{title}}, {{headings}}',
-        outputFormat: OutputFormat.MARKDOWN,
-        suggestedParams: availableParams
-      };
-
-      const taskId = await taskManager.createTask(taskData);
-
-      expect(mockStorageService.createCustomTask).toHaveBeenCalledWith(
-        expect.objectContaining({
-          promptTemplate: expect.stringContaining('{{domain}}'),
-          suggestedParams: expect.arrayContaining(['domain', 'title', 'headings'])
-        })
-      );
+    it('should throw error if not initialized', () => {
+      expect(() => workflow.getContextVariables()).toThrow('not initialized');
     });
   });
 
-  // ============================================================================
-  // WORKFLOW INTEGRATION TESTS
-  // ============================================================================
-
-  describe('Complete Task Addition Workflow Integration', () => {
-    it('should complete full workflow: create -> validate -> test -> refine', async () => {
-      // Step 1: Create initial task
-      const initialTaskData = {
-        name: 'SEO Analysis Task',
-        description: 'Analyze page for SEO optimization',
-        websitePatterns: ['.*'],
-        promptTemplate: 'Analyze {{title}} and {{headings}} for SEO optimization',
-        outputFormat: OutputFormat.MARKDOWN
-      };
-
-      const taskId = await taskManager.createTask(initialTaskData);
-      expect(taskId).toBe('new-task-id');
-
-      // Step 2: Validate task
-      const createdTask = createMockTask({
-        id: taskId,
-        ...initialTaskData
-      });
-      vi.spyOn(mockStorageService, 'getCustomTask').mockResolvedValue(createdTask);
-
-      const validationResult = await taskManager.validateTask(taskId);
-      expect(validationResult.isValid).toBe(true);
-
-      // Step 3: Test task
-      const executionContext = createMockExecutionContext();
-      const testResult = await taskManager.testTask(taskId, executionContext);
-      expect(testResult.success).toBe(true);
-
-      // Step 4: Refine task based on test results
-      const updates = {
-        promptTemplate: 'Analyze {{title}}, {{headings}}, and {{pageText}} for comprehensive SEO optimization'
-      };
-
-      const updateSuccess = await taskManager.updateTask(taskId, updates);
-      expect(updateSuccess).toBe(true);
-      expect(mockStorageService.updateCustomTask).toHaveBeenCalledWith(taskId, updates);
-    });
-
-    it('should handle workflow errors and provide recovery options', async () => {
-      // Simulate storage failure during creation
-      vi.spyOn(mockStorageService, 'createCustomTask').mockRejectedValue(new Error('Storage failure'));
+  describe('previewTask', () => {
+    it('should generate task preview with context injection', async () => {
+      const pageContent = createMockPageContent();
+      await workflow.initializeFromCurrentPage(pageContent);
 
       const taskData = {
-        name: 'Test Task',
-        description: 'Test description',
-        websitePatterns: ['example\\.com'],
-        promptTemplate: 'Test template',
-        outputFormat: OutputFormat.PLAIN_TEXT
+        name: 'Preview Task',
+        description: 'Task for preview',
+        promptTemplate: 'Generate content for {{domain}} with title "{{title}}"',
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        tags: []
       };
 
-      await expect(taskManager.createTask(taskData)).rejects.toThrow('Storage failure');
+      const preview = workflow.previewTask(taskData);
 
-      // Verify no partial state was created
-      expect(mockStorageService.getCustomTask).not.toHaveBeenCalled();
+      expect(preview.processedPrompt).toContain('example.com');
+      expect(preview.processedPrompt).toContain('Test Page Title');
+      expect(preview.contextVariables).toBeDefined();
+      expect(preview.estimatedTokens).toBeGreaterThan(0);
     });
 
-    it('should support task creation with different website contexts', async () => {
-      const contexts = [
-        createMockWebsiteContext({ domain: 'ecommerce.com', category: WebsiteCategory.ECOMMERCE }),
-        createMockWebsiteContext({ domain: 'news.org', category: WebsiteCategory.NEWS }),
-        createMockWebsiteContext({ domain: 'social.net', category: WebsiteCategory.SOCIAL })
-      ];
+    it('should handle template variables that are not available', async () => {
+      const pageContent = createMockPageContent();
+      await workflow.initializeFromCurrentPage(pageContent);
 
-      for (const context of contexts) {
-        const taskData = {
-          name: `${context.category} Task`,
-          description: `Task for ${context.category} websites`,
-          websitePatterns: [context.domain.replace('.', '\\.')],
-          promptTemplate: `Process ${context.category} content from {{domain}}`,
-          outputFormat: OutputFormat.JSON
-        };
+      const taskData = {
+        name: 'Preview Task',
+        description: 'Task for preview',
+        promptTemplate: 'Generate content for {{nonexistent}} variable',
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        tags: []
+      };
 
-        const taskId = await taskManager.createTask(taskData);
-        expect(taskId).toBe('new-task-id');
-      }
+      const preview = workflow.previewTask(taskData);
 
-      expect(mockStorageService.createCustomTask).toHaveBeenCalledTimes(3);
+      expect(preview.processedPrompt).toContain('{{nonexistent}}'); // Should remain unprocessed
+      expect(preview.warnings).toContain('Unknown template variable: nonexistent');
+    });
+  });
+
+  describe('reset', () => {
+    it('should reset workflow state', async () => {
+      const pageContent = createMockPageContent();
+      await workflow.initializeFromCurrentPage(pageContent);
+
+      expect(workflow.getContextVariables()).toBeDefined();
+
+      workflow.reset();
+
+      expect(() => workflow.getContextVariables()).toThrow('not initialized');
+    });
+  });
+
+  describe('Integration Tests', () => {
+    it('should handle complete workflow from initialization to task creation', async () => {
+      // Initialize with page content
+      const pageContent = createMockPageContent({
+        url: 'https://twitter.com/user/status/123',
+        title: 'Tweet about AI development'
+      });
+
+      const initResult = await workflow.initializeFromCurrentPage(pageContent);
+      expect(initResult.success).toBe(true);
+
+      // Generate suggestions
+      const context = createMockWebsiteContext({ 
+        domain: 'twitter.com',
+        category: WebsiteCategory.SOCIAL_MEDIA 
+      });
+      (mockPatternEngine.analyzeWebsite as any).mockResolvedValue(context);
+
+      const suggestions = await workflow.generateTaskSuggestions(context);
+      expect(suggestions.length).toBeGreaterThan(0);
+
+      // Create task from suggestion
+      const taskId = await workflow.createTaskFromTemplate(suggestions[0]);
+      expect(taskId).toBe('new-task-id');
+
+      // Verify the task was created with correct patterns
+      expect(mockStorageService.createCustomTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          websitePatterns: expect.arrayContaining(['example\\.com'])
+        })
+      );
+    });
+
+    it('should handle privacy-sensitive websites', async () => {
+      const pageContent = createMockPageContent({
+        url: 'https://banking.example.com/account'
+      });
+
+      const sensitiveContext = createMockWebsiteContext({
+        domain: 'banking.example.com',
+        securityLevel: SecurityLevel.RESTRICTED
+      });
+
+      (mockPatternEngine.analyzeWebsite as any).mockResolvedValue(sensitiveContext);
+
+      const initResult = await workflow.initializeFromCurrentPage(pageContent);
+      expect(initResult.success).toBe(true);
+      expect(initResult.privacyWarnings).toContain('sensitive website');
     });
   });
 });
