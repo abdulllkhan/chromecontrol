@@ -31,6 +31,12 @@ export * from './securityManager.js';
 // Preferences service
 export * from './preferencesService.js';
 
+// Error handling service
+export * from './errorHandler.js';
+
+// Fallback suggestions service
+export * from './fallbackSuggestions.js';
+
 // Service examples (for development and testing)
 export * from './patternEngineExample.js';
 export * from './aiServiceExample.js';
