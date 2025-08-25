@@ -195,6 +195,13 @@ export interface UserPreferences {
   automationPermissions: Record<string, boolean>;
   aiProvider: string;
   theme: 'light' | 'dark' | 'auto';
+  aiConfig?: {
+    apiKey: string;
+    model?: string;
+    maxTokens?: number;
+    temperature?: number;
+    baseUrl?: string;
+  };
 }
 
 export interface CustomPattern {

@@ -26,9 +26,13 @@ import {
 import { PatternEngine } from '../services/patternEngine';
 import { TaskManager } from '../services/taskManager';
 import { ChromeStorageService } from '../services/storage';
-import { AIService } from '../services/aiService';
+import { AIService, AIServiceConfig, DEFAULT_AI_CONFIG } from '../services/aiService';
+import { demoAIService } from '../services/demoAIService';
 import '../styles/TaskManagement.css';
 import '../styles/UserPreferences.css';
+import '../styles/PopupImproved.css';
+import { title } from 'process';
+import { title } from 'process';
 
 // ============================================================================
 // INTERFACES
@@ -40,7 +44,7 @@ interface PopupState {
   suggestions: PrioritizedSuggestion[];
   websiteContext: WebsiteContext | null;
   pageContent: PageContent | null;
-  activeView: 'suggestions' | 'task-management' | 'add-task' | 'full-task-management' | 'settings';
+  activeView: 'suggestions' | 'task-management' | 'add-task' | 'full-task-management' | 'settings' | 'ai-config';
   customTasks: CustomTask[];
   selectedTask: CustomTask | null;
   taskResult: TaskResult | null;
@@ -53,6 +57,8 @@ interface PopupState {
     hasCustomTasks: boolean;
     timeRange: { min: number; max: number };
   } | null;
+  aiConfigured: boolean;
+  aiConfig: AIServiceConfig | null;
 }
 
 interface SuggestionCardProps {
@@ -90,6 +96,13 @@ interface TaskFormProps {
   websiteContext: WebsiteContext | null;
   onSave: (task: Partial<CustomTask>) => void;
   onCancel: () => void;
+}
+
+interface AIConfigProps {
+  config: AIServiceConfig | null;
+  onSave: (config: AIServiceConfig) => void;
+  onCancel: () => void;
+  onTest: (config: AIServiceConfig) => Promise<boolean>;
 }
 
 interface TaskManagementProps {
@@ -813,6 +826,206 @@ Please provide relevant assistance based on the page content and user needs.`;
   );
 };
 
+const AIConfigComponent: React.FC<AIConfigProps> = ({
+  config,
+  onSave,
+  onCancel,
+  onTest
+}) => {
+  const [formData, setFormData] = useState({
+    apiKey: config?.apiKey || '',
+    model: config?.model || 'gpt-3.5-turbo',
+    maxTokens: config?.maxTokens || 1000,
+    temperature: config?.temperature || 0.7,
+    baseUrl: config?.baseUrl || 'https://api.openai.com/v1'
+  });
+  
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.apiKey.trim()) {
+      newErrors.apiKey = 'API key is required';
+    } else if (!formData.apiKey.startsWith('sk-')) {
+      newErrors.apiKey = 'OpenAI API key should start with "sk-"';
+    }
+    
+    if (formData.maxTokens < 1 || formData.maxTokens > 4000) {
+      newErrors.maxTokens = 'Max tokens must be between 1 and 4000';
+    }
+    
+    if (formData.temperature < 0 || formData.temperature > 2) {
+      newErrors.temperature = 'Temperature must be between 0 and 2';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleTestConnection = async () => {
+    if (!validateForm()) return;
+    
+    setIsTestingConnection(true);
+    setTestResult(null);
+    
+    try {
+      const testConfig: AIServiceConfig = {
+        apiKey: formData.apiKey.trim(),
+        model: formData.model,
+        maxTokens: formData.maxTokens,
+        temperature: formData.temperature,
+        baseUrl: formData.baseUrl
+      };
+      
+      const success = await onTest(testConfig);
+      setTestResult({
+        success,
+        message: success 
+          ? 'Connection successful! AI features are ready to use.' 
+          : 'Connection failed. Please check your API key and try again.'
+      });
+    } catch (error) {
+      setTestResult({
+        success: false,
+        message: `Connection error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+    
+    const aiConfig: AIServiceConfig = {
+      apiKey: formData.apiKey.trim(),
+      model: formData.model,
+      maxTokens: formData.maxTokens,
+      temperature: formData.temperature,
+      baseUrl: formData.baseUrl
+    };
+    
+    onSave(aiConfig);
+  };
+
+  return (
+    <div className="ai-config">
+      <div className="ai-config-header">
+        <h3>🤖 AI Configuration</h3>
+        <button className="btn btn-secondary" onClick={onCancel}>✕</button>
+      </div>
+      
+      <div className="ai-config-info">
+        <p>Configure your AI service to enable intelligent suggestions and automation.</p>
+        <div className="info-box">
+          <strong>🔑 OpenAI API Key Required</strong>
+          <p>Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI Platform</a></p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="ai-config-form">
+        <div className="form-group">
+          <label htmlFor="api-key">API Key *</label>
+          <input
+            id="api-key"
+            type="password"
+            value={formData.apiKey}
+            onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+            className={errors.apiKey ? 'error' : ''}
+            placeholder="sk-..."
+          />
+          {errors.apiKey && <span className="error-text">{errors.apiKey}</span>}
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="model">Model</label>
+            <select
+              id="model"
+              value={formData.model}
+              onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+            >
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Recommended)</option>
+              <option value="gpt-4">GPT-4 (More capable, slower)</option>
+              <option value="gpt-4-turbo-preview">GPT-4 Turbo</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="max-tokens">Max Tokens</label>
+            <input
+              id="max-tokens"
+              type="number"
+              min="1"
+              max="4000"
+              value={formData.maxTokens}
+              onChange={(e) => setFormData({ ...formData, maxTokens: parseInt(e.target.value) })}
+              className={errors.maxTokens ? 'error' : ''}
+            />
+            {errors.maxTokens && <span className="error-text">{errors.maxTokens}</span>}
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="temperature">
+            Temperature ({formData.temperature})
+            <small>Controls randomness: 0 = focused, 2 = creative</small>
+          </label>
+          <input
+            id="temperature"
+            type="range"
+            min="0"
+            max="2"
+            step="0.1"
+            value={formData.temperature}
+            onChange={(e) => setFormData({ ...formData, temperature: parseFloat(e.target.value) })}
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="base-url">Base URL (Advanced)</label>
+          <input
+            id="base-url"
+            type="url"
+            value={formData.baseUrl}
+            onChange={(e) => setFormData({ ...formData, baseUrl: e.target.value })}
+            placeholder="https://api.openai.com/v1"
+          />
+          <small>Leave default unless using a custom endpoint</small>
+        </div>
+
+        {testResult && (
+          <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
+            <span>{testResult.success ? '✅' : '❌'} {testResult.message}</span>
+          </div>
+        )}
+
+        <div className="form-actions">
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleTestConnection}
+            disabled={isTestingConnection || !formData.apiKey.trim()}
+          >
+            {isTestingConnection ? '🔄 Testing...' : '🧪 Test Connection'}
+          </button>
+          <button type="submit" className="btn btn-primary">
+            Save Configuration
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 const TaskManagement: React.FC<TaskManagementProps> = ({ 
   tasks, 
   onEdit, 
@@ -925,7 +1138,9 @@ export const PopupApp: React.FC = () => {
     copiedText: null,
     suggestionFilter: {},
     categorizedSuggestions: {},
-    filterOptions: null
+    filterOptions: null,
+    aiConfigured: false,
+    aiConfig: null
   });
   
   const [executingTask, setExecutingTask] = useState<string | null>(null);
@@ -958,13 +1173,16 @@ export const PopupApp: React.FC = () => {
 
         // Initialize services
         const storageService = new ChromeStorageService();
-        const aiService = new AIService({
-          apiKey: 'mock-key', // Will be replaced with actual configuration
-          baseUrl: 'https://api.openai.com/v1',
-          model: 'gpt-3.5-turbo',
-          timeout: 30000,
-          maxRetries: 3
-        });
+        await storageService.initialize();
+        
+        // Check for existing AI configuration
+        const preferences = await storageService.getUserPreferences();
+        const aiConfig = preferences?.aiConfig || null;
+        const aiConfigured = !!(aiConfig?.apiKey);
+        
+        const aiService = aiConfigured && aiConfig 
+          ? new AIService(aiConfig)
+          : demoAIService as any; // Use demo service when not configured
 
         const patternEngine = new PatternEngine();
         const taskManager = new TaskManager({
@@ -1041,7 +1259,9 @@ export const PopupApp: React.FC = () => {
           suggestions,
           categorizedSuggestions,
           filterOptions,
-          customTasks: Object.values(customTasks)
+          customTasks: Object.values(customTasks),
+          aiConfigured,
+          aiConfig
         }));
       });
     };
@@ -1092,19 +1312,47 @@ export const PopupApp: React.FC = () => {
     setExecutingTask(suggestion.id);
     
     const result = await executeWithErrorHandling(async () => {
-      // Mock task execution - will be replaced with actual task manager execution
-      await new Promise(resolve => setTimeout(resolve, suggestion.estimatedTime * 100));
-      
-      const mockResult: TaskResult = {
-        success: true,
-        content: `Result for "${suggestion.title}" (Priority: ${suggestion.priority.toFixed(1)}, Relevance: ${suggestion.relevanceScore.toFixed(1)})\n\nThis suggestion was generated from ${suggestion.source} source and matched patterns: ${suggestion.matchingPatterns.join(', ')}\n\nThe actual implementation will integrate with the task manager and AI service to process the request and return real results.`,
-        format: OutputFormat.PLAIN_TEXT,
-        timestamp: new Date(),
-        executionTime: suggestion.estimatedTime * 100
+      if (!taskManager || !state.websiteContext || !state.pageContent) {
+        throw new Error('Required services not initialized');
+      }
+
+      // Create execution context
+      const executionContext = {
+        websiteContext: state.websiteContext,
+        pageContent: state.pageContent,
+        taskId: suggestion.taskId || suggestion.id,
+        userInput: {}
       };
-      
-      setState(prev => ({ ...prev, taskResult: mockResult }));
-      return mockResult;
+
+      // Try to execute with task manager first
+      if (suggestion.taskId && suggestion.isCustom) {
+        const taskResult = await taskManager.executeTask(
+          suggestion.taskId, 
+          executionContext,
+          { validateBeforeExecution: false }
+        );
+        
+        setState(prev => ({ ...prev, taskResult }));
+        return taskResult;
+      } else {
+        // For built-in suggestions, simulate execution with demo content
+        await new Promise(resolve => setTimeout(resolve, suggestion.estimatedTime * 50));
+        
+        const demoContent = state.aiConfigured 
+          ? `AI-powered result for "${suggestion.title}"\n\nThis would contain intelligent, contextual assistance based on your request and the current website content.`
+          : `🤖 DEMO: "${suggestion.title}"\n\nThis is a demonstration of the ${suggestion.category} suggestion. In full mode with AI configured, you would receive:\n\n• Intelligent analysis of the current page\n• Contextual recommendations\n• Actionable insights\n• Automated assistance\n\n💡 Configure your OpenAI API key to unlock real AI capabilities!`;
+        
+        const mockResult: TaskResult = {
+          success: true,
+          content: demoContent,
+          format: OutputFormat.PLAIN_TEXT,
+          timestamp: new Date(),
+          executionTime: suggestion.estimatedTime * 50
+        };
+        
+        setState(prev => ({ ...prev, taskResult: mockResult }));
+        return mockResult;
+      }
     }, { 
       component: 'PopupApp', 
       action: 'executeSuggestion',
@@ -1112,7 +1360,7 @@ export const PopupApp: React.FC = () => {
     });
     
     setExecutingTask(null);
-  }, [executeWithErrorHandling]);
+  }, [executeWithErrorHandling, taskManager, state.websiteContext, state.pageContent, state.aiConfigured]);
   
   const handleCopyContent = useCallback(async (content: string) => {
     const success = await copyToClipboard(content);
@@ -1198,6 +1446,71 @@ export const PopupApp: React.FC = () => {
       }));
     }
   }, []);
+
+  const handleSaveAIConfig = useCallback(async (config: AIServiceConfig) => {
+    try {
+      if (!storageService) {
+        throw new Error('Storage service not initialized');
+      }
+
+      // Update user preferences with AI config
+      const preferences = await storageService.getUserPreferences();
+      await storageService.updateUserPreferences({
+        ...preferences,
+        aiConfig: config
+      });
+
+      // Update state
+      setState(prev => ({
+        ...prev,
+        aiConfig: config,
+        aiConfigured: true,
+        activeView: 'suggestions'
+      }));
+
+      console.log('AI configuration saved successfully');
+    } catch (error) {
+      console.error('Failed to save AI configuration:', error);
+      setState(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : 'Failed to save AI configuration'
+      }));
+    }
+  }, [storageService]);
+
+  const handleTestAIConfig = useCallback(async (config: AIServiceConfig): Promise<boolean> => {
+    try {
+      const testService = new AIService(config);
+      
+      // Test with a simple request
+      const testRequest = {
+        prompt: 'Say "Hello" to test the connection.',
+        context: {
+          domain: 'test.com',
+          category: WebsiteCategory.PRODUCTIVITY,
+          pageType: PageType.OTHER,
+          extractedData: {},
+          securityLevel: SecurityLevel.PUBLIC,
+          timestamp: new Date()
+        },
+        taskType: TaskType.GENERATE_TEXT,
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        constraints: {
+          allowSensitiveData: false,
+          maxContentLength: 100,
+          allowedDomains: [],
+          restrictedSelectors: []
+        },
+        timestamp: new Date()
+      };
+
+      const response = await testService.processRequest(testRequest);
+      return response.success !== false;
+    } catch (error) {
+      console.error('AI config test failed:', error);
+      return false;
+    }
+  }, []);
   
   // Render loading state
   if (state.isLoading) {
@@ -1264,13 +1577,20 @@ export const PopupApp: React.FC = () => {
             className={`nav-btn ${state.activeView === 'suggestions' ? 'active' : ''}`}
             onClick={() => setState(prev => ({ ...prev, activeView: 'suggestions', taskResult: null }))}
           >
-            Suggestions
+            💡 Suggestions
           </button>
           <button
             className={`nav-btn ${state.activeView === 'task-management' ? 'active' : ''}`}
             onClick={() => setState(prev => ({ ...prev, activeView: 'task-management', selectedTask: null }))}
           >
-            Tasks ({state.customTasks.length})
+            📋 Tasks ({state.customTasks.length})
+          </button>
+          <button
+            className={`nav-btn ${state.activeView === 'ai-config' ? 'active' : ''} ${!state.aiConfigured ? 'highlight' : ''}`}
+            onClick={() => setState(prev => ({ ...prev, activeView: 'ai-config', selectedTask: null }))}
+            title={!state.aiConfigured ? 'Configure AI to enable smart features' : 'AI Configuration'}
+          >
+            🤖 AI {!state.aiConfigured ? '⚠️' : '✅'}
           </button>
           <button
             className={`nav-btn ${state.activeView === 'settings' ? 'active' : ''}`}
@@ -1293,6 +1613,25 @@ export const PopupApp: React.FC = () => {
                 />
               ) : (
                 <div className="suggestions-container">
+                  {/* AI Status Banner */}
+                  {!state.aiConfigured && (
+                    <div className="ai-status-banner">
+                      <div className="banner-content">
+                        <span className="banner-icon">🤖</span>
+                        <div className="banner-text">
+                          <strong>AI Features Disabled</strong>
+                          <p>Configure your AI service to unlock intelligent suggestions and automation</p>
+                        </div>
+                        <button
+                          className="btn btn-primary btn-small"
+                          onClick={() => setState(prev => ({ ...prev, activeView: 'ai-config' }))}
+                        >
+                          Configure AI
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="suggestions-header">
                     <h2>Available Suggestions</h2>
                     <div className="suggestions-controls">
@@ -1403,6 +1742,15 @@ export const PopupApp: React.FC = () => {
                 activeView: state.selectedTask ? 'task-management' : 'suggestions',
                 selectedTask: null 
               }))}
+            />
+          )}
+
+          {state.activeView === 'ai-config' && (
+            <AIConfigComponent
+              config={state.aiConfig}
+              onSave={handleSaveAIConfig}
+              onCancel={() => setState(prev => ({ ...prev, activeView: 'suggestions' }))}
+              onTest={handleTestAIConfig}
             />
           )}
 
