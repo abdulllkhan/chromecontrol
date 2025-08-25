@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
 export default defineConfig(({ command, mode }) => {
+  const isProduction = mode === 'production';
+  
   return {
     plugins: [react()],
     resolve: {
@@ -25,10 +27,12 @@ export default defineConfig(({ command, mode }) => {
         }
       },
       target: 'es2020',
-      minify: false, // Keep readable for development
+      minify: isProduction,
+      sourcemap: !isProduction,
+      reportCompressedSize: isProduction,
     },
     define: {
-      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+      'process.env.NODE_ENV': JSON.stringify(mode || 'development'),
       global: 'globalThis',
     },
   };
