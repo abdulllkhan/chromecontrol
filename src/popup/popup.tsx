@@ -31,8 +31,6 @@ import { demoAIService } from '../services/demoAIService';
 import '../styles/TaskManagement.css';
 import '../styles/UserPreferences.css';
 import '../styles/PopupImproved.css';
-import { title } from 'process';
-import { title } from 'process';
 
 // ============================================================================
 // INTERFACES
