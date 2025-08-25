@@ -1043,15 +1043,7 @@ export const PopupApp: React.FC = () => {
           filterOptions,
           customTasks: Object.values(customTasks)
         }));
-        
-      } catch (error) {
-        console.error('Failed to initialize popup:', error);
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to initialize'
-        }));
-      }
+      });
     };
     
     initializePopup();

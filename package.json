@@ -5,11 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite build --watch && npm run copy-content",
-    "build": "vite build && npm run copy-content",
+    "build": "npm run clean && npm run build:prod && npm run copy-content && npm run copy-assets",
+    "build:prod": "vite build --mode production",
+    "build:dev": "vite build --mode development && npm run copy-content && npm run copy-assets",
+    "clean": "rm -rf dist",
     "copy-content": "cp src/content/content-simple.js dist/content.js",
+    "copy-assets": "cp manifest.json dist/ && cp -r icons dist/",
+    "package": "npm run build && npm run create-zip",
+    "create-zip": "cd dist && zip -r ../agentic-chrome-extension.zip . && cd ..",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint src --ext ts,tsx --fix",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -24,7 +31,8 @@
     "test:utils": "vitest run src/utils/**/*.test.ts",
     "test:chrome-api": "vitest run src/__tests__/integration/chrome-api.test.ts",
     "test:workflows": "vitest run src/__tests__/e2e/user-workflows.test.ts",
-    "test:mock-ai": "vitest run src/__tests__/mocks/mockAIService.test.ts"
+    "test:mock-ai": "vitest run src/__tests__/mocks/mockAIService.test.ts",
+    "validate": "npm run type-check && npm run lint && npm run test:run"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -35,6 +43,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/chrome": "^0.0.246",
+    "@types/node": "^24.3.0",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@typescript-eslint/eslint-plugin": "^6.10.0",
