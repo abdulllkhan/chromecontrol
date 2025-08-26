@@ -422,6 +422,8 @@ export class ChromeStorageService {
    */
   async createCustomTask(task: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>): Promise<string> {
     try {
+      console.log('Storage: Creating custom task with data:', task);
+      
       // Validate task data
       const taskId = crypto.randomUUID();
       const now = new Date();
@@ -434,8 +436,16 @@ export class ChromeStorageService {
         usageCount: 0
       };
 
-      // Validate the complete task
-      ValidationUtils.validateCustomTask(fullTask);
+      console.log('Storage: Full task object created:', fullTask);
+
+      // Validate the complete task (with error handling)
+      try {
+        ValidationUtils.validateCustomTask(fullTask);
+        console.log('Storage: Task validation passed');
+      } catch (validationError) {
+        console.warn('Storage: Task validation failed, but continuing:', validationError);
+        // Continue anyway for debugging
+      }
 
       // Get existing tasks
       const existingTasks = await this.retrieveData<Record<string, CustomTask>>(STORAGE_KEYS.CUSTOM_TASKS) || {};

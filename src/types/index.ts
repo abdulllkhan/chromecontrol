@@ -530,13 +530,19 @@ export const ValidationUtils = {
       throw new ValidationError('URL pattern must be a non-empty string');
     }
 
+    // Allow simple domain names without requiring regex escaping
+    const simpleDomainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$/;
+    if (simpleDomainRegex.test(pattern)) {
+      return true;
+    }
+
     try {
-      // Test if it's a valid regex pattern
+      // Test if it's a valid regex pattern for more complex patterns
       new RegExp(pattern);
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ValidationError(`Invalid URL pattern regex: ${errorMessage}`);
+      throw new ValidationError(`Invalid URL pattern: must be a valid domain name or regex pattern. Error: ${errorMessage}`);
     }
   },
 

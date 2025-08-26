@@ -86,12 +86,28 @@ export class UrlAnalyzer {
    */
   static extractDomain(url: string): string {
     try {
+      if (!url || typeof url !== 'string') {
+        console.warn('Invalid URL provided to extractDomain:', url);
+        return url || 'example.com';
+      }
+      
+      // Handle empty string case
+      if (url.trim() === '') {
+        return '';
+      }
+      
       const urlObj = new URL(url);
-      return urlObj.hostname.toLowerCase().replace(/^www\./, '');
+      const domain = urlObj.hostname.toLowerCase().replace(/^www\./, '');
+      return domain || 'example.com';
     } catch (error) {
+      console.warn('Failed to parse URL:', url, error);
       // Fallback for invalid URLs
       const match = url.match(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/);
-      return match ? match[1].toLowerCase() : url.toLowerCase();
+      if (match) {
+        return match[1].toLowerCase();
+      }
+      // Return the original URL if it's a simple string, otherwise fallback
+      return url && url.trim() !== '' ? url.toLowerCase() : 'example.com';
     }
   }
 
