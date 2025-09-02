@@ -2,6 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { CustomTask, WebsiteCategory, OutputFormat, UsageMetrics } from '../types';
 import { TaskManager } from '../services/taskManager';
 import { ChromeStorageService } from '../services/storage';
+import {
+  EditIcon,
+  DeleteIcon,
+  DuplicateIcon,
+  StatsIcon,
+  CloseIcon,
+  CheckIcon,
+  ErrorIcon
+} from './icons/IconComponents';
 
 // ============================================================================
 // INTERFACES
@@ -222,15 +231,15 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
             📥 Import
           </button>
           <button className="btn btn-secondary" onClick={onClose}>
-            ✕ Close
+            <CloseIcon size={16} /> Close
           </button>
         </div>
       </div>
 
       {error && (
         <div className="error-message">
-          <span>❌ {error}</span>
-          <button onClick={() => setError(null)}>✕</button>
+          <span><ErrorIcon size={16} /> {error}</span>
+          <button onClick={() => setError(null)}><CloseIcon size={14} /></button>
         </div>
       )}
 
@@ -524,7 +533,7 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
                 📤 Export Selected
               </button>
               <button className="btn btn-danger" onClick={handleBulkDelete}>
-                🗑️ Delete Selected
+                <DeleteIcon size={14} /> Delete Selected
               </button>
             </div>
           )}
@@ -620,7 +629,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
             onClick={() => onToggle(!task.isEnabled)}
             title={task.isEnabled ? 'Disable task' : 'Enable task'}
           >
-            {task.isEnabled ? '✅' : '❌'}
+            {task.isEnabled ? <CheckIcon size={16} /> : <ErrorIcon size={16} />}
           </button>
         </div>
       </div>
@@ -657,16 +666,16 @@ const TaskCard: React.FC<TaskCardProps> = ({
       
       <div className="task-actions">
         <button className="btn btn-small btn-secondary" onClick={onEdit}>
-          ✏️ Edit
+          <EditIcon size={14} /> Edit
         </button>
         <button className="btn btn-small btn-secondary" onClick={onDuplicate}>
-          📋 Duplicate
+          <DuplicateIcon size={14} /> Duplicate
         </button>
         <button className="btn btn-small btn-secondary" onClick={onViewStats}>
-          📊 Stats
+          <StatsIcon size={14} /> Stats
         </button>
         <button className="btn btn-small btn-danger" onClick={onDelete}>
-          🗑️ Delete
+          <DeleteIcon size={14} /> Delete
         </button>
       </div>
     </div>
@@ -720,8 +729,8 @@ const TaskStatsModal: React.FC<TaskStatsModalProps> = ({ task, stats, onClose })
     <div className="modal-overlay">
       <div className="modal task-stats-modal">
         <div className="modal-header">
-          <h3>📊 Task Statistics: {task.name}</h3>
-          <button className="btn btn-secondary" onClick={onClose}>✕</button>
+          <h3><StatsIcon size={18} /> Task Statistics: {task.name}</h3>
+          <button className="btn btn-secondary" onClick={onClose}><CloseIcon size={16} /></button>
         </div>
         
         <div className="modal-content">
@@ -800,7 +809,15 @@ const TaskStatsModal: React.FC<TaskStatsModalProps> = ({ task, stats, onClose })
               <div className="detail-item">
                 <label>Status:</label>
                 <span className={task.isEnabled ? 'enabled' : 'disabled'}>
-                  {task.isEnabled ? 'Enabled' : 'Disabled'}
+                  {task.isEnabled ? (
+                    <>
+                      <CheckIcon size={12} /> Enabled
+                    </>
+                  ) : (
+                    <>
+                      <ErrorIcon size={12} /> Disabled
+                    </>
+                  )}
                 </span>
               </div>
             </div>
@@ -856,7 +873,7 @@ const TaskExportModal: React.FC<TaskExportModalProps> = ({
       <div className="modal export-modal">
         <div className="modal-header">
           <h3>📤 Export Tasks</h3>
-          <button className="btn btn-secondary" onClick={onClose}>✕</button>
+          <button className="btn btn-secondary" onClick={onClose}><CloseIcon size={16} /></button>
         </div>
         
         <div className="modal-content">

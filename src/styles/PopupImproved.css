@@ -542,4 +542,213 @@
 
 .popup-content::-webkit-scrollbar-thumb:hover {
   background: #a0aec0;
+}/* ===
+=========================================================================
+   SCROLLBAR IMPROVEMENTS FOR POPUP
+   ============================================================================ */
+
+/* Apply minimal scrollbars to popup content areas */
+.popup-content,
+.suggestion-list,
+.task-list,
+.categorized-suggestions,
+.task-form-content,
+.modal-content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+}
+
+.popup-content::-webkit-scrollbar,
+.suggestion-list::-webkit-scrollbar,
+.task-list::-webkit-scrollbar,
+.categorized-suggestions::-webkit-scrollbar,
+.task-form-content::-webkit-scrollbar,
+.modal-content::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+
+.popup-content::-webkit-scrollbar-track,
+.suggestion-list::-webkit-scrollbar-track,
+.task-list::-webkit-scrollbar-track,
+.categorized-suggestions::-webkit-scrollbar-track,
+.task-form-content::-webkit-scrollbar-track,
+.modal-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.popup-content::-webkit-scrollbar-thumb,
+.suggestion-list::-webkit-scrollbar-thumb,
+.task-list::-webkit-scrollbar-thumb,
+.categorized-suggestions::-webkit-scrollbar-thumb,
+.task-form-content::-webkit-scrollbar-thumb,
+.modal-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 1px;
+  transition: background 0.2s ease;
+}
+
+.popup-content::-webkit-scrollbar-thumb:hover,
+.suggestion-list::-webkit-scrollbar-thumb:hover,
+.task-list::-webkit-scrollbar-thumb:hover,
+.categorized-suggestions::-webkit-scrollbar-thumb:hover,
+.task-form-content::-webkit-scrollbar-thumb:hover,
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================================================
+   ICON INTEGRATION IMPROVEMENTS
+   ============================================================================ */
+
+/* Ensure icons align properly with text */
+.suggestion-card .suggestion-icon,
+.category-header .category-icon,
+.task-form-context .context-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Improve button icon spacing */
+.btn svg {
+  margin-right: 6px;
+}
+
+.btn:last-child svg,
+.btn svg:only-child {
+  margin-right: 0;
+}
+
+/* Icon hover effects */
+.suggestion-card:hover .suggestion-icon svg,
+.category-header:hover .category-icon svg {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+}
+
+/* Priority icon styling */
+.suggestion-priority .priority-score {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Status toggle improvements */
+.status-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.status-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.status-toggle.enabled {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.status-toggle.disabled {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* Filter button improvements */
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-toggle:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+/* Task action buttons */
+.task-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.task-actions .btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+/* Modal header improvements */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Error message improvements */
+.error-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 6px;
+  color: #dc2626;
+  margin-bottom: 16px;
+}
+
+.error-message span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.error-message button {
+  background: none;
+  border: none;
+  color: #dc2626;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.error-message button:hover {
+  background: rgba(239, 68, 68, 0.1);
 }

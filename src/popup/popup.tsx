@@ -32,6 +32,26 @@ import { demoAIService } from '../services/demoAIService';
 import '../styles/TaskManagement.css';
 import '../styles/UserPreferences.css';
 import '../styles/PopupImproved.css';
+import '../styles/Icons.css';
+import {
+  getCategoryIcon,
+  getPriorityIcon,
+  EditIcon,
+  DeleteIcon,
+  DuplicateIcon,
+  StatsIcon,
+  CopyIcon,
+  CloseIcon,
+  CheckIcon,
+  ErrorIcon,
+  FilterIcon,
+  SearchIcon,
+  SettingsIcon,
+  LoadingIcon
+} from '../components/icons/IconComponents';
+// IMPORTANT: Do NOT import 'title' from 'process' - it causes build errors
+// All 'title' references in this file are object properties (tab.title, suggestion.title, etc.)
+// or HTML attributes (title="..."), NOT variables that need importing
 
 // ============================================================================
 // INTERFACES
@@ -93,7 +113,7 @@ interface TaskResultProps {
 interface TaskFormProps {
   task?: CustomTask;
   websiteContext: WebsiteContext | null;
-  onSave: (task: Partial<CustomTask>) => void;
+  onSave: (task: Partial<CustomTask>) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -148,18 +168,7 @@ const formatContent = (content: string, format: OutputFormat): string => {
   }
 };
 
-const getCategoryIcon = (category: string): string => {
-  const iconMap: Record<string, string> = {
-    [WebsiteCategory.SOCIAL_MEDIA]: '📱',
-    [WebsiteCategory.ECOMMERCE]: '🛒',
-    [WebsiteCategory.PROFESSIONAL]: '💼',
-    [WebsiteCategory.NEWS_CONTENT]: '📰',
-    [WebsiteCategory.PRODUCTIVITY]: '⚡',
-    [WebsiteCategory.CUSTOM]: '🔧',
-    default: '🌐'
-  };
-  return iconMap[category] || iconMap.default;
-};
+// Removed - now using SVG icons from IconComponents
 
 // ============================================================================
 // COMPONENTS
@@ -173,17 +182,17 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
   return (
     <div className="suggestion-card">
       <div className="suggestion-header">
-        <span className="suggestion-icon">
-          {suggestion.icon || getCategoryIcon(suggestion.category)}
-        </span>
+        <div className="suggestion-icon">
+          {getCategoryIcon(suggestion.category, { size: 20 })}
+        </div>
         <div className="suggestion-content">
           <h3 className="suggestion-title">{suggestion.title}</h3>
           <p className="suggestion-description">{suggestion.description}</p>
         </div>
         <div className="suggestion-priority">
-          <span className="priority-score" title={`Priority: ${suggestion.priority.toFixed(1)}`}>
-            {suggestion.priority > 10 ? '🔥' : suggestion.priority > 5 ? '⭐' : '💡'}
-          </span>
+          <div className="priority-score" title={`Priority: ${suggestion.priority.toFixed(1)}`}>
+            {getPriorityIcon(suggestion.priority, { size: 16 })}
+          </div>
         </div>
       </div>
 
@@ -191,13 +200,15 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
         <div className="suggestion-meta">
           <span className="suggestion-time">~{suggestion.estimatedTime}s</span>
           {suggestion.requiresPermission && (
-            <span className="suggestion-permission" title="Requires permission">🔒</span>
+            <span className="suggestion-permission" title="Requires permission">
+              <SettingsIcon size={12} />
+            </span>
           )}
           {suggestion.isCustom && (
             <span className="suggestion-custom" title="Custom task">Custom</span>
           )}
           <span className="suggestion-source" title={`Source: ${suggestion.source}`}>
-            {suggestion.source === 'builtin' ? '🏠' : suggestion.source === 'custom' ? '⚙️' : '🔗'}
+            {suggestion.source === 'builtin' ? '🏠' : suggestion.source === 'custom' ? <SettingsIcon size={12} /> : '🔗'}
           </span>
         </div>
 
@@ -242,7 +253,7 @@ const SuggestionFilterComponent: React.FC<SuggestionFilterProps> = ({
           className="filter-toggle"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          🔍 Filter {hasActiveFilters && '●'}
+          <FilterIcon size={14} /> Filter {hasActiveFilters && '●'}
         </button>
         {hasActiveFilters && (
           <button className="filter-clear" onClick={clearFilters}>
@@ -378,7 +389,7 @@ const CategorizedSuggestions: React.FC<CategorizedSuggestionsProps> = ({
               className="category-header"
               onClick={() => toggleCategory(category)}
             >
-              <span className="category-icon">{getCategoryIcon(category)}</span>
+              <div className="category-icon">{getCategoryIcon(category, { size: 18 })}</div>
               <h3 className="category-title">{category}</h3>
               <span className="category-count">({suggestions.length})</span>
               <span className="category-toggle">{isExpanded ? '▼' : '▶'}</span>
@@ -419,7 +430,7 @@ const TaskResult: React.FC<TaskResultProps> = ({
       <div className="task-result-header">
         <h3>Task Result</h3>
         <button className="btn btn-secondary" onClick={onClose}>
-          ✕
+          <CloseIcon size={16} />
         </button>
       </div>
 
@@ -432,7 +443,15 @@ const TaskResult: React.FC<TaskResultProps> = ({
                   className="btn btn-primary"
                   onClick={() => onCopy(rawContent)}
                 >
-                  {copiedText === rawContent ? '✓ Copied!' : '📋 Copy'}
+                  {copiedText === rawContent ? (
+                    <>
+                      <CheckIcon size={14} /> Copied!
+                    </>
+                  ) : (
+                    <>
+                      <CopyIcon size={14} /> Copy
+                    </>
+                  )}
                 </button>
                 <button
                   className="btn btn-secondary"
@@ -477,11 +496,22 @@ const TaskForm: React.FC<TaskFormProps> = ({
   onSave,
   onCancel
 }) => {
+  // Safety check to ensure websiteContext is defined
+  if (!websiteContext) {
+    return (
+      <div className="task-form">
+        <div className="loading-container">
+          <LoadingSpinner />
+          <p>Loading website context...</p>
+        </div>
+      </div>
+    );
+  }
   const [formData, setFormData] = useState({
     name: task?.name || '',
     description: task?.description || '',
     promptTemplate: task?.promptTemplate || '',
-    websitePatterns: task?.websitePatterns?.join(', ') || (websiteContext?.domain || ''),
+    websitePatterns: task?.websitePatterns?.join(', ') || (websiteContext?.domain || 'example.com'),
     outputFormat: task?.outputFormat || OutputFormat.PLAIN_TEXT,
     tags: task?.tags?.join(', ') || ''
   });
@@ -504,7 +534,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
         [WebsiteCategory.CUSTOM]: 'Custom Task'
       };
 
-      const suggestedName = categoryNames[websiteContext.category] || 'New Task';
+      const suggestedName = categoryNames[websiteContext?.category] || 'New Task';
 
       // Auto-generate description based on page type
       const pageTypeDescriptions = {
@@ -516,10 +546,10 @@ const TaskForm: React.FC<TaskFormProps> = ({
         [PageType.OTHER]: 'Provide contextual assistance for this page'
       };
 
-      const suggestedDescription = pageTypeDescriptions[websiteContext.pageType] || 'Provide AI assistance for this website';
+      const suggestedDescription = pageTypeDescriptions[websiteContext?.pageType || PageType.OTHER] || 'Provide AI assistance for this website';
 
       // Auto-generate prompt template with context variables
-      const suggestedPrompt = `Analyze the current page on {{domain}} and help with the following:
+      const suggestedPrompt = `Analyze the current page and help with the following:
 
 Page Title: {{title}}
 Page Category: {{category}}
@@ -621,7 +651,7 @@ Please provide relevant assistance based on the page content and user needs.`;
 
       const mockResult: TaskResult = {
         success: true,
-        content: `Test execution of "${tempTask.name}" completed successfully!\n\nThis task would analyze the current page (${websiteContext?.domain}) and provide AI-powered assistance based on your prompt template.\n\nPrompt preview:\n${formData.promptTemplate.slice(0, 200)}${formData.promptTemplate.length > 200 ? '...' : ''}\n\nThe actual implementation will integrate with the AI service to process real requests.`,
+        content: `Test execution of "${tempTask.name}" completed successfully!\n\nThis task would analyze the current page (${websiteContext?.domain || 'unknown'}) and provide AI-powered assistance based on your prompt template.\n\nPrompt preview:\n${formData.promptTemplate.slice(0, 200)}${formData.promptTemplate.length > 200 ? '...' : ''}\n\nThe actual implementation will integrate with the AI service to process real requests.`,
         format: tempTask.outputFormat,
         timestamp: new Date(),
         executionTime: 1500
@@ -644,7 +674,7 @@ Please provide relevant assistance based on the page content and user needs.`;
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     console.log('Form submission started');
@@ -676,7 +706,12 @@ Please provide relevant assistance based on the page content and user needs.`;
     }
 
     console.log('Calling onSave with task data:', taskData);
-    onSave(taskData);
+    try {
+      await onSave(taskData);
+    } catch (error) {
+      console.error('Failed to save task:', error);
+      setErrors({ general: error instanceof Error ? error.message : 'Failed to save task' });
+    }
   };
 
   return (
@@ -684,20 +719,26 @@ Please provide relevant assistance based on the page content and user needs.`;
       <div className="task-form-header">
         <h3>{task ? 'Edit Task' : 'Add New Task'}</h3>
         <button className="btn btn-secondary" onClick={onCancel}>
-          ✕
+          <CloseIcon size={16} />
         </button>
       </div>
 
       {websiteContext && !task && (
         <div className="task-form-context">
           <div className="context-info">
-            <span className="context-icon">{getCategoryIcon(websiteContext.category)}</span>
+            <div className="context-icon">{getCategoryIcon(websiteContext?.category || WebsiteCategory.CUSTOM, { size: 20 })}</div>
             <div className="context-details">
-              <strong>{websiteContext.domain}</strong>
-              <small>{websiteContext.category} • {websiteContext.pageType}</small>
+              <strong>{websiteContext?.domain || 'Unknown Domain'}</strong>
+              <small>{websiteContext?.category || 'Unknown'} • {websiteContext?.pageType || 'Unknown'}</small>
             </div>
           </div>
           <small>Task will be pre-configured for this website</small>
+        </div>
+      )}
+
+      {errors.general && (
+        <div className="error-banner">
+          <ErrorIcon size={16} /> {errors.general}
         </div>
       )}
 
@@ -739,7 +780,7 @@ Please provide relevant assistance based on the page content and user needs.`;
             rows={4}
           />
           {errors.promptTemplate && <span className="error-text">{errors.promptTemplate}</span>}
-          <small>Available variables: {{ domain }}, {{ title }}, {{ category }}, {{ pageType }}, {{ textContent }}, {{ userInput }}</small>
+          <small>Available variables: {`{{ title }}, {{ category }}, {{ pageType }}, {{ textContent }}, {{ userInput }}`}</small>
         </div>
 
         <div className="form-group">
@@ -794,7 +835,15 @@ Please provide relevant assistance based on the page content and user needs.`;
               onClick={handleTestTask}
               disabled={isTestingTask || !formData.name.trim() || !formData.promptTemplate.trim()}
             >
-              {isTestingTask ? '🔄 Testing...' : '🧪 Test on Current Page'}
+              {isTestingTask ? (
+                <>
+                  <LoadingIcon size={14} /> Testing...
+                </>
+              ) : (
+                <>
+                  🧪 Test on Current Page
+                </>
+              )}
             </button>
           </div>
           <small>Test your task configuration with the current page context before saving</small>
@@ -810,7 +859,7 @@ Please provide relevant assistance based on the page content and user needs.`;
                 className="btn btn-small btn-secondary"
                 onClick={() => setShowTestResult(false)}
               >
-                ✕
+                <CloseIcon size={12} />
               </button>
             </div>
 
@@ -820,12 +869,12 @@ Please provide relevant assistance based on the page content and user needs.`;
                   <pre>{testResult.content}</pre>
                 </div>
                 <div className="test-result-meta">
-                  <small>✅ Test completed in {testResult.executionTime}ms</small>
+                  <small><CheckIcon size={12} /> Test completed in {testResult.executionTime}ms</small>
                 </div>
               </div>
             ) : (
               <div className="test-result-error">
-                <p>❌ Test failed: {testResult.error}</p>
+                <p><ErrorIcon size={12} /> Test failed: {testResult.error}</p>
               </div>
             )}
           </div>
@@ -942,8 +991,8 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
   return (
     <div className="ai-config">
       <div className="ai-config-header">
-        <h3>🤖 AI Configuration</h3>
-        <button className="btn btn-secondary" onClick={onCancel}>✕</button>
+        <h3><SettingsIcon size={16} /> AI Configuration</h3>
+        <button className="btn btn-secondary" onClick={onCancel}><CloseIcon size={16} /></button>
       </div>
 
       <div className="ai-config-info">
@@ -1027,7 +1076,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
 
         {testResult && (
           <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
-            <span>{testResult.success ? '✅' : '❌'} {testResult.message}</span>
+            <span>{testResult.success ? <CheckIcon size={14} /> : <ErrorIcon size={14} />} {testResult.message}</span>
           </div>
         )}
 
@@ -1105,21 +1154,21 @@ const TaskManagement: React.FC<TaskManagementProps> = ({
                     onClick={() => onToggle(task.id, !task.isEnabled)}
                     title={task.isEnabled ? 'Disable task' : 'Enable task'}
                   >
-                    {task.isEnabled ? '👁️' : '👁️‍🗨️'}
+                    {task.isEnabled ? <CheckIcon size={14} /> : <ErrorIcon size={14} />}
                   </button>
                   <button
                     className="btn btn-small btn-secondary"
                     onClick={() => onEdit(task)}
                     title="Edit task"
                   >
-                    ✏️
+                    <EditIcon size={14} />
                   </button>
                   <button
                     className="btn btn-small btn-danger"
                     onClick={() => onDelete(task.id)}
                     title="Delete task"
                   >
-                    🗑️
+                    <DeleteIcon size={14} />
                   </button>
                 </div>
               </div>
@@ -1199,7 +1248,7 @@ export const PopupApp: React.FC = () => {
           console.warn('No tab URL found, using fallback');
           // Use a fallback URL if tab.url is not available
           tab.url = 'https://example.com';
-          tab.title = 'Example Page';
+          tab.title = 'Example Page'; // Property assignment, not a variable
         }
 
         // Initialize services
@@ -1252,9 +1301,10 @@ export const PopupApp: React.FC = () => {
         setStorageService(storageService);
 
         // Extract page content (mock for now - will be replaced with content script)
+        const pageTitle = tab.title || '';
         const mockPageContent: PageContent = {
           url: tab.url,
-          title: tab.title || '',
+          title: pageTitle,
           headings: ['Main Heading', 'Sub Heading'],
           textContent: 'Sample page content for analysis',
           forms: [],
@@ -1376,7 +1426,7 @@ export const PopupApp: React.FC = () => {
 
         const demoContent = state.aiConfigured
           ? `AI-powered result for "${suggestion.title}"\n\nThis would contain intelligent, contextual assistance based on your request and the current website content.`
-          : `🤖 DEMO: "${suggestion.title}"\n\nThis is a demonstration of the ${suggestion.category} suggestion. In full mode with AI configured, you would receive:\n\n• Intelligent analysis of the current page\n• Contextual recommendations\n• Actionable insights\n• Automated assistance\n\n💡 Configure your OpenAI API key to unlock real AI capabilities!`;
+          : `DEMO: "${suggestion.title}"\n\nThis is a demonstration of the ${suggestion.category} suggestion. In full mode with AI configured, you would receive:\n\n• Intelligent analysis of the current page\n• Contextual recommendations\n• Actionable insights\n• Automated assistance\n\nConfigure your OpenAI API key to unlock real AI capabilities!`;
 
         const mockResult: TaskResult = {
           success: true,
@@ -1408,91 +1458,211 @@ export const PopupApp: React.FC = () => {
   }, []);
 
   const handleSaveTask = useCallback(async (taskData: Partial<CustomTask>) => {
-    try {
-      console.log('Starting task save process...', taskData);
+    console.log('=== TASK SAVE PROCESS STARTED ===');
+    console.log('Input task data:', JSON.stringify(taskData, null, 2));
 
+    try {
       if (!taskManager) {
-        console.error('Task manager not initialized');
-        throw new Error('Task manager not initialized');
+        const error = 'Task manager not initialized';
+        console.error('❌ CRITICAL ERROR:', error);
+        throw new Error(error);
       }
+
+      console.log('✅ Task manager is available');
 
       let taskId: string;
 
       if (taskData.id) {
         // Update existing task
-        console.log('Updating existing task:', taskData.id);
-        await taskManager.updateTask(taskData.id, taskData);
+        console.log('📝 Updating existing task:', taskData.id);
+        const success = await taskManager.updateTask(taskData.id, taskData);
+        if (!success) {
+          throw new Error('Failed to update task');
+        }
         taskId = taskData.id;
+        console.log('✅ Task updated successfully');
       } else {
         // Create new task - ensure all required fields are present and valid
-        const newTaskData = {
-          name: (taskData.name || 'Untitled Task').trim(),
-          description: (taskData.description || 'No description provided').trim(),
-          promptTemplate: (taskData.promptTemplate || 'Please provide assistance with {{domain}}').trim(),
-          websitePatterns: Array.isArray(taskData.websitePatterns) ? taskData.websitePatterns.filter(p => p && p.trim()) : ['.*'],
+        console.log('🆕 Creating new task...');
+
+        // Validate and clean input data
+        const cleanedTaskData = {
+          name: (taskData.name || '').trim(),
+          description: (taskData.description || '').trim(),
+          promptTemplate: (taskData.promptTemplate || '').trim(),
+          websitePatterns: Array.isArray(taskData.websitePatterns)
+            ? taskData.websitePatterns.filter(p => p && p.trim()).map(p => p.trim())
+            : [],
           outputFormat: taskData.outputFormat || OutputFormat.PLAIN_TEXT,
-          tags: Array.isArray(taskData.tags) ? taskData.tags.filter(t => t && t.trim()) : [],
+          tags: Array.isArray(taskData.tags)
+            ? taskData.tags.filter(t => t && t.trim()).map(t => t.trim())
+            : [],
           isEnabled: taskData.isEnabled !== undefined ? taskData.isEnabled : true
         };
 
-        console.log('Creating new task with data:', newTaskData);
+        console.log('🧹 Cleaned task data:', JSON.stringify(cleanedTaskData, null, 2));
 
-        // Validate required fields before creation
-        if (!newTaskData.name || newTaskData.name.length === 0) {
-          throw new Error('Task name is required');
-        }
-        if (!newTaskData.description || newTaskData.description.length === 0) {
-          throw new Error('Task description is required');
-        }
-        if (!newTaskData.promptTemplate || newTaskData.promptTemplate.length === 0) {
-          throw new Error('Prompt template is required');
-        }
-        if (!newTaskData.websitePatterns || newTaskData.websitePatterns.length === 0) {
-          throw new Error('At least one website pattern is required');
+        // Comprehensive validation
+        const validationErrors: string[] = [];
+
+        if (!cleanedTaskData.name || cleanedTaskData.name.length < 3) {
+          validationErrors.push('Task name must be at least 3 characters long');
         }
 
-        taskId = await taskManager.createTask(newTaskData);
-        console.log('Task created successfully with ID:', taskId);
+        if (!cleanedTaskData.description || cleanedTaskData.description.length < 10) {
+          validationErrors.push('Task description must be at least 10 characters long');
+        }
+
+        if (!cleanedTaskData.promptTemplate || cleanedTaskData.promptTemplate.length < 10) {
+          validationErrors.push('Prompt template must be at least 10 characters long');
+        }
+
+        if (!cleanedTaskData.websitePatterns || cleanedTaskData.websitePatterns.length === 0) {
+          validationErrors.push('At least one website pattern is required');
+        }
+
+        if (validationErrors.length > 0) {
+          const errorMessage = 'Validation failed: ' + validationErrors.join(', ');
+          console.error('❌ VALIDATION ERRORS:', validationErrors);
+          throw new Error(errorMessage);
+        }
+
+        console.log('✅ Validation passed, creating task...');
+
+        try {
+          // Test Chrome storage directly first
+          console.log('🔧 Testing Chrome storage access...');
+          await chrome.storage.local.set({ test: 'test-value' });
+          const testResult = await chrome.storage.local.get('test');
+          console.log('✅ Chrome storage test successful:', testResult);
+
+          // Check current storage usage
+          const currentStorage = await chrome.storage.local.get(null);
+          const storageKeys = Object.keys(currentStorage);
+          console.log('📊 Current storage keys:', storageKeys.length, 'items');
+          console.log('📊 Storage keys:', storageKeys);
+
+          // Try a simplified task creation first
+          console.log('🔧 Attempting simplified task creation...');
+          const simpleTaskData = {
+            name: cleanedTaskData.name,
+            description: cleanedTaskData.description,
+            promptTemplate: cleanedTaskData.promptTemplate,
+            websitePatterns: cleanedTaskData.websitePatterns,
+            outputFormat: cleanedTaskData.outputFormat || OutputFormat.PLAIN_TEXT,
+            tags: cleanedTaskData.tags || [],
+            isEnabled: true
+          };
+
+          console.log('🔧 About to call taskManager.createTask with:', simpleTaskData);
+          taskId = await taskManager.createTask(simpleTaskData);
+          console.log('✅ Task created successfully with ID:', taskId);
+        } catch (createError) {
+          console.error('❌ Task creation failed:', createError);
+          console.error('Error details:', {
+            message: createError instanceof Error ? createError.message : 'Unknown error',
+            stack: createError instanceof Error ? createError.stack : 'No stack trace',
+            taskData: cleanedTaskData
+          });
+
+          // Try to identify and fix common issues
+          if (createError instanceof Error) {
+            if (createError.message.includes('quota') || createError.message.includes('storage')) {
+              console.log('🔧 Storage quota issue detected, trying to clear cache...');
+              try {
+                await chrome.storage.local.clear();
+                console.log('✅ Storage cleared, retrying task creation...');
+                taskId = await taskManager.createTask(cleanedTaskData);
+                console.log('✅ Task created successfully after storage clear:', taskId);
+              } catch (retryError) {
+                console.error('❌ Retry after storage clear failed:', retryError);
+                throw new Error(`Storage issue: ${createError.message}. Tried clearing storage but still failed: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`);
+              }
+            } else {
+              throw createError;
+            }
+          } else {
+            throw createError;
+          }
+        }
       }
 
       // Refresh the task list
-      console.log('Refreshing task list...');
-      const updatedTasks = await taskManager.getAllTasks();
-      console.log('Updated tasks:', Object.keys(updatedTasks).length, 'tasks found');
+      console.log('🔄 Refreshing task list...');
+      try {
+        const updatedTasks = await taskManager.getAllTasks();
+        const taskCount = Object.keys(updatedTasks).length;
+        console.log('✅ Task list refreshed:', taskCount, 'tasks found');
 
-      setState(prev => ({
-        ...prev,
-        customTasks: Object.values(updatedTasks),
-        activeView: 'task-management',
-        selectedTask: null,
-        error: null
-      }));
+        setState(prev => ({
+          ...prev,
+          customTasks: Object.values(updatedTasks),
+          activeView: 'task-management',
+          selectedTask: null,
+          error: null
+        }));
 
-      console.log(`Task ${taskData.id ? 'updated' : 'created'} successfully:`, taskId);
+        console.log('✅ UI state updated successfully');
+      } catch (refreshError) {
+        console.error('❌ Failed to refresh task list:', refreshError);
+        // Don't throw here, task was created successfully
+        setState(prev => ({
+          ...prev,
+          activeView: 'task-management',
+          selectedTask: null,
+          error: 'Task saved but failed to refresh list. Please reload the extension.'
+        }));
+      }
+
+      console.log('🎉 TASK SAVE PROCESS COMPLETED SUCCESSFULLY');
+      console.log(`Task ${taskData.id ? 'updated' : 'created'} with ID:`, taskId);
 
     } catch (error) {
-      console.error('Failed to save task - detailed error:', error);
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('💥 TASK SAVE PROCESS FAILED');
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        type: error instanceof Error ? error.constructor.name : typeof error,
+        taskData: taskData
+      });
+
+      // Show user-friendly error message
+      const userMessage = error instanceof Error
+        ? error.message
+        : 'An unexpected error occurred while saving the task';
 
       setState(prev => ({
         ...prev,
-        error: error instanceof Error ? error.message : 'Failed to save task'
+        error: userMessage,
+        // Don't change the view on error, let user fix the issue
       }));
+    } finally {
+      console.log('=== TASK SAVE PROCESS ENDED ===');
     }
   }, [taskManager]);
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
     try {
-      const result = await chrome.storage.local.get(['customTasks']);
-      const customTasks = result.customTasks || {};
+      if (!taskManager) {
+        console.error('Task manager not initialized');
+        throw new Error('Task manager not initialized');
+      }
 
-      delete customTasks[taskId];
-      await chrome.storage.local.set({ customTasks });
+      console.log('Deleting task:', taskId);
+      const success = await taskManager.deleteTask(taskId);
 
-      setState(prev => ({
-        ...prev,
-        customTasks: Object.values(customTasks)
-      }));
+      if (success) {
+        // Refresh the task list
+        const updatedTasks = await taskManager.getAllTasks();
+        setState(prev => ({
+          ...prev,
+          customTasks: Object.values(updatedTasks),
+          error: null
+        }));
+        console.log('Task deleted successfully');
+      } else {
+        throw new Error('Failed to delete task');
+      }
 
     } catch (error) {
       console.error('Failed to delete task:', error);
@@ -1585,7 +1755,7 @@ export const PopupApp: React.FC = () => {
       };
 
       const response = await testService.processRequest(testRequest);
-      return response.success !== false;
+      return !!(response.content && response.content.length > 0);
     } catch (error) {
       console.error('AI config test failed:', error);
       return false;
@@ -1640,13 +1810,13 @@ export const PopupApp: React.FC = () => {
       <div className="popup-container">
         {/* Header */}
         <div className="popup-header">
-          <h1>Agentic Assistant</h1>
+          <h1>chromeControl</h1>
           {state.websiteContext && (
             <div className="website-info">
               <span className="website-icon">
-                {getCategoryIcon(state.websiteContext.category)}
+                {getCategoryIcon(state.websiteContext?.category || WebsiteCategory.CUSTOM)}
               </span>
-              <span className="website-domain">{state.websiteContext.domain}</span>
+              <span className="website-domain">{state.websiteContext?.domain || 'Unknown Domain'}</span>
             </div>
           )}
         </div>
@@ -1657,7 +1827,7 @@ export const PopupApp: React.FC = () => {
             className={`nav-btn ${state.activeView === 'suggestions' ? 'active' : ''}`}
             onClick={() => setState(prev => ({ ...prev, activeView: 'suggestions', taskResult: null }))}
           >
-            💡 Suggestions
+            <SearchIcon size={16} /> Suggestions
           </button>
           <button
             className={`nav-btn ${state.activeView === 'task-management' ? 'active' : ''}`}
@@ -1670,13 +1840,13 @@ export const PopupApp: React.FC = () => {
             onClick={() => setState(prev => ({ ...prev, activeView: 'ai-config', selectedTask: null }))}
             title={!state.aiConfigured ? 'Configure AI to enable smart features' : 'AI Configuration'}
           >
-            🤖 AI {!state.aiConfigured ? '⚠️' : '✅'}
+            <SettingsIcon size={16} /> AI {!state.aiConfigured ? <ErrorIcon size={12} /> : <CheckIcon size={12} />}
           </button>
           <button
             className={`nav-btn ${state.activeView === 'settings' ? 'active' : ''}`}
             onClick={() => setState(prev => ({ ...prev, activeView: 'settings', selectedTask: null }))}
           >
-            ⚙️ Settings
+            <SettingsIcon size={16} /> Settings
           </button>
         </div>
 
@@ -1697,7 +1867,7 @@ export const PopupApp: React.FC = () => {
                   {!state.aiConfigured && (
                     <div className="ai-status-banner">
                       <div className="banner-content">
-                        <span className="banner-icon">🤖</span>
+                        <span className="banner-icon"><SettingsIcon size={20} /></span>
                         <div className="banner-text">
                           <strong>AI Features Disabled</strong>
                           <p>Configure your AI service to unlock intelligent suggestions and automation</p>
@@ -1813,16 +1983,47 @@ export const PopupApp: React.FC = () => {
           )}
 
           {state.activeView === 'add-task' && (
-            <TaskForm
-              task={state.selectedTask || undefined}
-              websiteContext={state.websiteContext}
-              onSave={handleSaveTask}
-              onCancel={() => setState(prev => ({
-                ...prev,
-                activeView: state.selectedTask ? 'task-management' : 'suggestions',
-                selectedTask: null
-              }))}
-            />
+            <ErrorBoundary
+              onError={(error, errorInfo) => {
+                console.error('🚨 Task form crashed:', error, errorInfo);
+                setState(prev => ({
+                  ...prev,
+                  error: `Task form crashed: ${error.message}. Please try again or reload the extension.`,
+                  activeView: 'suggestions'
+                }));
+              }}
+              showDetails={true}
+            >
+              {state.websiteContext ? (
+                <ErrorBoundary
+                  onError={(error) => {
+                    console.error('🚨 Task form crashed:', error.message, error);
+                    setState(prev => ({
+                      ...prev,
+                      error: `Task form error: ${error.message}`,
+                      activeView: 'suggestions'
+                    }));
+                  }}
+                  showDetails={true}
+                >
+                  <TaskForm
+                    task={state.selectedTask || undefined}
+                    websiteContext={state.websiteContext}
+                    onSave={handleSaveTask}
+                    onCancel={() => setState(prev => ({
+                      ...prev,
+                      activeView: state.selectedTask ? 'task-management' : 'suggestions',
+                      selectedTask: null
+                    }))}
+                  />
+                </ErrorBoundary>
+              ) : (
+                <div className="loading-container">
+                  <LoadingSpinner />
+                  <p>Loading website context...</p>
+                </div>
+              )}
+            </ErrorBoundary>
           )}
 
           {state.activeView === 'ai-config' && (
