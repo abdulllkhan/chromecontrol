@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test Popup</title>
+</head>
+<body>
+    <div id="popup-root">Loading...</div>
+    <script>
+        console.log("Test popup loading...");
+        try {
+            // Test if basic variables are accessible
+            console.log("Testing domain access...");
+            
+            // Simulate the code that might be failing
+            const mockWebsiteContext = {
+                domain: 'test.com',
+                category: 'test',
+                pageType: 'test'
+            };
+            
+            console.log("Mock context:", mockWebsiteContext);
+            console.log("Domain access:", mockWebsiteContext?.domain || 'fallback');
+            
+            // Test title variable
+            const pageTitle = 'Test Page';
+            console.log("Page title:", pageTitle);
+            
+            // Test template string
+            const template = `Test template with {{domain}} and {{title}}`;
+            console.log("Template:", template);
+            
+            document.getElementById('popup-root').innerHTML = '<div>Basic test passed</div>';
+            
+        } catch (error) {
+            console.error("Test failed:", error);
+            document.getElementById('popup-root').innerHTML = '<div style="color: red;">Error: ' + error.message + '</div>';
+        }
+    </script>
+</body>
+</html>

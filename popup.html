@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agentic Chrome Extension</title>
+  <title>chromeControl</title>
   <style>
     body {
       width: 380px;
@@ -705,6 +705,19 @@
       color: #ef4444;
       font-weight: 500;
     }
+
+    .error-banner {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #dc2626;
+      font-size: 14px;
+    }
     
     .task-test-section {
       border-top: 1px solid #e5e7eb;
@@ -814,7 +827,7 @@
     /* ============================================================================ */
     
     .popup-content::-webkit-scrollbar {
-      width: 6px;
+      width: 3px;
     }
     
     .popup-content::-webkit-scrollbar-track {
@@ -836,7 +849,7 @@
     <!-- Fallback content while React loads -->
     <div class="loading-container">
       <div class="loading-spinner"></div>
-      <div class="loading-text">Loading Agentic Extension...</div>
+      <div class="loading-text">Loading chromeControl...</div>
     </div>
   </div>
   <script type="module" src="popup.js"></script>

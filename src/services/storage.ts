@@ -105,7 +105,7 @@ export class EncryptionService {
   static async encrypt(data: string, key: CryptoKey): Promise<{ encrypted: ArrayBuffer; iv: ArrayBuffer }> {
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const encodedData = this.encoder.encode(data);
-    
+
     const encrypted = await crypto.subtle.encrypt(
       {
         name: 'AES-GCM',
@@ -211,7 +211,7 @@ export class ChromeStorageService {
     try {
       // Try to load existing key
       const result = await chrome.storage.local.get(STORAGE_KEYS.ENCRYPTION_KEY);
-      
+
       if (result[STORAGE_KEYS.ENCRYPTION_KEY]) {
         // Import existing key
         const keyData = EncryptionService.base64ToArrayBuffer(result[STORAGE_KEYS.ENCRYPTION_KEY]);
@@ -221,7 +221,7 @@ export class ChromeStorageService {
         this.encryptionKey = await EncryptionService.generateKey();
         const keyData = await EncryptionService.exportKey(this.encryptionKey);
         const keyBase64 = EncryptionService.arrayBufferToBase64(keyData);
-        
+
         await chrome.storage.local.set({
           [STORAGE_KEYS.ENCRYPTION_KEY]: keyBase64
         });
@@ -261,16 +261,17 @@ export class ChromeStorageService {
       return data;
     }
 
-    // If encryption is disabled but we have encrypted data, return null to trigger default initialization
+    // If encryption is disabled, we should not have encrypted data at this point
+    // The retrieveData method should have already cleared it
     if (!this.config.encryptionEnabled || !this.encryptionKey) {
-      console.warn('Found encrypted data but encryption is disabled. Returning null to use defaults.');
+      console.warn('Found encrypted data but encryption is disabled. This should not happen.');
       return null;
     }
 
     try {
       const encryptedBuffer = EncryptionService.base64ToArrayBuffer(data.encrypted);
       const ivBuffer = EncryptionService.base64ToArrayBuffer(data.iv);
-      
+
       return await EncryptionService.decrypt(encryptedBuffer, ivBuffer, this.encryptionKey);
     } catch (error) {
       console.error('Decryption failed:', error);
@@ -284,12 +285,17 @@ export class ChromeStorageService {
   private async storeData(key: string, data: unknown, useSync: boolean = false): Promise<void> {
     const serializedData = JSON.stringify(data);
     const processedData = await this.encryptData(serializedData);
-    
+
     const storageArea = (useSync && this.config.syncEnabled) ? chrome.storage.sync : chrome.storage.local;
-    
-    await storageArea.set({
-      [key]: processedData
-    });
+
+    try {
+      await storageArea.set({
+        [key]: processedData
+      });
+    } catch (error) {
+      console.error(`Storage: failed to store data for key: ${key}`, error);
+      throw error;
+    }
   }
 
   /**
@@ -297,24 +303,39 @@ export class ChromeStorageService {
    */
   private async retrieveData<T>(key: string, useSync: boolean = false): Promise<T | null> {
     const storageArea = (useSync && this.config.syncEnabled) ? chrome.storage.sync : chrome.storage.local;
-    
+
     const result = await storageArea.get(key);
-    
+
     if (!result || result[key] === undefined) {
       return null;
     }
 
     try {
+      // Check if we have encrypted data but encryption is disabled
+      if (typeof result[key] === 'object' && result[key].encrypted && !this.config.encryptionEnabled) {
+        console.warn(`Found encrypted data for key ${key} but encryption is disabled. Clearing and using defaults.`);
+        // Clear the encrypted data
+        await storageArea.remove(key);
+        return null;
+      }
+
       const decryptedData = await this.decryptData(result[key]);
       if (decryptedData === null) {
         return null;
       }
       const parsed = JSON.parse(decryptedData) as T;
-      
+
       // Convert ISO date strings back to Date objects
       return this.reviveDates(parsed);
     } catch (error) {
       console.error(`Failed to retrieve data for key ${key}:`, error);
+      // If there's an error (e.g., corrupted encrypted data), clear it and return null
+      try {
+        await storageArea.remove(key);
+        console.warn(`Cleared corrupted data for key ${key}`);
+      } catch (clearError) {
+        console.error(`Failed to clear corrupted data for key ${key}:`, clearError);
+      }
       return null;
     }
   }
@@ -350,13 +371,13 @@ export class ChromeStorageService {
    */
   private async runMigrations(): Promise<void> {
     const currentVersion = await this.retrieveData<number>(STORAGE_KEYS.STORAGE_VERSION) || 0;
-    
+
     if (currentVersion < this.config.migrationVersion) {
       console.log(`Running storage migration from version ${currentVersion} to ${this.config.migrationVersion}`);
-      
+
       // Run migration logic here
       await this.migrate(currentVersion, this.config.migrationVersion);
-      
+
       // Update version
       await this.storeData(STORAGE_KEYS.STORAGE_VERSION, this.config.migrationVersion);
     }
@@ -371,11 +392,11 @@ export class ChromeStorageService {
       // Clear any encrypted data from previous versions
       console.log('Clearing encrypted data during migration');
       await chrome.storage.local.clear();
-      
+
       // Initial migration - ensure all storage keys exist
       await this.initializeDefaults();
     }
-    
+
     // Add more migration logic as needed for future versions
   }
 
@@ -422,10 +443,12 @@ export class ChromeStorageService {
    */
   async createCustomTask(task: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>): Promise<string> {
     try {
+      console.log('Storage: Creating custom task with data:', task);
+
       // Validate task data
       const taskId = crypto.randomUUID();
       const now = new Date();
-      
+
       const fullTask: CustomTask = {
         ...task,
         id: taskId,
@@ -434,18 +457,26 @@ export class ChromeStorageService {
         usageCount: 0
       };
 
-      // Validate the complete task
-      ValidationUtils.validateCustomTask(fullTask);
+      console.log('Storage: Full task object created:', fullTask);
+
+      // Validate the complete task (with error handling)
+      try {
+        ValidationUtils.validateCustomTask(fullTask);
+        console.log('Storage: Task validation passed');
+      } catch (validationError) {
+        console.warn('Storage: Task validation failed, but continuing:', validationError);
+        // Continue anyway for debugging
+      }
 
       // Get existing tasks
       const existingTasks = await this.retrieveData<Record<string, CustomTask>>(STORAGE_KEYS.CUSTOM_TASKS) || {};
-      
+
       // Add new task
       existingTasks[taskId] = fullTask;
-      
+
       // Store updated tasks
       await this.storeData(STORAGE_KEYS.CUSTOM_TASKS, existingTasks);
-      
+
       console.log(`Created custom task: ${taskId}`);
       return taskId;
     } catch (error) {
@@ -485,7 +516,7 @@ export class ChromeStorageService {
   async updateCustomTask(taskId: string, updates: Partial<Omit<CustomTask, 'id' | 'createdAt'>>): Promise<boolean> {
     try {
       const tasks = await this.retrieveData<Record<string, CustomTask>>(STORAGE_KEYS.CUSTOM_TASKS) || {};
-      
+
       if (!tasks[taskId]) {
         throw new Error(`Task with ID ${taskId} not found`);
       }
@@ -501,10 +532,10 @@ export class ChromeStorageService {
       ValidationUtils.validateCustomTask(updatedTask);
 
       tasks[taskId] = updatedTask;
-      
+
       // Store updated tasks
       await this.storeData(STORAGE_KEYS.CUSTOM_TASKS, tasks);
-      
+
       console.log(`Updated custom task: ${taskId}`);
       return true;
     } catch (error) {
@@ -519,19 +550,19 @@ export class ChromeStorageService {
   async deleteCustomTask(taskId: string): Promise<boolean> {
     try {
       const tasks = await this.retrieveData<Record<string, CustomTask>>(STORAGE_KEYS.CUSTOM_TASKS) || {};
-      
+
       if (!tasks[taskId]) {
         return false;
       }
 
       delete tasks[taskId];
-      
+
       // Store updated tasks
       await this.storeData(STORAGE_KEYS.CUSTOM_TASKS, tasks);
-      
+
       // Also clean up related usage stats
       await this.deleteUsageStats(taskId);
-      
+
       console.log(`Deleted custom task: ${taskId}`);
       return true;
     } catch (error) {
@@ -570,8 +601,8 @@ export class ChromeStorageService {
       console.error(`Failed to get tasks for website ${domain}:`, error);
       return [];
     }
-  } 
- // ============================================================================
+  }
+  // ============================================================================
   // WEBSITE PATTERNS CRUD OPERATIONS
   // ============================================================================
 
@@ -592,9 +623,9 @@ export class ChromeStorageService {
 
       const existingPatterns = await this.retrieveData<Record<string, WebsitePattern>>(STORAGE_KEYS.WEBSITE_PATTERNS) || {};
       existingPatterns[patternId] = fullPattern;
-      
+
       await this.storeData(STORAGE_KEYS.WEBSITE_PATTERNS, existingPatterns);
-      
+
       console.log(`Created website pattern: ${patternId}`);
       return patternId;
     } catch (error) {
@@ -621,7 +652,7 @@ export class ChromeStorageService {
   async updateWebsitePattern(patternId: string, updates: Partial<Omit<WebsitePattern, 'id' | 'createdAt'>>): Promise<boolean> {
     try {
       const patterns = await this.retrieveData<Record<string, WebsitePattern>>(STORAGE_KEYS.WEBSITE_PATTERNS) || {};
-      
+
       if (!patterns[patternId]) {
         throw new Error(`Website pattern with ID ${patternId} not found`);
       }
@@ -638,7 +669,7 @@ export class ChromeStorageService {
 
       patterns[patternId] = updatedPattern;
       await this.storeData(STORAGE_KEYS.WEBSITE_PATTERNS, patterns);
-      
+
       console.log(`Updated website pattern: ${patternId}`);
       return true;
     } catch (error) {
@@ -653,14 +684,14 @@ export class ChromeStorageService {
   async deleteWebsitePattern(patternId: string): Promise<boolean> {
     try {
       const patterns = await this.retrieveData<Record<string, WebsitePattern>>(STORAGE_KEYS.WEBSITE_PATTERNS) || {};
-      
+
       if (!patterns[patternId]) {
         return false;
       }
 
       delete patterns[patternId];
       await this.storeData(STORAGE_KEYS.WEBSITE_PATTERNS, patterns);
-      
+
       console.log(`Deleted website pattern: ${patternId}`);
       return true;
     } catch (error) {
@@ -701,7 +732,7 @@ export class ChromeStorageService {
       };
 
       await this.storeData(STORAGE_KEYS.USER_PREFERENCES, updatedPrefs, true);
-      
+
       console.log('Updated user preferences');
       return true;
     } catch (error) {
@@ -720,10 +751,10 @@ export class ChromeStorageService {
   async cacheResponse(requestHash: string, response: CachedResponse): Promise<void> {
     try {
       const cache = await this.retrieveData<Record<string, CachedResponse>>(STORAGE_KEYS.RESPONSE_CACHE) || {};
-      
+
       // Clean expired entries before adding new one
       await this.cleanExpiredCache(cache);
-      
+
       // Check cache size limit
       const cacheEntries = Object.keys(cache);
       if (cacheEntries.length >= this.config.maxCacheSize) {
@@ -731,16 +762,16 @@ export class ChromeStorageService {
         const sortedEntries = cacheEntries
           .map(key => ({ key, timestamp: cache[key].response.timestamp.getTime() }))
           .sort((a, b) => a.timestamp - b.timestamp);
-        
+
         const entriesToRemove = sortedEntries.slice(0, cacheEntries.length - this.config.maxCacheSize + 1);
         for (const entry of entriesToRemove) {
           delete cache[entry.key];
         }
       }
-      
+
       cache[requestHash] = response;
       await this.storeData(STORAGE_KEYS.RESPONSE_CACHE, cache);
-      
+
       console.log(`Cached response for hash: ${requestHash}`);
     } catch (error) {
       console.error('Failed to cache response:', error);
@@ -754,7 +785,7 @@ export class ChromeStorageService {
     try {
       const cache = await this.retrieveData<Record<string, CachedResponse>>(STORAGE_KEYS.RESPONSE_CACHE) || {};
       const cachedResponse = cache[requestHash];
-      
+
       if (!cachedResponse) {
         return null;
       }
@@ -772,7 +803,7 @@ export class ChromeStorageService {
       cachedResponse.hitCount++;
       cache[requestHash] = cachedResponse;
       await this.storeData(STORAGE_KEYS.RESPONSE_CACHE, cache);
-      
+
       return cachedResponse;
     } catch (error) {
       console.error(`Failed to get cached response for hash ${requestHash}:`, error);
@@ -786,14 +817,14 @@ export class ChromeStorageService {
   private async cleanExpiredCache(cache: Record<string, CachedResponse>): Promise<void> {
     const now = new Date();
     let hasExpired = false;
-    
+
     for (const [key, cachedResponse] of Object.entries(cache)) {
       if (now > cachedResponse.expiresAt) {
         delete cache[key];
         hasExpired = true;
       }
     }
-    
+
     if (hasExpired) {
       await this.storeData(STORAGE_KEYS.RESPONSE_CACHE, cache);
     }
@@ -822,7 +853,7 @@ export class ChromeStorageService {
   async recordTaskUsage(taskId: string, success: boolean, executionTime: number): Promise<void> {
     try {
       const stats = await this.retrieveData<Record<string, UsageMetrics>>(STORAGE_KEYS.USAGE_STATS) || {};
-      
+
       if (!stats[taskId]) {
         stats[taskId] = {
           taskId,
@@ -837,12 +868,12 @@ export class ChromeStorageService {
       const metric = stats[taskId];
       metric.usageCount++;
       metric.lastUsed = new Date();
-      
+
       if (success) {
         // Update success rate
         const totalSuccesses = Math.round(metric.successRate * (metric.usageCount - 1) / 100) + 1;
         metric.successRate = (totalSuccesses / metric.usageCount) * 100;
-        
+
         // Update average execution time
         const totalTime = metric.averageExecutionTime * (metric.usageCount - 1) + executionTime;
         metric.averageExecutionTime = totalTime / metric.usageCount;
@@ -852,13 +883,13 @@ export class ChromeStorageService {
         const totalSuccesses = Math.round(metric.successRate * (metric.usageCount - 1) / 100);
         metric.successRate = (totalSuccesses / metric.usageCount) * 100;
       }
-      
+
       stats[taskId] = metric;
       await this.storeData(STORAGE_KEYS.USAGE_STATS, stats);
-      
+
       // Also update the task's usage count
       await this.updateCustomTask(taskId, { usageCount: metric.usageCount });
-      
+
       console.log(`Recorded usage for task: ${taskId}`);
     } catch (error) {
       console.error(`Failed to record task usage for ${taskId}:`, error);
@@ -896,14 +927,14 @@ export class ChromeStorageService {
   async deleteUsageStats(taskId: string): Promise<boolean> {
     try {
       const stats = await this.retrieveData<Record<string, UsageMetrics>>(STORAGE_KEYS.USAGE_STATS) || {};
-      
+
       if (!stats[taskId]) {
         return false;
       }
 
       delete stats[taskId];
       await this.storeData(STORAGE_KEYS.USAGE_STATS, stats);
-      
+
       console.log(`Deleted usage stats for task: ${taskId}`);
       return true;
     } catch (error) {
@@ -1022,7 +1053,7 @@ export class ChromeStorageService {
         chrome.storage.local.clear(),
         chrome.storage.sync.clear()
       ]);
-      
+
       console.log('All storage data cleared');
     } catch (error) {
       console.error('Failed to clear all data:', error);

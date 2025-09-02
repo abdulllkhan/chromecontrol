@@ -1,0 +1,365 @@
+/* ============================================================================
+   ICON STYLES
+   ============================================================================ */
+
+.icon {
+  display: inline-block;
+  vertical-align: middle;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.icon:hover {
+  transform: scale(1.1);
+  opacity: 0.8;
+}
+
+.icon.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.icon.disabled:hover {
+  transform: none;
+  opacity: 0.5;
+}
+
+/* Loading animation */
+.loading-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Icon sizes */
+.icon-xs { width: 12px; height: 12px; }
+.icon-sm { width: 16px; height: 16px; }
+.icon-md { width: 20px; height: 20px; }
+.icon-lg { width: 24px; height: 24px; }
+.icon-xl { width: 32px; height: 32px; }
+
+/* Icon colors */
+.icon-primary { color: var(--primary-color, #007bff); }
+.icon-secondary { color: var(--secondary-color, #6c757d); }
+.icon-success { color: var(--success-color, #28a745); }
+.icon-danger { color: var(--danger-color, #dc3545); }
+.icon-warning { color: var(--warning-color, #ffc107); }
+.icon-info { color: var(--info-color, #17a2b8); }
+.icon-light { color: var(--light-color, #f8f9fa); }
+.icon-dark { color: var(--dark-color, #343a40); }
+
+/* ============================================================================
+   IMPROVED SCROLLBAR STYLES - MINIMAL WIDTH, NO BACKGROUND
+   ============================================================================ */
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 1.5px;
+  transition: background 0.2s ease;
+  border: none;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+/* Custom scrollable containers */
+.scrollable {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.scrollable::-webkit-scrollbar {
+  width: 3px;
+}
+
+.scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollable::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 1.5px;
+}
+
+.scrollable::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Popup specific scrollbar styling */
+.popup-content::-webkit-scrollbar {
+  width: 2px;
+}
+
+.popup-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 1px;
+}
+
+.popup-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Dark theme scrollbars */
+.dark-theme ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark-theme ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.dark-theme * {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+/* ============================================================================
+   ICON BUTTON STYLES
+   ============================================================================ */
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: inherit;
+}
+
+.icon-button:hover {
+  background: rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+}
+
+.icon-button:active {
+  transform: translateY(0);
+}
+
+.icon-button.primary {
+  background: var(--primary-color, #007bff);
+  color: white;
+}
+
+.icon-button.primary:hover {
+  background: var(--primary-hover, #0056b3);
+}
+
+.icon-button.secondary {
+  background: var(--secondary-color, #6c757d);
+  color: white;
+}
+
+.icon-button.secondary:hover {
+  background: var(--secondary-hover, #545b62);
+}
+
+.icon-button.danger {
+  background: var(--danger-color, #dc3545);
+  color: white;
+}
+
+.icon-button.danger:hover {
+  background: var(--danger-hover, #c82333);
+}
+
+.icon-button.small {
+  padding: 4px;
+}
+
+.icon-button.large {
+  padding: 12px;
+}
+
+/* ============================================================================
+   ICON WITH TEXT STYLES
+   ============================================================================ */
+
+.icon-with-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-with-text .icon {
+  flex-shrink: 0;
+}
+
+.icon-with-text.vertical {
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.icon-with-text.vertical .icon {
+  margin-bottom: 2px;
+}
+
+/* ============================================================================
+   CATEGORY ICON SPECIFIC STYLES
+   ============================================================================ */
+
+.category-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.05);
+  margin-right: 8px;
+}
+
+.category-icon .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.category-icon.social-media {
+  background: rgba(59, 89, 152, 0.1);
+  color: #3b5998;
+}
+
+.category-icon.ecommerce {
+  background: rgba(255, 152, 0, 0.1);
+  color: #ff9800;
+}
+
+.category-icon.professional {
+  background: rgba(0, 119, 181, 0.1);
+  color: #0077b5;
+}
+
+.category-icon.news {
+  background: rgba(76, 175, 80, 0.1);
+  color: #4caf50;
+}
+
+.category-icon.productivity {
+  background: rgba(156, 39, 176, 0.1);
+  color: #9c27b0;
+}
+
+.category-icon.custom {
+  background: rgba(96, 125, 139, 0.1);
+  color: #607d8b;
+}
+
+/* ============================================================================
+   PRIORITY INDICATOR STYLES
+   ============================================================================ */
+
+.priority-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.priority-indicator.high {
+  color: #ff4444;
+}
+
+.priority-indicator.medium {
+  color: #ffaa00;
+}
+
+.priority-indicator.low {
+  color: #4CAF50;
+}
+
+/* ============================================================================
+   RESPONSIVE ICON STYLES
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .icon-button {
+    padding: 6px;
+  }
+  
+  .icon-button.large {
+    padding: 10px;
+  }
+  
+  .category-icon {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .category-icon .icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* ============================================================================
+   ACCESSIBILITY IMPROVEMENTS
+   ============================================================================ */
+
+.icon[role="button"] {
+  outline: none;
+}
+
+.icon[role="button"]:focus {
+  outline: 2px solid var(--focus-color, #007bff);
+  outline-offset: 2px;
+}
+
+.icon-button:focus {
+  outline: 2px solid var(--focus-color, #007bff);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .icon {
+    filter: contrast(1.5);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .icon,
+  .icon-button,
+  .loading-spin {
+    transition: none;
+    animation: none;
+  }
+}

@@ -1,4 +1,5 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
+import { ErrorIcon } from './icons/IconComponents';
 
 interface Props {
   children: ReactNode;
@@ -23,7 +24,7 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, retryCount: 0 };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -157,7 +158,9 @@ class ErrorBoundary extends Component<Props, State> {
           margin: '8px',
           fontFamily: 'system-ui, -apple-system, sans-serif'
         }}>
-          <div style={{ fontSize: '24px', marginBottom: '8px' }}>⚠️</div>
+          <div style={{ marginBottom: '8px' }}>
+            <ErrorIcon size={32} color="#d32f2f" />
+          </div>
           <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: '600' }}>
             Oops! Something went wrong
           </h3>

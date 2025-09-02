@@ -1,5 +1,5 @@
 {
-  "name": "agentic-chrome-extension",
+  "name": "chrome-control",
   "version": "1.0.0",
   "description": "Intelligent Chrome extension that provides contextual AI-powered suggestions",
   "type": "module",
@@ -12,7 +12,7 @@
     "copy-content": "cp src/content/content-simple.js dist/content.js",
     "copy-assets": "cp manifest.json popup.html dist/ && cp -r icons dist/",
     "package": "npm run build && npm run create-zip",
-    "create-zip": "cd dist && zip -r ../agentic-chrome-extension.zip . && cd ..",
+    "create-zip": "cd dist && zip -r ../chrome-control.zip . && cd ..",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",

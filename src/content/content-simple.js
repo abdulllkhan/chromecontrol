@@ -2,7 +2,7 @@
 (function() {
   'use strict';
   
-  console.log('Agentic Chrome Extension content script loaded on:', window.location.href);
+  console.log('chromeControl content script loaded on:', window.location.href);
   
   // Basic page content extraction without imports
   function extractPageContent() {
