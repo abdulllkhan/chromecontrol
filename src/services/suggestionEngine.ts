@@ -709,6 +709,22 @@ export class SuggestionFilter {
       }
     };
   }
+
+  /**
+   * Get fallback suggestions when AI is unavailable
+   */
+  private getFallbackSuggestions(context: SuggestionContext): PrioritizedSuggestion[] {
+    const fallbackService = fallbackSuggestions;
+    const fallbackSuggestionList = fallbackService.getFallbackSuggestions(context.websiteContext);
+    
+    return fallbackSuggestionList.map(suggestion => ({
+      ...suggestion,
+      priority: 0.5, // Lower priority than AI suggestions
+      relevanceScore: this.calculateRelevanceScore(suggestion, context.websiteContext),
+      source: 'fallback' as const,
+      matchingPatterns: []
+    }));
+  }
 }
 
 // ============================================================================
@@ -775,7 +791,7 @@ export class SuggestionEngine {
     return fallbackSuggestions.map(suggestion => ({
       ...suggestion,
       priority: 0.5, // Lower priority than AI suggestions
-      relevanceScore: this.calculateRelevanceScore(suggestion, context.websiteContext),
+      relevanceScore: 0.3, // Simple fixed relevance score for fallback suggestions
       source: 'fallback' as const,
       matchingPatterns: []
     }));

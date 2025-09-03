@@ -1,5 +1,15 @@
 // Background service worker for the Agentic Chrome Extension
-console.log('Agentic Chrome Extension background script loaded');
+console.log('chromeControl background script loaded');
+
+// Handle extension icon click to open side panel
+chrome.action.onClicked.addListener(async (tab) => {
+  try {
+    // Open the side panel
+    await chrome.sidePanel.open({ tabId: tab.id });
+  } catch (error) {
+    console.error('Failed to open side panel:', error);
+  }
+});
 
 // Initialize extension on install/startup
 chrome.runtime.onInstalled.addListener((details) => {
