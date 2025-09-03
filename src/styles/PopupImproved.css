@@ -555,7 +555,7 @@
 .task-form-content,
 .modal-content {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+  scrollbar-color: rgba(200, 200, 200, 0.6) rgba(255, 255, 255, 0.8);
 }
 
 .popup-content::-webkit-scrollbar,
@@ -564,8 +564,8 @@
 .categorized-suggestions::-webkit-scrollbar,
 .task-form-content::-webkit-scrollbar,
 .modal-content::-webkit-scrollbar {
-  width: 2px;
-  height: 2px;
+  width: 1px;
+  height: 1px;
 }
 
 .popup-content::-webkit-scrollbar-track,
@@ -574,7 +574,8 @@
 .categorized-suggestions::-webkit-scrollbar-track,
 .task-form-content::-webkit-scrollbar-track,
 .modal-content::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 0.5px;
 }
 
 .popup-content::-webkit-scrollbar-thumb,
@@ -583,8 +584,8 @@
 .categorized-suggestions::-webkit-scrollbar-thumb,
 .task-form-content::-webkit-scrollbar-thumb,
 .modal-content::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.08);
-  border-radius: 1px;
+  background: rgba(200, 200, 200, 0.6);
+  border-radius: 0.5px;
   transition: background 0.2s ease;
 }
 
@@ -594,7 +595,7 @@
 .categorized-suggestions::-webkit-scrollbar-thumb:hover,
 .task-form-content::-webkit-scrollbar-thumb:hover,
 .modal-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(150, 150, 150, 0.8);
 }
 
 /* ============================================================================
