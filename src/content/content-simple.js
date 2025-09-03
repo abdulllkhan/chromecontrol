@@ -41,7 +41,9 @@
   // Listen for messages from popup/background
   if (chrome?.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.type === 'EXTRACT_CONTENT') {
+      if (message.type === 'PING') {
+        sendResponse({ success: true, status: 'ready' });
+      } else if (message.type === 'EXTRACT_CONTENT') {
         const content = extractPageContent();
         sendResponse({ success: true, content });
       }

@@ -180,13 +180,44 @@ The extension successfully bridges the gap between user needs and AI capabilitie
   - Test task creation across different website contexts
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-## 🚀 Next Steps
+- [x] 22. Extension Architecture Migration - Popup to Sidebar
+  - Convert Chrome extension from popup to persistent sidebar using Side Panel API
+  - Update manifest.json to use Side Panel instead of popup action
+  - Migrate all React components from popup.tsx to sidebar.tsx
+  - Update build configuration for sidebar entry point
+  - Implement proper error handling for sidebar initialization
+  - _Requirements: 4.1, 4.2, 1.1, 1.2_
 
-The core implementation is complete. Current focus:
+- [x] 23. AI Service Integration Enhancements
+  - Update available AI models to GPT-5, GPT-4.1, and o4-mini (current OpenAI models)
+  - Add comprehensive Claude AI integration alongside OpenAI
+  - Implement unified AI provider service with automatic fallback
+  - Remove encryption from storage service per user preference
+  - Fix AI configuration storage to use UserPreferences pattern
+  - _Requirements: 3.1, 3.2, 3.3, 7.1, 7.2_
 
-1. **UI Polish**: Replace emojis with professional SVG icons
-2. **Bug Fixes**: Resolve custom task creation crash
-3. **Chrome Web Store Submission**: Upload updated extension
-4. **Store Listing**: Use content from `docs/STORE_LISTING.md`
-5. **Privacy Policy**: Link to `docs/PRIVACY_POLICY.md`
-6. **Monitor & Support**: Track user feedback and plan future enhancements
+- [x] 24. Sidebar Runtime Error Resolution
+  - Fix `getAIServiceConfig is not a function` by updating storage service calls
+  - Fix `generateSuggestions is not a function` by correcting SuggestionEngine method calls
+  - Fix `getFallbackSuggestions is not a function` by adding missing method to SuggestionGenerator
+  - Improve content script communication error handling for sidebar
+  - Add proper tab ID validation for chrome.tabs.sendMessage calls
+  - _Requirements: 3.4, 5.5, 1.4_
+
+## 🚀 Current Status & Next Steps
+
+**Latest Achievement:** Successfully converted chromeControl extension from popup to sidebar architecture with full error resolution.
+
+### Recent Work Completed:
+1. **Architecture Migration**: Extension now operates as persistent sidebar instead of popup
+2. **AI Integration**: Updated to latest models (GPT-5, GPT-4.1, o4-mini) with Claude support
+3. **Error Resolution**: Fixed all sidebar runtime errors (getAIServiceConfig, generateSuggestions, getFallbackSuggestions)
+4. **Content Script**: Improved communication between sidebar and content scripts
+5. **Build System**: Updated Vite configuration for sidebar build process
+
+### Current Focus:
+1. **Sidebar Testing**: Ensure all functionality works correctly in sidebar mode
+2. **ChatGPT Integration**: Plan future integration with ChatGPT account login (postponed per user request)
+3. **Performance Optimization**: Monitor sidebar performance and responsiveness
+4. **User Experience**: Refine sidebar UI for persistent, always-visible operation
+5. **Extension Distribution**: Package sidebar version for testing and deployment

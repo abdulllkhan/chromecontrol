@@ -462,22 +462,14 @@ const CategoryPreferencesComponent: React.FC<CategoryPreferencesProps> = ({
     onChange(newCategories);
   };
 
-  const categoryDescriptions = {
-    [WebsiteCategory.SOCIAL_MEDIA]: 'Social media platforms like Twitter, Facebook, LinkedIn',
-    [WebsiteCategory.ECOMMERCE]: 'Online shopping sites like Amazon, eBay, Shopify stores',
-    [WebsiteCategory.PROFESSIONAL]: 'Professional platforms like LinkedIn, job boards, company sites',
-    [WebsiteCategory.NEWS_CONTENT]: 'News websites, blogs, and content platforms',
-    [WebsiteCategory.PRODUCTIVITY]: 'Productivity tools, project management, and work applications',
-    [WebsiteCategory.CUSTOM]: 'Custom website patterns you define'
-  };
 
   const categoryIcons = {
-    [WebsiteCategory.SOCIAL_MEDIA]: '📱',
-    [WebsiteCategory.ECOMMERCE]: '🛒',
-    [WebsiteCategory.PROFESSIONAL]: '💼',
-    [WebsiteCategory.NEWS_CONTENT]: '📰',
-    [WebsiteCategory.PRODUCTIVITY]: '⚡',
-    [WebsiteCategory.CUSTOM]: '🔧'
+    [WebsiteCategory.SOCIAL_MEDIA]: 'Social',
+    [WebsiteCategory.ECOMMERCE]: 'Shop',
+    [WebsiteCategory.PROFESSIONAL]: 'Work',
+    [WebsiteCategory.NEWS_CONTENT]: 'News',
+    [WebsiteCategory.PRODUCTIVITY]: 'Productivity',
+    [WebsiteCategory.CUSTOM]: 'Custom'
   };
 
   return (
@@ -498,13 +490,7 @@ const CategoryPreferencesComponent: React.FC<CategoryPreferencesProps> = ({
             <div className="category-content">
               <div className="category-header">
                 <span className="category-icon">{categoryIcons[category]}</span>
-                <span className="category-title">
-                  {category.replace('_', ' ').toUpperCase()}
-                </span>
               </div>
-              <small className="category-description">
-                {categoryDescriptions[category]}
-              </small>
             </div>
           </label>
         ))}
@@ -692,31 +678,31 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
             className={`tab ${activeTab === 'categories' ? 'active' : ''}`}
             onClick={() => setActiveTab('categories')}
           >
-            📂 Categories
+            Categories
           </button>
           <button
             className={`tab ${activeTab === 'patterns' ? 'active' : ''}`}
             onClick={() => setActiveTab('patterns')}
           >
-            🔗 Website Patterns
+            Website Patterns
           </button>
           <button
             className={`tab ${activeTab === 'privacy' ? 'active' : ''}`}
             onClick={() => setActiveTab('privacy')}
           >
-            🔒 Privacy & Security
+            Privacy & Security
           </button>
           <button
             className={`tab ${activeTab === 'automation' ? 'active' : ''}`}
             onClick={() => setActiveTab('automation')}
           >
-            🤖 Automation
+            Automation
           </button>
           <button
             className={`tab ${activeTab === 'general' ? 'active' : ''}`}
             onClick={() => setActiveTab('general')}
           >
-            ⚙️ General
+            General
           </button>
         </div>
 
@@ -822,7 +808,7 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
                   <option value="claude">Claude</option>
                   <option value="local">Local Model</option>
                 </select>
-                <small>Choose your preferred AI service provider</small>
+                {/* <small>Choose your preferred AI service provider</small> */}
               </div>
 
               <div className="settings-group">
@@ -857,7 +843,7 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
                     <option>Select AI Provider First</option>
                   </select>
                 )}
-                <small>Select the AI model to use for suggestions and analysis</small>
+                {/* <small>Select the AI model to use for suggestions and analysis</small> */}
               </div>
 
               <div className="settings-group">
@@ -902,7 +888,7 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
       {hasUnsavedChanges && (
         <div className="preferences-footer">
           <div className="unsaved-changes-notice">
-            <span>⚠️ You have unsaved changes</span>
+            <span>Warning: You have unsaved changes</span>
             <button
               className="btn btn-primary"
               onClick={savePreferences}

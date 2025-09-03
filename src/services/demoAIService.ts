@@ -93,7 +93,7 @@ export class DemoAIService {
     
     // Add a note about demo mode
     return allResponses.map(response => 
-      `🤖 DEMO MODE: ${response}\n\n💡 To unlock full AI capabilities, configure your OpenAI API key in the AI settings.`
+      `DEMO MODE: ${response}\n\nTo unlock full AI capabilities, configure your OpenAI API key in the AI settings.`
     );
   }
 

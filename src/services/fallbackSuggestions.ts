@@ -65,8 +65,8 @@ const OFFLINE_SUGGESTIONS: OfflineSuggestionSet[] = [
         isCustom: false,
         estimatedTime: 30,
         requiresPermission: false,
-        icon: '📱',
-        template: 'Check out this amazing [TOPIC]! 🎉\n\n[MAIN_MESSAGE]\n\n#[HASHTAG1] #[HASHTAG2] #[HASHTAG3]',
+        icon: 'Social',
+        template: 'Check out this amazing [TOPIC]!\n\n[MAIN_MESSAGE]\n\n#[HASHTAG1] #[HASHTAG2] #[HASHTAG3]',
         placeholders: {
           TOPIC: 'Enter your topic',
           MAIN_MESSAGE: 'Write your main message',
@@ -120,7 +120,7 @@ const OFFLINE_SUGGESTIONS: OfflineSuggestionSet[] = [
         isCustom: false,
         estimatedTime: 45,
         requiresPermission: false,
-        icon: '🔍',
+        icon: 'Search',
         template: 'Product Comparison:\n\n**[PRODUCT1]**\n- Price: [PRICE1]\n- Features: [FEATURES1]\n- Pros: [PROS1]\n- Cons: [CONS1]\n\n**[PRODUCT2]**\n- Price: [PRICE2]\n- Features: [FEATURES2]\n- Pros: [PROS2]\n- Cons: [CONS2]\n\n**Recommendation:** [RECOMMENDATION]',
         placeholders: {
           PRODUCT1: 'First product name',
@@ -187,7 +187,7 @@ const OFFLINE_SUGGESTIONS: OfflineSuggestionSet[] = [
         isCustom: false,
         estimatedTime: 20,
         requiresPermission: false,
-        icon: '💼',
+        icon: 'Professional',
         template: '[HOOK_QUESTION]\n\n[MAIN_INSIGHT]\n\n[SUPPORTING_DETAILS]\n\n[CALL_TO_ACTION]\n\n#[INDUSTRY] #[SKILL] #[TOPIC]',
         placeholders: {
           HOOK_QUESTION: 'Engaging opening question',
@@ -246,7 +246,7 @@ const OFFLINE_SUGGESTIONS: OfflineSuggestionSet[] = [
         isCustom: false,
         estimatedTime: 25,
         requiresPermission: false,
-        icon: '📰',
+        icon: 'News',
         template: '**Article Summary: [TITLE]**\n\n**Key Points:**\n- [POINT1]\n- [POINT2]\n- [POINT3]\n\n**Main Argument:** [MAIN_ARGUMENT]\n\n**Evidence:** [EVIDENCE]\n\n**Conclusion:** [CONCLUSION]\n\n**My Takeaway:** [PERSONAL_TAKEAWAY]',
         placeholders: {
           TITLE: 'Article title',
@@ -370,7 +370,7 @@ export class FallbackSuggestionsService {
         isCustom: false,
         estimatedTime: 5,
         requiresPermission: false,
-        icon: '📋',
+        icon: 'Copy',
         instructions: [
           'Select the text you want to copy',
           'Use Ctrl+C (or Cmd+C on Mac) to copy',
@@ -433,7 +433,7 @@ export class FallbackSuggestionsService {
         isCustom: false,
         estimatedTime: 5,
         requiresPermission: false,
-        icon: '🔄',
+        icon: 'Refresh',
         template: cached.response,
         instructions: [
           'This is a previously generated response',

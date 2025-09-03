@@ -558,11 +558,28 @@ export class CustomPatternMatcher {
 // MAIN PATTERN ENGINE
 // ============================================================================
 
+export interface PatternEngineConfig {
+  enableBuiltInPatterns?: boolean;
+  enableCustomPatterns?: boolean;
+  cachePatterns?: boolean;
+  maxCacheSize?: number;
+  customPatterns?: CustomPattern[];
+}
+
 export class PatternEngine {
   private customPatternMatcher: CustomPatternMatcher;
+  private config: PatternEngineConfig;
 
-  constructor(customPatterns: CustomPattern[] = []) {
-    this.customPatternMatcher = new CustomPatternMatcher(customPatterns);
+  constructor(config: PatternEngineConfig = {}) {
+    this.config = {
+      enableBuiltInPatterns: true,
+      enableCustomPatterns: true,
+      cachePatterns: true,
+      maxCacheSize: 100,
+      ...config
+    };
+    
+    this.customPatternMatcher = new CustomPatternMatcher(config.customPatterns || []);
   }
 
   /**

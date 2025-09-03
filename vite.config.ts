@@ -16,7 +16,7 @@ export default defineConfig(({ command, mode }) => {
       outDir: 'dist',
       rollupOptions: {
         input: {
-          popup: resolve(__dirname, 'src/popup/popup.tsx'),
+          sidebar: resolve(__dirname, 'src/sidebar/sidebar.tsx'),
           background: resolve(__dirname, 'src/background/background.ts'),
           // Skip content script from Vite build - use simple JS version
         },

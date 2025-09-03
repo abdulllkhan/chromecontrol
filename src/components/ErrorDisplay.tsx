@@ -42,7 +42,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
         };
       case 'ai':
         return {
-          icon: '🤖',
+          icon: 'AI',
           title: 'AI Service Error',
           message: 'The AI service is temporarily unavailable. Please try again in a moment.',
           color: '#9c27b0',
@@ -50,7 +50,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
         };
       case 'storage':
         return {
-          icon: '💾',
+          icon: 'Storage',
           title: 'Storage Error',
           message: 'Unable to save or retrieve data. Please check available storage space.',
           color: '#607d8b',
@@ -58,7 +58,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
         };
       case 'validation':
         return {
-          icon: '⚠️',
+          icon: 'Warning',
           title: 'Invalid Input',
           message: 'Please check your input and try again.',
           color: '#ff5722',

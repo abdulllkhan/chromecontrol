@@ -488,6 +488,98 @@ export const SettingsIcon: React.FC<IconProps> = ({
   </svg>
 );
 
+export const RefreshIcon: React.FC<IconProps> = ({ 
+  size = 16, 
+  color = 'currentColor', 
+  className = '', 
+  onClick,
+  title = 'Refresh'
+}) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    className={`icon ${className}`}
+    onClick={onClick}
+    title={title}
+  >
+    <path 
+      d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" 
+      fill={color}
+    />
+  </svg>
+);
+
+export const PlayIcon: React.FC<IconProps> = ({ 
+  size = 16, 
+  color = 'currentColor', 
+  className = '', 
+  onClick,
+  title = 'Play'
+}) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    className={`icon ${className}`}
+    onClick={onClick}
+    title={title}
+  >
+    <path 
+      d="M8 5v14l11-7z" 
+      fill={color}
+    />
+  </svg>
+);
+
+export const PauseIcon: React.FC<IconProps> = ({ 
+  size = 16, 
+  color = 'currentColor', 
+  className = '', 
+  onClick,
+  title = 'Pause'
+}) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    className={`icon ${className}`}
+    onClick={onClick}
+    title={title}
+  >
+    <path 
+      d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" 
+      fill={color}
+    />
+  </svg>
+);
+
+export const AIIcon: React.FC<IconProps> = ({ 
+  size = 16, 
+  color = 'currentColor', 
+  className = '', 
+  onClick,
+  title = 'AI Assistant'
+}) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    className={`icon ${className}`}
+    onClick={onClick}
+    title={title}
+  >
+    <path 
+      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" 
+      fill={color}
+    />
+  </svg>
+);
+
 // ============================================================================
 // PRIORITY ICONS
 // ============================================================================
