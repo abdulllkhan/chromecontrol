@@ -320,9 +320,11 @@
 .pattern-form {
   margin-bottom: 24px;
   padding: 20px;
-  border: 1px solid var(--border-color, #e1e5e9);
+  border: 1px solid #e1e5e9;
   border-radius: 8px;
-  background: var(--bg-secondary, #f8f9fa);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .pattern-form-header {
@@ -336,6 +338,7 @@
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+  color: #2d3748;
 }
 
 .pattern-form-content {
@@ -738,29 +741,46 @@
   }
 }
 
-/* Dark Theme Support */
+/* Force Light Theme - Override System Dark Mode */
+.pattern-form {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: #2d3748 !important;
+}
+
+.pattern-form .form-group input,
+.pattern-form .form-group textarea, 
+.pattern-form .form-group select {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #2d3748 !important;
+  border: 1px solid #e1e5e9 !important;
+}
+
+.pattern-form .form-group label {
+  color: #2d3748 !important;
+}
+
+.pattern-form .form-group small {
+  color: #6c757d !important;
+}
+
+.pattern-form .error-text {
+  color: #dc3545 !important;
+}
+
+/* Dark Theme Support - Disabled for consistent light theme */
 @media (prefers-color-scheme: dark) {
-  .user-preferences {
-    --bg-primary: #1a1a1a;
-    --bg-secondary: #2d2d2d;
-    --bg-hover: #3a3a3a;
-    --text-primary: #ffffff;
-    --text-secondary: #b0b0b0;
-    --border-color: #404040;
-    --border-light: #333333;
-    --border-hover: #555555;
+  /* Keep original dark theme for other components if needed, but override pattern form */
+  .pattern-form,
+  .pattern-form * {
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: #2d3748 !important;
   }
-
-  .pattern-url {
-    background: var(--bg-primary, #1a1a1a);
-    color: var(--text-secondary, #b0b0b0);
-  }
-
-  .form-group input,
-  .form-group textarea,
-  .form-group select,
-  .setting-select {
-    background: var(--bg-primary, #1a1a1a);
-    color: var(--text-primary, #ffffff);
+  
+  .pattern-form .form-group input,
+  .pattern-form .form-group textarea,
+  .pattern-form .form-group select {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #2d3748 !important;
+    border: 1px solid #e1e5e9 !important;
   }
 }

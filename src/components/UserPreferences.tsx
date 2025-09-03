@@ -808,7 +808,7 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
                   <option value="claude">Claude</option>
                   <option value="local">Local Model</option>
                 </select>
-                <small>Choose your preferred AI service provider</small>
+                {/* <small>Choose your preferred AI service provider</small> */}
               </div>
 
               <div className="settings-group">
@@ -843,7 +843,7 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
                     <option>Select AI Provider First</option>
                   </select>
                 )}
-                <small>Select the AI model to use for suggestions and analysis</small>
+                {/* <small>Select the AI model to use for suggestions and analysis</small> */}
               </div>
 
               <div className="settings-group">

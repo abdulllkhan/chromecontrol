@@ -222,13 +222,13 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
             className={`btn ${activeView === 'library' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveView('library')}
           >
-            📚 Library
+            Library
           </button>
           <button
             className={`btn ${activeView === 'import' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveView('import')}
           >
-            📥 Import
+            Import
           </button>
           <button className="btn btn-secondary" onClick={onClose}>
             <CloseIcon size={16} /> Close
@@ -530,7 +530,7 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
           {selectedTaskIds.length > 0 && (
             <div className="bulk-buttons">
               <button className="btn btn-secondary" onClick={handleBulkExport}>
-                📤 Export Selected
+                Export Selected
               </button>
               <button className="btn btn-danger" onClick={handleBulkDelete}>
                 <DeleteIcon size={14} /> Delete Selected
@@ -872,7 +872,7 @@ const TaskExportModal: React.FC<TaskExportModalProps> = ({
     <div className="modal-overlay">
       <div className="modal export-modal">
         <div className="modal-header">
-          <h3>📤 Export Tasks</h3>
+          <h3>Export Tasks</h3>
           <button className="btn btn-secondary" onClick={onClose}><CloseIcon size={16} /></button>
         </div>
         
@@ -1134,7 +1134,7 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
     <div className="modal-overlay">
       <div className="modal import-modal">
         <div className="modal-header">
-          <h3>📥 Import Tasks</h3>
+          <h3>Import Tasks</h3>
           <button className="btn btn-secondary" onClick={onClose}>✕</button>
         </div>
         
@@ -1145,7 +1145,7 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
                 className={`tab ${importMethod === 'file' ? 'active' : ''}`}
                 onClick={() => setImportMethod('file')}
               >
-                📁 Upload File
+                Upload File
               </button>
               <button
                 className={`tab ${importMethod === 'paste' ? 'active' : ''}`}
@@ -1188,7 +1188,7 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
 
           {parseError && (
             <div className="error-message">
-              <span>❌ {parseError}</span>
+              <span>{parseError}</span>
             </div>
           )}
 
