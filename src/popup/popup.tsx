@@ -909,8 +909,8 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     apiKey: config?.apiKey || '',
-    model: config?.model || 'gpt-3.5-turbo',
-    maxTokens: config?.maxTokens || 1000,
+    model: config?.model || 'gpt-5',
+    maxTokens: config?.maxTokens || 8000,
     temperature: config?.temperature || 0.7,
     baseUrl: config?.baseUrl || 'https://api.openai.com/v1'
   });
@@ -928,8 +928,8 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
       newErrors.apiKey = 'OpenAI API key should start with "sk-"';
     }
 
-    if (formData.maxTokens < 1 || formData.maxTokens > 4000) {
-      newErrors.maxTokens = 'Max tokens must be between 1 and 4000';
+    if (formData.maxTokens < 1 || formData.maxTokens > 200000) {
+      newErrors.maxTokens = 'Max tokens must be between 1 and 200000';
     }
 
     if (formData.temperature < 0 || formData.temperature > 2) {
@@ -1025,9 +1025,14 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
               value={formData.model}
               onChange={(e) => setFormData({ ...formData, model: e.target.value })}
             >
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Recommended)</option>
-              <option value="gpt-4">GPT-4 (More capable, slower)</option>
-              <option value="gpt-4-turbo-preview">GPT-4 Turbo</option>
+              <option value="gpt-5">GPT-5 (Latest)</option>
+              <option value="gpt-4.1">GPT-4.1 (Enhanced)</option>
+              <option value="o4-mini">o4 Mini (Fast & Efficient)</option>
+              <option value="gpt-4o">GPT-4o (Legacy)</option>
+              <option value="gpt-4o-mini">GPT-4o Mini (Legacy)</option>
+              <option value="gpt-4">GPT-4 (Legacy)</option>
+              <option value="gpt-4-turbo">GPT-4 Turbo (Legacy)</option>
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
             </select>
           </div>
 

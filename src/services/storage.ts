@@ -262,9 +262,9 @@ export class ChromeStorageService {
     }
 
     // If encryption is disabled, we should not have encrypted data at this point
-    // The retrieveData method should have already cleared it
+    // The retrieveData method should have already cleared it, but handle gracefully
     if (!this.config.encryptionEnabled || !this.encryptionKey) {
-      console.warn('Found encrypted data but encryption is disabled. This should not happen.');
+      console.log('Encrypted data found but encryption is disabled, returning null for graceful fallback.');
       return null;
     }
 

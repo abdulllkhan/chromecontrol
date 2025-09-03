@@ -82,8 +82,8 @@ export class AIService {
   constructor(config: AIServiceConfig) {
     this.config = {
       baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4',
-      maxTokens: 2000,
+      model: 'gpt-5', // Updated to GPT-5 (latest available)
+      maxTokens: 8000, // Increased for GPT-5's larger context window
       temperature: 0.7,
       timeout: 30000,
       maxRetries: 3,
@@ -895,8 +895,8 @@ export function createAIService(config: AIServiceConfig): AIService {
  */
 export const DEFAULT_AI_CONFIG: Omit<AIServiceConfig, 'apiKey'> = {
   baseUrl: 'https://api.openai.com/v1',
-  model: 'gpt-4',
-  maxTokens: 2000,
+  model: 'gpt-5', // Updated to GPT-5 (latest available)
+  maxTokens: 8000, // Increased for GPT-5's larger context window
   temperature: 0.7,
   timeout: 30000,
   maxRetries: 3,
@@ -907,6 +907,24 @@ export const DEFAULT_AI_CONFIG: Omit<AIServiceConfig, 'apiKey'> = {
 /**
  * Utility to validate AI service configuration
  */
+/**
+ * Available OpenAI models with their configurations
+ */
+export const AVAILABLE_MODELS = {
+  'gpt-5': { maxTokens: 200000, name: 'GPT-5 (Latest)' },
+  'gpt-4.1': { maxTokens: 150000, name: 'GPT-4.1 (Enhanced)' },
+  'o4-mini': { maxTokens: 128000, name: 'o4 Mini (Fast & Efficient)' },
+  'gpt-4o': { maxTokens: 128000, name: 'GPT-4o (Legacy)' },
+  'gpt-4o-mini': { maxTokens: 128000, name: 'GPT-4o Mini (Legacy)' },
+  'gpt-4': { maxTokens: 8192, name: 'GPT-4 (Legacy)' },
+  'gpt-4-turbo': { maxTokens: 128000, name: 'GPT-4 Turbo (Legacy)' },
+  'gpt-3.5-turbo': { maxTokens: 16384, name: 'GPT-3.5 Turbo (Legacy)' }
+} as const;
+
+export function getModelMaxTokens(model: string): number {
+  return AVAILABLE_MODELS[model as keyof typeof AVAILABLE_MODELS]?.maxTokens || 4000;
+}
+
 export function validateAIConfig(config: AIServiceConfig): boolean {
   if (!config.apiKey || typeof config.apiKey !== 'string') {
     throw new Error('API key is required and must be a string');

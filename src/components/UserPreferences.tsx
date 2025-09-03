@@ -826,6 +826,24 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
               </div>
 
               <div className="settings-group">
+                <h5>AI Model</h5>
+                <select
+                  className="setting-select"
+                  defaultValue="gpt-5"
+                >
+                  <option value="gpt-5">GPT-5 (Latest)</option>
+                  <option value="gpt-4.1">GPT-4.1 (Enhanced)</option>
+                  <option value="o4-mini">o4 Mini (Fast & Efficient)</option>
+                  <option value="gpt-4o">GPT-4o (Legacy)</option>
+                  <option value="gpt-4o-mini">GPT-4o Mini (Legacy)</option>
+                  <option value="gpt-4">GPT-4 (Legacy)</option>
+                  <option value="gpt-4-turbo">GPT-4 Turbo (Legacy)</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
+                </select>
+                <small>Select the AI model to use for suggestions and analysis</small>
+              </div>
+
+              <div className="settings-group">
                 <h5>Theme</h5>
                 <div className="theme-options">
                   {(['light', 'dark', 'auto'] as const).map(theme => (

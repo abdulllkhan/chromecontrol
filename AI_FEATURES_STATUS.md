@@ -7,7 +7,7 @@
 - **✅ Demo Mode**: Fallback demo service when no API key is configured
 - **✅ Configuration UI**: User-friendly AI configuration interface in the popup
 - **✅ API Key Management**: Secure storage and validation of OpenAI API keys
-- **✅ Multiple Models**: Support for GPT-3.5 Turbo, GPT-4, and GPT-4 Turbo
+- **✅ Multiple Models**: Support for GPT-5, GPT-4.1, o4-mini, and legacy models
 
 ### AI Configuration Features
 - **🔧 API Key Setup**: Easy configuration with validation and testing
@@ -35,7 +35,7 @@
 1. Open the extension popup
 2. Click the **🤖 AI** tab (shows ⚠️ if not configured)
 3. Paste your API key
-4. Choose your preferred model (GPT-3.5 Turbo recommended)
+4. Choose your preferred model (GPT-5 recommended)
 5. Adjust settings if needed
 6. Click **🧪 Test Connection** to verify
 7. Click **Save Configuration**
@@ -53,7 +53,7 @@
 // Real AI Service (when configured)
 const aiService = new AIService({
   apiKey: 'sk-your-key-here',
-  model: 'gpt-3.5-turbo',
+  model: 'gpt-5',
   maxTokens: 1000,
   temperature: 0.7
 });
