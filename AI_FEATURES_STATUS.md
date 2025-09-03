@@ -3,15 +3,17 @@
 ## ✅ Current Implementation Status
 
 ### AI Service Integration
-- **✅ Complete AI Service**: Full OpenAI API integration with error handling, rate limiting, and streaming support
+- **✅ Multi-Provider Support**: Full OpenAI and Claude API integration with unified interface
+- **✅ Complete AI Service**: Error handling, rate limiting, and automatic fallback between providers
 - **✅ Demo Mode**: Fallback demo service when no API key is configured
-- **✅ Configuration UI**: User-friendly AI configuration interface in the popup
-- **✅ API Key Management**: Secure storage and validation of OpenAI API keys
-- **✅ Multiple Models**: Support for GPT-5, GPT-4.1, o4-mini, and legacy models
+- **✅ Configuration UI**: User-friendly AI configuration interface supporting both providers
+- **✅ API Key Management**: Secure storage and validation for OpenAI and Claude API keys
+- **✅ Multiple Models**: Support for GPT-5, GPT-4.1, o4-mini, Claude 3.5 Sonnet, Claude 3.5 Haiku, and more
 
 ### AI Configuration Features
-- **🔧 API Key Setup**: Easy configuration with validation and testing
-- **⚙️ Model Selection**: Choose between different OpenAI models
+- **🔧 API Key Setup**: Easy configuration with validation and testing for both providers
+- **⚙️ Provider Selection**: Switch between OpenAI and Claude (Anthropic) with dedicated configurations
+- **🎯 Model Selection**: Choose from the latest models including GPT-5 and Claude 3.5 Sonnet
 - **🎛️ Parameter Control**: Adjust temperature, max tokens, and other settings
 - **🧪 Connection Testing**: Test API connectivity before saving
 - **💾 Secure Storage**: Encrypted storage of API credentials
@@ -25,20 +27,31 @@
 
 ## 🎯 How to Enable AI Features
 
-### Step 1: Get OpenAI API Key
+### Step 1: Get API Key
+
+#### Option A: OpenAI (Recommended for GPT-5)
 1. Visit [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Create an account or sign in
 3. Generate a new API key
 4. Copy the key (starts with `sk-`)
 
+#### Option B: Claude (Anthropic)
+1. Visit [Anthropic Console](https://console.anthropic.com/)
+2. Create an account or sign in
+3. Generate a new API key
+4. Copy the key (starts with `sk-ant-`)
+
 ### Step 2: Configure in Extension
 1. Open the extension popup
 2. Click the **🤖 AI** tab (shows ⚠️ if not configured)
-3. Paste your API key
-4. Choose your preferred model (GPT-5 recommended)
-5. Adjust settings if needed
-6. Click **🧪 Test Connection** to verify
-7. Click **Save Configuration**
+3. **Choose your AI Provider** (OpenAI or Claude)
+4. Paste your API key for the selected provider
+5. Choose your preferred model:
+   - **OpenAI**: GPT-5 (recommended), GPT-4.1, o4-mini
+   - **Claude**: Claude 3.5 Sonnet (recommended), Claude 3.5 Haiku, Claude 3 Opus
+6. Adjust settings if needed
+7. Click **🧪 Test Connection** to verify
+8. Click **Save Configuration**
 
 ### Step 3: Enjoy AI Features
 - **Smart Suggestions**: Get contextual AI suggestions for any website

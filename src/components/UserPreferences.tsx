@@ -827,19 +827,36 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
 
               <div className="settings-group">
                 <h5>AI Model</h5>
-                <select
-                  className="setting-select"
-                  defaultValue="gpt-5"
-                >
-                  <option value="gpt-5">GPT-5 (Latest)</option>
-                  <option value="gpt-4.1">GPT-4.1 (Enhanced)</option>
-                  <option value="o4-mini">o4 Mini (Fast & Efficient)</option>
-                  <option value="gpt-4o">GPT-4o (Legacy)</option>
-                  <option value="gpt-4o-mini">GPT-4o Mini (Legacy)</option>
-                  <option value="gpt-4">GPT-4 (Legacy)</option>
-                  <option value="gpt-4-turbo">GPT-4 Turbo (Legacy)</option>
-                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
-                </select>
+                {preferences.aiProvider === 'openai' ? (
+                  <select
+                    className="setting-select"
+                    defaultValue="gpt-5"
+                  >
+                    <option value="gpt-5">GPT-5 (Latest)</option>
+                    <option value="gpt-4.1">GPT-4.1 (Enhanced)</option>
+                    <option value="o4-mini">o4 Mini (Fast & Efficient)</option>
+                    <option value="gpt-4o">GPT-4o (Legacy)</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini (Legacy)</option>
+                    <option value="gpt-4">GPT-4 (Legacy)</option>
+                    <option value="gpt-4-turbo">GPT-4 Turbo (Legacy)</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
+                  </select>
+                ) : preferences.aiProvider === 'claude' ? (
+                  <select
+                    className="setting-select"
+                    defaultValue="claude-3-5-sonnet-20241022"
+                  >
+                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Latest)</option>
+                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
+                    <option value="claude-3-opus-20240229">Claude 3 Opus (Most Capable)</option>
+                    <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (Balanced)</option>
+                    <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast)</option>
+                  </select>
+                ) : (
+                  <select className="setting-select" disabled>
+                    <option>Select AI Provider First</option>
+                  </select>
+                )}
                 <small>Select the AI model to use for suggestions and analysis</small>
               </div>
 

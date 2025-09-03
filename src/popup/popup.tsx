@@ -7,10 +7,8 @@ import useErrorHandler from '../components/useErrorHandler';
 import { FullTaskManagement } from '../components/TaskManagement';
 import UserPreferencesComponent from '../components/UserPreferences';
 import {
-  Suggestion,
   CustomTask,
   WebsiteContext,
-  TaskResult,
   OutputFormat,
   WebsiteCategory,
   PageContent,
@@ -18,6 +16,7 @@ import {
   PageType,
   TaskType
 } from '../types';
+import type { TaskResult } from '../types';
 import {
   SuggestionEngine,
   type SuggestionContext,
@@ -27,7 +26,7 @@ import {
 import { PatternEngine } from '../services/patternEngine';
 import { TaskManager } from '../services/taskManager';
 import { ChromeStorageService } from '../services/storage';
-import { AIService, AIServiceConfig, DEFAULT_AI_CONFIG } from '../services/aiService';
+import { AIService, AIServiceConfig } from '../services/aiService';
 import { demoAIService } from '../services/demoAIService';
 import '../styles/TaskManagement.css';
 import '../styles/UserPreferences.css';
@@ -38,8 +37,6 @@ import {
   getPriorityIcon,
   EditIcon,
   DeleteIcon,
-  DuplicateIcon,
-  StatsIcon,
   CopyIcon,
   CloseIcon,
   CheckIcon,
@@ -652,7 +649,7 @@ Please provide relevant assistance based on the page content and user needs.`;
       const mockResult: TaskResult = {
         success: true,
         content: `Test execution of "${tempTask.name}" completed successfully!\n\nThis task would analyze the current page (${websiteContext?.domain || 'unknown'}) and provide AI-powered assistance based on your prompt template.\n\nPrompt preview:\n${formData.promptTemplate.slice(0, 200)}${formData.promptTemplate.length > 200 ? '...' : ''}\n\nThe actual implementation will integrate with the AI service to process real requests.`,
-        format: tempTask.outputFormat,
+        format: tempTask.outputFormat || OutputFormat.PLAIN_TEXT,
         timestamp: new Date(),
         executionTime: 1500
       };
@@ -907,25 +904,38 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
   onCancel,
   onTest
 }) => {
+  const [provider, setProvider] = useState<'openai' | 'claude'>('openai');
   const [formData, setFormData] = useState({
     apiKey: config?.apiKey || '',
-    model: config?.model || 'gpt-5',
+    model: config?.model || (provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
     maxTokens: config?.maxTokens || 8000,
     temperature: config?.temperature || 0.7,
-    baseUrl: config?.baseUrl || 'https://api.openai.com/v1'
+    baseUrl: config?.baseUrl || (provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
   });
 
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Update form data when provider changes
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      model: provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022',
+      baseUrl: provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1',
+      apiKey: '' // Clear API key when switching providers
+    }));
+  }, [provider]);
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.apiKey.trim()) {
       newErrors.apiKey = 'API key is required';
-    } else if (!formData.apiKey.startsWith('sk-')) {
+    } else if (provider === 'openai' && !formData.apiKey.startsWith('sk-')) {
       newErrors.apiKey = 'OpenAI API key should start with "sk-"';
+    } else if (provider === 'claude' && !formData.apiKey.startsWith('sk-ant-')) {
+      newErrors.apiKey = 'Claude API key should start with "sk-ant-"';
     }
 
     if (formData.maxTokens < 1 || formData.maxTokens > 200000) {
@@ -998,12 +1008,33 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
       <div className="ai-config-info">
         <p>Configure your AI service to enable intelligent suggestions and automation.</p>
         <div className="info-box">
-          <strong>🔑 OpenAI API Key Required</strong>
-          <p>Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI Platform</a></p>
+          <strong>🔑 {provider === 'openai' ? 'OpenAI' : 'Claude'} API Key Required</strong>
+          <p>Get your API key from <a 
+            href={provider === 'openai' 
+              ? 'https://platform.openai.com/api-keys' 
+              : 'https://console.anthropic.com/'
+            } 
+            target="_blank" 
+            rel="noopener noreferrer"
+          >
+            {provider === 'openai' ? 'OpenAI Platform' : 'Anthropic Console'}
+          </a></p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="ai-config-form">
+        <div className="form-group">
+          <label htmlFor="provider">AI Provider *</label>
+          <select
+            id="provider"
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as 'openai' | 'claude')}
+          >
+            <option value="openai">OpenAI</option>
+            <option value="claude">Claude (Anthropic)</option>
+          </select>
+        </div>
+
         <div className="form-group">
           <label htmlFor="api-key">API Key *</label>
           <input
@@ -1012,7 +1043,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
             value={formData.apiKey}
             onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
             className={errors.apiKey ? 'error' : ''}
-            placeholder="sk-..."
+            placeholder={provider === 'openai' ? 'sk-...' : 'sk-ant-...'}
           />
           {errors.apiKey && <span className="error-text">{errors.apiKey}</span>}
         </div>
@@ -1025,14 +1056,26 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
               value={formData.model}
               onChange={(e) => setFormData({ ...formData, model: e.target.value })}
             >
-              <option value="gpt-5">GPT-5 (Latest)</option>
-              <option value="gpt-4.1">GPT-4.1 (Enhanced)</option>
-              <option value="o4-mini">o4 Mini (Fast & Efficient)</option>
-              <option value="gpt-4o">GPT-4o (Legacy)</option>
-              <option value="gpt-4o-mini">GPT-4o Mini (Legacy)</option>
-              <option value="gpt-4">GPT-4 (Legacy)</option>
-              <option value="gpt-4-turbo">GPT-4 Turbo (Legacy)</option>
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
+              {provider === 'openai' ? (
+                <>
+                  <option value="gpt-5">GPT-5 (Latest)</option>
+                  <option value="gpt-4.1">GPT-4.1 (Enhanced)</option>
+                  <option value="o4-mini">o4 Mini (Fast & Efficient)</option>
+                  <option value="gpt-4o">GPT-4o (Legacy)</option>
+                  <option value="gpt-4o-mini">GPT-4o Mini (Legacy)</option>
+                  <option value="gpt-4">GPT-4 (Legacy)</option>
+                  <option value="gpt-4-turbo">GPT-4 Turbo (Legacy)</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
+                </>
+              ) : (
+                <>
+                  <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Latest)</option>
+                  <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
+                  <option value="claude-3-opus-20240229">Claude 3 Opus (Most Capable)</option>
+                  <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (Balanced)</option>
+                  <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast)</option>
+                </>
+              )}
             </select>
           </div>
 
@@ -1230,7 +1273,7 @@ export const PopupApp: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'categorized'>('list');
 
   // Enhanced error handling
-  const { error: globalError, isRetrying, handleError, retry, clearError, executeWithErrorHandling } = useErrorHandler({
+  const { error: globalError, retry, clearError, executeWithErrorHandling } = useErrorHandler({
     onError: (errorReport) => {
       console.error('Popup error:', errorReport);
       setState(prev => ({ ...prev, error: errorReport.userFriendlyMessage }));
@@ -1293,6 +1336,7 @@ export const PopupApp: React.FC = () => {
           maxSuggestions: 20,
           enableBuiltInSuggestions: true,
           enableCustomSuggestions: true,
+          enableCaching: true,
           priorityWeights: {
             usage: 1.0,
             recency: 0.8,
@@ -1402,7 +1446,7 @@ export const PopupApp: React.FC = () => {
   const handleExecuteSuggestion = useCallback(async (suggestion: PrioritizedSuggestion) => {
     setExecutingTask(suggestion.id);
 
-    const result = await executeWithErrorHandling(async () => {
+    await executeWithErrorHandling(async () => {
       if (!taskManager || !state.websiteContext || !state.pageContent) {
         throw new Error('Required services not initialized');
       }
