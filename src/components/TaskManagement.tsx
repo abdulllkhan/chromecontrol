@@ -1151,7 +1151,7 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
                 className={`tab ${importMethod === 'paste' ? 'active' : ''}`}
                 onClick={() => setImportMethod('paste')}
               >
-                📋 Paste Data
+                Paste Data
               </button>
             </div>
           </div>
@@ -1200,7 +1200,7 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
               <div className="preview-list">
                 {parsedTasks.slice(0, 5).map((task, index) => (
                   <div key={index} className="preview-task">
-                    <div className="task-name">✓ {task.name}</div>
+                    <div className="task-name">[✓] {task.name}</div>
                     <div className="task-details">
                       <small>{task.description}</small>
                       <small>{task.websitePatterns.length} website pattern{task.websitePatterns.length !== 1 ? 's' : ''}</small>
@@ -1216,7 +1216,7 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
               
               <div className="import-warnings">
                 <small>
-                  ⚠️ Imported tasks will be created as new tasks. Existing tasks with the same name will not be overwritten.
+                  Note: Imported tasks will be created as new tasks. Existing tasks with the same name will not be overwritten.
                 </small>
               </div>
             </div>

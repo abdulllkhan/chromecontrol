@@ -527,11 +527,11 @@ export class SuggestionGenerator {
   private getTaskIcon(task: CustomTask): string {
     const iconMap: Record<string, string> = {
       content: '📝',
-      analysis: '🔍',
-      automation: '🤖',
-      research: '📚',
-      optimization: '⚡',
-      organization: '📋'
+      analysis: 'Analysis',
+      automation: 'Auto',
+      research: 'Research',
+      optimization: 'Optimize',
+      organization: 'Organize'
     };
 
     // Try to determine category from task content
@@ -543,7 +543,7 @@ export class SuggestionGenerator {
       }
     }
 
-    return task.tags.length > 0 ? '🏷️' : '⚙️';
+    return task.tags.length > 0 ? 'Tagged' : 'Task';
   }
 
   /**

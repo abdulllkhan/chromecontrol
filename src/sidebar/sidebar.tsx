@@ -375,7 +375,11 @@ const SidebarApp: React.FC = () => {
 
   // Handle AI configuration
   const handleAISave = useCallback(async (config: AIServiceConfig) => {
-    if (!storageService) return;
+    if (!storageService) {
+      console.error('Storage service not available');
+      setState(prev => ({ ...prev, error: 'Storage service not available' }));
+      return;
+    }
 
     try {
       // Save AI config to user preferences
@@ -389,13 +393,15 @@ const SidebarApp: React.FC = () => {
       const newAIService = new AIService(config);
       setAIService(newAIService);
       
-      setState(prev => ({ ...prev, hasAIConfig: true }));
+      setState(prev => ({ ...prev, hasAIConfig: true, error: null }));
       setShowAIConfig(false);
       
       // Reinitialize with new AI service
       await initializeSidebar();
     } catch (error) {
       console.error('Failed to save AI config:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save AI configuration';
+      setState(prev => ({ ...prev, error: errorMessage }));
     }
   }, [storageService, initializeSidebar]);
 
@@ -487,19 +493,19 @@ const SidebarApp: React.FC = () => {
           className={`nav-button ${state.activeTab === 'suggestions' ? 'active' : ''}`}
           onClick={() => setState(prev => ({ ...prev, activeTab: 'suggestions' }))}
         >
-          💡 Suggestions
+          Suggestions
         </button>
         <button
           className={`nav-button ${state.activeTab === 'tasks' ? 'active' : ''}`}
           onClick={() => setState(prev => ({ ...prev, activeTab: 'tasks' }))}
         >
-          ⚡ Tasks
+          Tasks
         </button>
         <button
           className={`nav-button ${state.activeTab === 'ai' ? 'active' : ''} ${!state.hasAIConfig ? 'warning' : ''}`}
           onClick={() => setState(prev => ({ ...prev, activeTab: 'ai' }))}
         >
-          🤖 AI {!state.hasAIConfig && '⚠️'}
+          AI {!state.hasAIConfig && '(!)'}
         </button>
       </div>
 
@@ -658,7 +664,13 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
   onCancel,
   onTest
 }) => {
-  const [provider, setProvider] = useState<'openai' | 'claude'>('openai');
+  const [provider, setProvider] = useState<'openai' | 'claude'>(() => {
+    // Determine provider from existing config
+    if (config?.baseUrl?.includes('anthropic')) {
+      return 'claude';
+    }
+    return 'openai';
+  });
   const [formData, setFormData] = useState({
     apiKey: config?.apiKey || '',
     model: config?.model || (provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
@@ -704,10 +716,18 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      onSave(formData as AIServiceConfig);
+      try {
+        await onSave(formData as AIServiceConfig);
+      } catch (error) {
+        console.error('Failed to save configuration:', error);
+        setTestResult({
+          success: false,
+          message: 'Failed to save configuration: ' + (error instanceof Error ? error.message : 'Unknown error')
+        });
+      }
     }
   };
 
@@ -737,15 +757,17 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     <div className="ai-config-modal">
       <div className="modal-header">
         <h3>AI Configuration</h3>
-        <button onClick={onCancel}>
-          <CloseIcon />
+        <button onClick={onCancel} className="btn-close">
+          <CloseIcon size={20} />
         </button>
       </div>
 
       <div className="ai-config-info">
         <p>Configure your AI service to enable intelligent suggestions and automation.</p>
         <div className="info-box">
-          <strong>🔑 {provider === 'openai' ? 'OpenAI' : 'Claude'} API Key Required</strong>
+          <strong>
+            {provider === 'openai' ? 'OpenAI' : 'Claude'} API Key Required
+          </strong>
           <p>Get your API key from <a 
             href={provider === 'openai' 
               ? 'https://platform.openai.com/api-keys' 
@@ -760,30 +782,62 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="ai-config-form">
-        <div className="form-group">
-          <label htmlFor="provider">AI Provider *</label>
-          <select
-            id="provider"
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as 'openai' | 'claude')}
-          >
-            <option value="openai">OpenAI</option>
-            <option value="claude">Claude (Anthropic)</option>
-          </select>
+        <div className="form-section">
+          <div className="form-section-title">
+            Provider Selection
+          </div>
+          
+          <div className="provider-selection">
+            <div 
+              className={`provider-option ${provider === 'openai' ? 'selected' : ''}`}
+              onClick={() => setProvider('openai')}
+            >
+              <div className="provider-logo">OpenAI</div>
+              <div className="provider-name">OpenAI</div>
+              <div className="provider-description">GPT-5, GPT-4.1, o4-mini</div>
+            </div>
+            
+            <div 
+              className={`provider-option ${provider === 'claude' ? 'selected' : ''}`}
+              onClick={() => setProvider('claude')}
+            >
+              <div className="provider-logo">Claude</div>
+              <div className="provider-name">Claude</div>
+              <div className="provider-description">Anthropic AI Assistant</div>
+            </div>
+          </div>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="api-key">API Key *</label>
-          <input
-            id="api-key"
-            type="password"
-            value={formData.apiKey}
-            onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-            className={errors.apiKey ? 'error' : ''}
-            placeholder={provider === 'openai' ? 'sk-...' : 'sk-ant-...'}
-          />
-          {errors.apiKey && <span className="error-text">{errors.apiKey}</span>}
-        </div>
+        <div className="form-section">
+          <div className="form-section-title">
+            API Configuration
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="api-key">API Key *</label>
+            <div className="input-with-toggle">
+              <input
+                id="api-key"
+                type="password"
+                value={formData.apiKey}
+                onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+                className={errors.apiKey ? 'error' : ''}
+                placeholder={provider === 'openai' ? 'sk-...' : 'sk-ant-...'}
+              />
+              <button 
+                type="button" 
+                className="password-toggle"
+                onClick={(e) => {
+                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                  input.type = input.type === 'password' ? 'text' : 'password';
+                  e.currentTarget.textContent = input.type === 'password' ? 'Show' : 'Hide';
+                }}
+              >
+                Show
+              </button>
+            </div>
+            {errors.apiKey && <span className="error-text">{errors.apiKey}</span>}
+          </div>
 
         <div className="form-row">
           <div className="form-group">
@@ -831,17 +885,46 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
           </div>
         </div>
 
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="temperature">Temperature</label>
+            <input
+              id="temperature"
+              type="number"
+              step="0.1"
+              value={formData.temperature}
+              onChange={(e) => setFormData({ ...formData, temperature: parseFloat(e.target.value) })}
+              min="0"
+              max="2"
+              className={errors.temperature ? 'error' : ''}
+            />
+            {errors.temperature && <span className="error-text">{errors.temperature}</span>}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="base-url">Base URL</label>
+            <input
+              id="base-url"
+              type="url"
+              value={formData.baseUrl}
+              onChange={(e) => setFormData({ ...formData, baseUrl: e.target.value })}
+              placeholder="https://api.example.com/v1"
+            />
+          </div>
+        </div>
+        </div>
+
         <div className="form-actions">
-          <button type="button" onClick={onCancel}>Cancel</button>
+          <button type="button" onClick={onCancel} className="btn-cancel">Cancel</button>
           <button
             type="button"
             onClick={handleTestConnection}
             disabled={isTestingConnection}
-            className="test-button"
+            className="btn-test"
           >
-            {isTestingConnection ? 'Testing...' : '🧪 Test Connection'}
+            {isTestingConnection ? 'Testing...' : 'Test Connection'}
           </button>
-          <button type="submit">Save Configuration</button>
+          <button type="submit" className="btn-save">Save Configuration</button>
         </div>
 
         {testResult && (
