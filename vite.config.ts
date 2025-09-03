@@ -6,7 +6,12 @@ export default defineConfig(({ command, mode }) => {
   const isProduction = mode === 'production';
   
   return {
-    plugins: [react()],
+    plugins: [
+      react({
+        jsxRuntime: 'automatic',
+        jsxImportSource: 'react'
+      })
+    ],
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src'),
@@ -34,6 +39,10 @@ export default defineConfig(({ command, mode }) => {
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode || 'development'),
       global: 'globalThis',
+    },
+    esbuild: {
+      jsx: 'automatic',
+      jsxDev: false, // Force production JSX to avoid jsxDEV errors
     },
   };
 });

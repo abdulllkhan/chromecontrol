@@ -447,31 +447,34 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
     <div className="task-library-view">
       {/* Organization Controls */}
       <div className="organization-controls">
-        <div className="control-group">
+        <div className="control-group sort-control-group">
           <label htmlFor="sort-by">Sort by:</label>
-          <select
-            id="sort-by"
-            value={organizationOptions.sortBy}
-            onChange={(e) => setOrganizationOptions(prev => ({
-              ...prev,
-              sortBy: e.target.value as any
-            }))}
-          >
-            <option value="name">Name</option>
-            <option value="created">Created Date</option>
-            <option value="usage">Usage Count</option>
-            <option value="category">Category</option>
-          </select>
-          
-          <button
-            className="btn btn-small"
-            onClick={() => setOrganizationOptions(prev => ({
-              ...prev,
-              sortOrder: prev.sortOrder === 'asc' ? 'desc' : 'asc'
-            }))}
-          >
-            {organizationOptions.sortOrder === 'asc' ? '↑' : '↓'}
-          </button>
+          <div className="sort-controls">
+            <select
+              id="sort-by"
+              value={organizationOptions.sortBy}
+              onChange={(e) => setOrganizationOptions(prev => ({
+                ...prev,
+                sortBy: e.target.value as any
+              }))}
+            >
+              <option value="name">Name</option>
+              <option value="created">Created Date</option>
+              <option value="usage">Usage Count</option>
+              <option value="category">Category</option>
+            </select>
+            
+            <button
+              className="btn btn-small sort-order-btn"
+              onClick={() => setOrganizationOptions(prev => ({
+                ...prev,
+                sortOrder: prev.sortOrder === 'asc' ? 'desc' : 'asc'
+              }))}
+              title={`Sort ${organizationOptions.sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+            >
+              {organizationOptions.sortOrder === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
         </div>
 
         <div className="control-group">
