@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CustomTask, WebsiteCategory, OutputFormat, UsageMetrics } from '../types';
+import { CustomTask, WebsiteCategory, OutputFormat, UsageMetrics, WebsiteContext } from '../types';
 import { TaskManager } from '../services/taskManager';
 import { ChromeStorageService } from '../services/storage';
 import {
@@ -20,6 +20,7 @@ interface TaskManagementProps {
   taskManager: TaskManager;
   storageService: ChromeStorageService;
   onClose: () => void;
+  websiteContext?: WebsiteContext | null;
 }
 
 interface TaskLibraryViewProps {
@@ -54,6 +55,7 @@ interface TaskImportModalProps {
 interface TaskCreateModalProps {
   onSave: (task: Partial<CustomTask>) => void;
   onCancel: () => void;
+  websiteContext?: WebsiteContext | null;
 }
 
 interface TaskOrganizationOptions {
@@ -88,7 +90,8 @@ function ensureDate(value: Date | string | undefined): Date {
 export const FullTaskManagement: React.FC<TaskManagementProps> = ({
   taskManager,
   storageService,
-  onClose
+  onClose,
+  websiteContext
 }) => {
   const [tasks, setTasks] = useState<CustomTask[]>([]);
   const [usageStats, setUsageStats] = useState<Record<string, UsageMetrics>>({});
@@ -275,6 +278,7 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
         <TaskCreateModal
           onSave={handleCreateTask}
           onCancel={() => setActiveView('library')}
+          websiteContext={websiteContext}
         />
       )}
 
@@ -741,12 +745,41 @@ const convertTasksToCSV = (tasks: CustomTask[]): string => {
 // TASK CREATE MODAL
 // ============================================================================
 
-const TaskCreateModal: React.FC<TaskCreateModalProps> = ({ onSave, onCancel }) => {
+// Helper function to generate website patterns from domain
+const generateWebsitePatterns = (websiteContext: WebsiteContext | null): string => {
+  if (!websiteContext?.domain) return '';
+  
+  const domain = websiteContext.domain;
+  const escapedDomain = domain.replace(/\./g, '\\.');
+  
+  // Generate regex patterns:
+  // 1. Exact domain match (works for any domain/subdomain)
+  // 2. If it's a subdomain, also match the base domain
+  // 3. Pattern to match any subdomain of the base domain
+  const patterns = [`^${escapedDomain}$`];
+  
+  // If domain has a subdomain (like www.example.com), extract base domain
+  const parts = domain.split('.');
+  if (parts.length > 2) {
+    // Remove first part (subdomain) to get base domain
+    const baseDomain = parts.slice(1).join('.');
+    const escapedBaseDomain = baseDomain.replace(/\./g, '\\.');
+    patterns.push(`^${escapedBaseDomain}$`);
+    patterns.push(`^.*\\.${escapedBaseDomain}$`);
+  } else {
+    // For base domains, add pattern for any subdomain
+    patterns.push(`^.*\\.${escapedDomain}$`);
+  }
+  
+  return patterns.join(', ');
+};
+
+const TaskCreateModal: React.FC<TaskCreateModalProps> = ({ onSave, onCancel, websiteContext }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     promptTemplate: '',
-    websitePatterns: '',
+    websitePatterns: generateWebsitePatterns(websiteContext),
     outputFormat: OutputFormat.PLAIN_TEXT as OutputFormat,
     tags: ''
   });
@@ -760,7 +793,7 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({ onSave, onCancel }) =
       name: '',
       description: '',
       promptTemplate: '',
-      websitePatterns: '',
+      websitePatterns: generateWebsitePatterns(websiteContext),
       tags: ''
     },
     quickStart: {
@@ -775,7 +808,7 @@ Please:
 1. Analyze what I'm looking at
 2. Provide relevant assistance
 3. Suggest next steps`,
-      websitePatterns: '',
+      websitePatterns: generateWebsitePatterns(websiteContext),
       tags: 'general, quick, assistant'
     }
   };
@@ -880,7 +913,7 @@ Please:
                 <option value="custom">Custom Task</option>
                 <option value="quickStart">Quick Start Template</option>
               </select>
-              <small>Website-specific tasks (Google, LeetCode, GitHub, etc.) are automatically available in suggestions when you visit those sites.</small>
+              <small>Tasks you create will automatically appear as suggestions when you visit matching websites. Built-in tasks (Google, LeetCode, GitHub, etc.) are already available.</small>
             </div>
 
             {/* Task Name */}
@@ -923,7 +956,12 @@ Please:
                 placeholder="example.com, *.example.com/page/*"
               />
               {errors.websitePatterns && <span className="error-text">{errors.websitePatterns}</span>}
-              <small>Separate multiple patterns with commas. Use * as wildcard.</small>
+              <small>
+                {websiteContext?.domain ? 
+                  `Auto-filled for ${websiteContext.domain}. ` : 
+                  ''
+                }Separate multiple patterns with commas. Use * as wildcard.
+              </small>
             </div>
 
             {/* Prompt Template */}
