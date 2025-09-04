@@ -645,6 +645,12 @@ export class PatternEngine {
   getMatchingPatterns(context: WebsiteContext): Pattern[] {
     const patterns: Pattern[] = [];
     
+    // Add website-specific patterns first (higher priority)
+    const websiteSpecificPattern = this.createWebsiteSpecificPattern(context);
+    if (websiteSpecificPattern) {
+      patterns.push(websiteSpecificPattern);
+    }
+    
     // Add built-in patterns based on category
     const builtInPattern = this.createBuiltInPattern(context);
     if (builtInPattern) {
@@ -696,6 +702,277 @@ export class PatternEngine {
       suggestions,
       isBuiltIn: true
     };
+  }
+
+  /**
+   * Creates website-specific pattern with tailored suggestions
+   */
+  private createWebsiteSpecificPattern(context: WebsiteContext): Pattern | null {
+    const domain = context.domain.toLowerCase();
+    
+    // Google Search
+    if (domain.includes('google.com') && (context.url?.includes('/search') || context.pageType === PageType.SEARCH)) {
+      return {
+        id: 'google-search-assistant',
+        name: 'Google Search Assistant',
+        urlRegex: 'google\\.com/search.*',
+        category: WebsiteCategory.RESEARCH,
+        suggestions: [
+          {
+            id: 'google-search-analyze',
+            title: 'Analyze Search Results',
+            description: 'Get a summary of top search results and key insights',
+            category: 'research',
+            isCustom: false,
+            estimatedTime: 15,
+            requiresPermission: false,
+            prompt: `Analyze the current Google search results and help with:
+
+Search Query: {{query}}
+Current Results: {{textContent}}
+
+Provide:
+1. Summary of top results
+2. Suggest related searches  
+3. Identify the most relevant results
+4. Help refine search strategy`
+          },
+          {
+            id: 'google-search-refine',
+            title: 'Refine Search Strategy',
+            description: 'Get suggestions to improve your search query',
+            category: 'research',
+            isCustom: false,
+            estimatedTime: 10,
+            requiresPermission: false,
+            prompt: `Help improve this Google search:
+
+Current Query: {{query}}
+Search Results: {{textContent}}
+
+Suggest:
+1. Better search terms and operators
+2. Alternative approaches
+3. Related topics to explore
+4. Advanced search techniques`
+          }
+        ],
+        isBuiltIn: true
+      };
+    }
+
+    // LeetCode
+    if (domain.includes('leetcode.com') && context.url?.includes('/problems/')) {
+      return {
+        id: 'leetcode-problem-solver',
+        name: 'LeetCode Problem Solver',
+        urlRegex: 'leetcode\\.com/problems/.*',
+        category: WebsiteCategory.DEVELOPMENT,
+        suggestions: [
+          {
+            id: 'leetcode-problem-analysis',
+            title: 'Analyze Problem',
+            description: 'Break down the problem and suggest solution approaches',
+            category: 'coding',
+            isCustom: false,
+            estimatedTime: 20,
+            requiresPermission: false,
+            prompt: `Help solve this LeetCode problem:
+
+Problem Title: {{title}}
+Problem Description: {{textContent}}
+
+Provide:
+1. Problem analysis and understanding
+2. Approach and algorithm suggestions
+3. Time/space complexity considerations
+4. Code structure hints (without giving full solution)
+5. Edge cases to consider`
+          },
+          {
+            id: 'leetcode-hint-system',
+            title: 'Get Hints',
+            description: 'Get progressive hints without spoiling the solution',
+            category: 'coding',
+            isCustom: false,
+            estimatedTime: 10,
+            requiresPermission: false,
+            prompt: `Provide progressive hints for this LeetCode problem:
+
+Problem: {{title}}
+Description: {{textContent}}
+
+Give me:
+1. A gentle nudge in the right direction
+2. Key insight without revealing algorithm
+3. What data structure might be useful
+4. One example walkthrough`
+          }
+        ],
+        isBuiltIn: true
+      };
+    }
+
+    // GitHub Repository
+    if (domain.includes('github.com')) {
+      return {
+        id: 'github-repo-assistant',
+        name: 'GitHub Repository Assistant',
+        urlRegex: 'github\\.com/.*/.*',
+        category: WebsiteCategory.DEVELOPMENT,
+        suggestions: [
+          {
+            id: 'github-repo-analysis',
+            title: 'Analyze Repository',
+            description: 'Get insights about this repository and how to contribute',
+            category: 'development',
+            isCustom: false,
+            estimatedTime: 15,
+            requiresPermission: false,
+            prompt: `Analyze this GitHub repository:
+
+Repository: {{title}}
+Content: {{textContent}}
+
+Provide:
+1. Repository overview and purpose
+2. Key features and technologies
+3. How to contribute or get started
+4. Code structure analysis
+5. Suggest improvements or issues`
+          },
+          {
+            id: 'github-code-review',
+            title: 'Code Review Assistant',
+            description: 'Help review code changes and pull requests',
+            category: 'development',
+            isCustom: false,
+            estimatedTime: 20,
+            requiresPermission: false,
+            prompt: `Review this GitHub code:
+
+Repository: {{title}}
+Current Page: {{textContent}}
+
+Provide:
+1. Code quality assessment
+2. Potential bugs or issues
+3. Performance considerations
+4. Best practices recommendations
+5. Testing suggestions`
+          }
+        ],
+        isBuiltIn: true
+      };
+    }
+
+    // Stack Overflow
+    if (domain.includes('stackoverflow.com') && context.url?.includes('/questions/')) {
+      return {
+        id: 'stackoverflow-helper',
+        name: 'Stack Overflow Helper',
+        urlRegex: 'stackoverflow\\.com/questions/.*',
+        category: WebsiteCategory.DEVELOPMENT,
+        suggestions: [
+          {
+            id: 'stackoverflow-question-analysis',
+            title: 'Analyze Question',
+            description: 'Help understand the problem and evaluate answers',
+            category: 'programming',
+            isCustom: false,
+            estimatedTime: 15,
+            requiresPermission: false,
+            prompt: `Help with this Stack Overflow question:
+
+Question: {{title}}
+Details: {{textContent}}
+
+Provide:
+1. Problem analysis
+2. Potential solutions or approaches
+3. Best practices recommendations
+4. Related questions or resources
+5. Code review if applicable`
+          },
+          {
+            id: 'stackoverflow-answer-helper',
+            title: 'Craft Better Answer',
+            description: 'Help write a comprehensive answer to the question',
+            category: 'programming',
+            isCustom: false,
+            estimatedTime: 25,
+            requiresPermission: false,
+            prompt: `Help write an answer for this Stack Overflow question:
+
+Question: {{title}}
+Question Details: {{textContent}}
+
+Help me create an answer that:
+1. Directly addresses the problem
+2. Provides clear code examples
+3. Explains the reasoning
+4. Considers edge cases
+5. Follows Stack Overflow best practices`
+          }
+        ],
+        isBuiltIn: true
+      };
+    }
+
+    // YouTube
+    if (domain.includes('youtube.com') && context.url?.includes('/watch')) {
+      return {
+        id: 'youtube-video-assistant',
+        name: 'YouTube Video Assistant',
+        urlRegex: 'youtube\\.com/watch.*',
+        category: WebsiteCategory.ENTERTAINMENT,
+        suggestions: [
+          {
+            id: 'youtube-video-summary',
+            title: 'Summarize Video',
+            description: 'Get key points and takeaways from the video',
+            category: 'learning',
+            isCustom: false,
+            estimatedTime: 10,
+            requiresPermission: false,
+            prompt: `Analyze this YouTube video:
+
+Video Title: {{title}}
+Description: {{textContent}}
+
+Provide:
+1. Content summary
+2. Key takeaways
+3. Timestamps for important sections
+4. Related video suggestions
+5. Learning notes`
+          },
+          {
+            id: 'youtube-learning-notes',
+            title: 'Create Learning Notes',
+            description: 'Generate structured notes for educational content',
+            category: 'learning',
+            isCustom: false,
+            estimatedTime: 15,
+            requiresPermission: false,
+            prompt: `Create learning notes from this YouTube video:
+
+Video: {{title}}
+Content: {{textContent}}
+
+Generate:
+1. Structured outline
+2. Key concepts and definitions
+3. Important quotes or insights
+4. Action items or next steps
+5. Questions for further research`
+          }
+        ],
+        isBuiltIn: true
+      };
+    }
+
+    return null;
   }
 
   /**

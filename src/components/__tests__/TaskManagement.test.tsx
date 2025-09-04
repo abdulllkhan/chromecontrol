@@ -99,8 +99,8 @@ describe('FullTaskManagement', () => {
       expect(screen.getByText('Task Management')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('📚 Library')).toBeInTheDocument();
-    expect(screen.getByText('📥 Import')).toBeInTheDocument();
+    expect(screen.getByText('Library')).toBeInTheDocument();
+    expect(screen.getByText('+ Create Task')).toBeInTheDocument();
   });
 
   it('should display tasks in library view', async () => {
@@ -157,7 +157,7 @@ describe('FullTaskManagement', () => {
     });
 
     // Find and click duplicate button for first task
-    const duplicateButtons = screen.getAllByText('📋 Duplicate');
+    const duplicateButtons = screen.getAllByText('Duplicate');
     fireEvent.click(duplicateButtons[0]);
 
     await waitFor(() => {
@@ -185,7 +185,7 @@ describe('FullTaskManagement', () => {
     });
 
     // Find and click delete button for first task
-    const deleteButtons = screen.getAllByText('🗑️ Delete');
+    const deleteButtons = screen.getAllByText('Delete');
     fireEvent.click(deleteButtons[0]);
 
     await waitFor(() => {
@@ -285,11 +285,11 @@ describe('FullTaskManagement', () => {
     });
 
     // Find and click stats button for first task
-    const statsButtons = screen.getAllByText('📊 Stats');
+    const statsButtons = screen.getAllByText('Stats');
     fireEvent.click(statsButtons[0]);
 
     await waitFor(() => {
-      expect(screen.getByText('📊 Task Statistics: Test Task 1')).toBeInTheDocument();
+      expect(screen.getByText('Task Statistics: Test Task 1')).toBeInTheDocument();
       expect(screen.getByText('Usage Count')).toBeInTheDocument();
       expect(screen.getByText('Success Rate')).toBeInTheDocument();
       // Use getAllByText since there might be multiple 80% values
@@ -323,42 +323,19 @@ describe('FullTaskManagement', () => {
     fireEvent.click(selectAllCheckbox);
 
     await waitFor(() => {
-      expect(screen.getByText('📤 Export Selected')).toBeInTheDocument();
+      expect(screen.getByText('Export Selected')).toBeInTheDocument();
     });
 
     // Click export
-    const exportButton = screen.getByText('📤 Export Selected');
+    const exportButton = screen.getByText('Export Selected');
     fireEvent.click(exportButton);
 
     // Should show export modal
     await waitFor(() => {
-      expect(screen.getByText('📤 Export Tasks')).toBeInTheDocument();
+      expect(screen.getByText('Export Tasks')).toBeInTheDocument();
     });
   });
 
-  it('should handle import functionality', async () => {
-    render(
-      <FullTaskManagement
-        taskManager={mockTaskManager}
-        storageService={mockStorageService}
-        onClose={mockOnClose}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('📥 Import')).toBeInTheDocument();
-    });
-
-    // Click import button
-    const importButton = screen.getByText('📥 Import');
-    fireEvent.click(importButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('📥 Import Tasks')).toBeInTheDocument();
-      expect(screen.getByText('📁 Upload File')).toBeInTheDocument();
-      expect(screen.getByText('📋 Paste Data')).toBeInTheDocument();
-    });
-  });
 
   it('should handle errors gracefully', async () => {
     // Mock error in getAllTasks
@@ -373,7 +350,7 @@ describe('FullTaskManagement', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('❌ Storage error')).toBeInTheDocument();
+      expect(screen.getByText('Storage error')).toBeInTheDocument();
     });
   });
 
@@ -387,10 +364,10 @@ describe('FullTaskManagement', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('✕ Close')).toBeInTheDocument();
+      expect(document.querySelector('.close-button')).toBeInTheDocument();
     });
 
-    const closeButton = screen.getByText('✕ Close');
+    const closeButton = document.querySelector('.close-button') as HTMLButtonElement;
     fireEvent.click(closeButton);
 
     expect(mockOnClose).toHaveBeenCalled();
@@ -417,6 +394,297 @@ describe('FullTaskManagement', () => {
       // Should show group headers for website patterns
       expect(screen.getByRole('heading', { name: /twitter.com/ })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: /amazon.com/ })).toBeInTheDocument();
+    });
+  });
+
+  // New tests for task creation functionality
+  it('should render Create Task button', async () => {
+    render(
+      <FullTaskManagement
+        taskManager={mockTaskManager}
+        storageService={mockStorageService}
+        onClose={mockOnClose}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('+ Create Task')).toBeInTheDocument();
+    });
+  });
+
+  it('should open create task modal when Create Task button is clicked', async () => {
+    render(
+      <FullTaskManagement
+        taskManager={mockTaskManager}
+        storageService={mockStorageService}
+        onClose={mockOnClose}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('+ Create Task')).toBeInTheDocument();
+    });
+
+    // Click create task button
+    const createButton = screen.getByText('+ Create Task');
+    fireEvent.click(createButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Task')).toBeInTheDocument();
+      expect(screen.getByLabelText('Task Name *')).toBeInTheDocument();
+      expect(screen.getByLabelText('Description *')).toBeInTheDocument();
+      expect(screen.getByLabelText('Website Patterns *')).toBeInTheDocument();
+      expect(screen.getByLabelText('Prompt Template *')).toBeInTheDocument();
+    });
+  });
+
+  it('should populate form when selecting a template', async () => {
+    render(
+      <FullTaskManagement
+        taskManager={mockTaskManager}
+        storageService={mockStorageService}
+        onClose={mockOnClose}
+      />
+    );
+
+    // Wait for data to load first
+    await waitFor(() => {
+      expect(screen.getByText('+ Create Task')).toBeInTheDocument();
+    });
+
+    // Open create task modal
+    const createButton = screen.getByText('+ Create Task');
+    fireEvent.click(createButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Task')).toBeInTheDocument();
+    });
+
+    // Select Google template
+    const templateSelect = screen.getByDisplayValue('Custom Task');
+    fireEvent.change(templateSelect, { target: { value: 'quickStart' } });
+
+    await waitFor(() => {
+      // Check the task name input specifically
+      const taskNameInput = screen.getByLabelText('Task Name *') as HTMLInputElement;
+      expect(taskNameInput.value).toBe('Quick Task');
+      
+      // Check description
+      const descriptionInput = screen.getByLabelText('Description *') as HTMLTextAreaElement;
+      expect(descriptionInput.value).toBe('A simple task for getting started');
+      
+      // Check tags input
+      const tagsInput = screen.getByLabelText('Tags') as HTMLInputElement;
+      expect(tagsInput.value).toBe('general, quick, assistant');
+    });
+  });
+
+  it('should validate required fields when creating a task', async () => {
+    render(
+      <FullTaskManagement
+        taskManager={mockTaskManager}
+        storageService={mockStorageService}
+        onClose={mockOnClose}
+      />
+    );
+
+    // Wait for data to load first
+    await waitFor(() => {
+      expect(screen.getByText('+ Create Task')).toBeInTheDocument();
+    });
+
+    // Open create task modal
+    const createButton = screen.getByText('+ Create Task');
+    fireEvent.click(createButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Task')).toBeInTheDocument();
+    });
+
+    // Try to submit empty form
+    const submitButton = screen.getByText('Create Task');
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Task name is required')).toBeInTheDocument();
+      expect(screen.getByText('Description is required')).toBeInTheDocument();
+      expect(screen.getByText('Prompt template is required')).toBeInTheDocument();
+      expect(screen.getByText('At least one website pattern is required')).toBeInTheDocument();
+    });
+  });
+
+  it('should create a new task successfully', async () => {
+    (mockTaskManager.createTask as any).mockResolvedValue('new-task-id');
+    
+    render(
+      <FullTaskManagement
+        taskManager={mockTaskManager}
+        storageService={mockStorageService}
+        onClose={mockOnClose}
+      />
+    );
+
+    // Wait for data to load first
+    await waitFor(() => {
+      expect(screen.getByText('+ Create Task')).toBeInTheDocument();
+    });
+
+    // Open create task modal
+    const createButton = screen.getByText('+ Create Task');
+    fireEvent.click(createButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Task')).toBeInTheDocument();
+    });
+
+    // Fill out the form
+    fireEvent.change(screen.getByLabelText('Task Name *'), {
+      target: { value: 'Test New Task' }
+    });
+    fireEvent.change(screen.getByLabelText('Description *'), {
+      target: { value: 'This is a test task description that is long enough to pass validation' }
+    });
+    fireEvent.change(screen.getByLabelText('Website Patterns *'), {
+      target: { value: 'example.com' }
+    });
+    fireEvent.change(screen.getByLabelText('Prompt Template *'), {
+      target: { value: 'This is a test prompt template that is long enough to pass validation' }
+    });
+    fireEvent.change(screen.getByLabelText('Tags'), {
+      target: { value: 'test, new' }
+    });
+
+    // Submit the form
+    const submitButton = screen.getByText('Create Task');
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockTaskManager.createTask).toHaveBeenCalledWith({
+        name: 'Test New Task',
+        description: 'This is a test task description that is long enough to pass validation',
+        promptTemplate: 'This is a test prompt template that is long enough to pass validation',
+        websitePatterns: ['example.com'],
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        tags: ['test', 'new'],
+        isEnabled: true,
+        automationSteps: [],
+        usageCount: 0,
+        createdAt: expect.any(Date),
+        updatedAt: expect.any(Date)
+      });
+    });
+  });
+
+  it('should close create modal when cancel is clicked', async () => {
+    render(
+      <FullTaskManagement
+        taskManager={mockTaskManager}
+        storageService={mockStorageService}
+        onClose={mockOnClose}
+      />
+    );
+
+    // Wait for data to load first
+    await waitFor(() => {
+      expect(screen.getByText('+ Create Task')).toBeInTheDocument();
+    });
+
+    // Open create task modal
+    const createButton = screen.getByText('+ Create Task');
+    fireEvent.click(createButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Task')).toBeInTheDocument();
+    });
+
+    // Click cancel button
+    const cancelButton = screen.getByText('Cancel');
+    fireEvent.click(cancelButton);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Create New Task')).not.toBeInTheDocument();
+      expect(screen.getByText('Library')).toBeInTheDocument(); // Should be back in library view
+    });
+  });
+
+  it('should handle template selection between custom and quick start', async () => {
+    render(
+      <FullTaskManagement
+        taskManager={mockTaskManager}
+        storageService={mockStorageService}
+        onClose={mockOnClose}
+      />
+    );
+
+    // Wait for data to load first
+    await waitFor(() => {
+      expect(screen.getByText('+ Create Task')).toBeInTheDocument();
+    });
+
+    // Open create task modal
+    const createButton = screen.getByText('+ Create Task');
+    fireEvent.click(createButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Task')).toBeInTheDocument();
+    });
+
+    const templateSelect = screen.getByDisplayValue('Custom Task');
+
+    // Test switching to Quick Start template
+    fireEvent.change(templateSelect, { target: { value: 'quickStart' } });
+    await waitFor(() => {
+      const taskNameInput = screen.getByLabelText('Task Name *') as HTMLInputElement;
+      expect(taskNameInput.value).toBe('Quick Task');
+    });
+
+    // Test switching back to Custom template
+    fireEvent.change(templateSelect, { target: { value: 'custom' } });
+    await waitFor(() => {
+      const taskNameInput = screen.getByLabelText('Task Name *') as HTMLInputElement;
+      expect(taskNameInput.value).toBe('');
+    });
+  });
+
+  it('should handle task creation errors gracefully', async () => {
+    (mockTaskManager.createTask as any).mockRejectedValue(new Error('Creation failed'));
+    
+    render(
+      <FullTaskManagement
+        taskManager={mockTaskManager}
+        storageService={mockStorageService}
+        onClose={mockOnClose}
+      />
+    );
+
+    // Wait for data to load first
+    await waitFor(() => {
+      expect(screen.getByText('+ Create Task')).toBeInTheDocument();
+    });
+
+    // Open create task modal and fill valid form
+    const createButton = screen.getByText('+ Create Task');
+    fireEvent.click(createButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Task')).toBeInTheDocument();
+    });
+
+    // Select a template and fill out the form with valid data to trigger the API call
+    const templateSelect = screen.getByDisplayValue('Custom Task');
+    fireEvent.change(templateSelect, { target: { value: 'quickStart' } });
+
+    // Add the missing website pattern to make form valid
+    fireEvent.change(screen.getByLabelText('Website Patterns *'), {
+      target: { value: 'example.com' }
+    });
+
+    const submitButton = screen.getByText('Create Task');
+    fireEvent.click(submitButton);
+
+    // Should show error message from the failed API call
+    await waitFor(() => {
+      expect(screen.getByText('Creation failed')).toBeInTheDocument();
     });
   });
 });

@@ -373,8 +373,13 @@ export class ChromeStorageService {
       return obj;
     }
 
-    if (typeof obj === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/.test(obj)) {
-      return new Date(obj) as unknown as T;
+    // Check for ISO date string pattern (more flexible regex)
+    if (typeof obj === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z?$/.test(obj)) {
+      const date = new Date(obj);
+      // Verify it's a valid date
+      if (!isNaN(date.getTime())) {
+        return date as unknown as T;
+      }
     }
 
     if (Array.isArray(obj)) {
@@ -389,6 +394,52 @@ export class ChromeStorageService {
     }
 
     return result;
+  }
+
+  /**
+   * Ensures date fields are proper Date objects in tasks
+   */
+  private sanitizeTaskDates(tasks: Record<string, CustomTask>): Record<string, CustomTask> {
+    const sanitized = {} as Record<string, CustomTask>;
+    
+    for (const [taskId, task] of Object.entries(tasks)) {
+      sanitized[taskId] = {
+        ...task,
+        createdAt: this.ensureDateObject(task.createdAt),
+        updatedAt: this.ensureDateObject(task.updatedAt)
+      };
+    }
+    
+    return sanitized;
+  }
+
+  /**
+   * Ensures a value is a proper Date object
+   */
+  private ensureDateObject(value: any): Date {
+    if (!value) return new Date();
+    if (value instanceof Date) return value;
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? new Date() : date;
+    }
+    return new Date();
+  }
+
+  /**
+   * Sanitizes usage stats to ensure dates are proper Date objects
+   */
+  private sanitizeUsageStats(stats: Record<string, UsageMetrics>): Record<string, UsageMetrics> {
+    const sanitized = {} as Record<string, UsageMetrics>;
+    
+    for (const [taskId, metric] of Object.entries(stats)) {
+      sanitized[taskId] = {
+        ...metric,
+        lastUsed: metric.lastUsed ? this.ensureDateObject(metric.lastUsed) : undefined
+      };
+    }
+    
+    return sanitized;
   }
 
   /**
@@ -528,7 +579,17 @@ export class ChromeStorageService {
    */
   async getAllCustomTasks(): Promise<Record<string, CustomTask>> {
     try {
-      return await this.retrieveData<Record<string, CustomTask>>(STORAGE_KEYS.CUSTOM_TASKS) || {};
+      const tasks = await this.retrieveData<Record<string, CustomTask>>(STORAGE_KEYS.CUSTOM_TASKS) || {};
+      // Sanitize date fields to ensure they are proper Date objects
+      const sanitizedTasks = this.sanitizeTaskDates(tasks);
+      
+      // If sanitization was needed, store the corrected data
+      if (JSON.stringify(tasks) !== JSON.stringify(sanitizedTasks)) {
+        console.log('Sanitizing task dates and storing corrected data');
+        await this.storeData(STORAGE_KEYS.CUSTOM_TASKS, sanitizedTasks);
+      }
+      
+      return sanitizedTasks;
     } catch (error) {
       console.error('Failed to get all custom tasks:', error);
       return {};
@@ -939,7 +1000,17 @@ export class ChromeStorageService {
    */
   async getAllUsageStats(): Promise<Record<string, UsageMetrics>> {
     try {
-      return await this.retrieveData<Record<string, UsageMetrics>>(STORAGE_KEYS.USAGE_STATS) || {};
+      const stats = await this.retrieveData<Record<string, UsageMetrics>>(STORAGE_KEYS.USAGE_STATS) || {};
+      // Sanitize date fields to ensure they are proper Date objects
+      const sanitizedStats = this.sanitizeUsageStats(stats);
+      
+      // If sanitization was needed, store the corrected data
+      if (JSON.stringify(stats) !== JSON.stringify(sanitizedStats)) {
+        console.log('Sanitizing usage stats dates and storing corrected data');
+        await this.storeData(STORAGE_KEYS.USAGE_STATS, sanitizedStats);
+      }
+      
+      return sanitizedStats;
     } catch (error) {
       console.error('Failed to get all usage stats:', error);
       return {};

@@ -644,8 +644,7 @@ const SidebarApp: React.FC = () => {
             <FullTaskManagement
               taskManager={taskManager}
               storageService={storageService}
-              websiteContext={state.websiteContext}
-              pageContent={state.pageContent}
+              onClose={() => {}}
             />
           </div>
         )}

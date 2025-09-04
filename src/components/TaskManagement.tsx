@@ -51,6 +51,11 @@ interface TaskImportModalProps {
   onClose: () => void;
 }
 
+interface TaskCreateModalProps {
+  onSave: (task: Partial<CustomTask>) => void;
+  onCancel: () => void;
+}
+
 interface TaskOrganizationOptions {
   sortBy: 'name' | 'created' | 'usage' | 'category';
   sortOrder: 'asc' | 'desc';
@@ -67,6 +72,19 @@ interface TaskOrganizationOptions {
 // MAIN COMPONENT
 // ============================================================================
 
+/**
+ * Ensures a value is a Date object, converting from string if necessary
+ */
+function ensureDate(value: Date | string | undefined): Date {
+  if (!value) return new Date();
+  if (value instanceof Date) return value;
+  if (typeof value === 'string') {
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? new Date() : date;
+  }
+  return new Date();
+}
+
 export const FullTaskManagement: React.FC<TaskManagementProps> = ({
   taskManager,
   storageService,
@@ -76,7 +94,7 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
   const [usageStats, setUsageStats] = useState<Record<string, UsageMetrics>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'library' | 'stats' | 'export' | 'import'>('library');
+  const [activeView, setActiveView] = useState<'library' | 'create' | 'stats' | 'export'>('library');
   const [selectedTask, setSelectedTask] = useState<CustomTask | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [organizationOptions, setOrganizationOptions] = useState<TaskOrganizationOptions>({
@@ -157,17 +175,13 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
     setActiveView('stats');
   };
 
-  const handleImportTasks = async (importedTasks: CustomTask[]) => {
+  const handleCreateTask = async (taskData: Partial<CustomTask>) => {
     try {
-      for (const task of importedTasks) {
-        // Remove ID to create new tasks
-        const { id, ...taskData } = task;
-        await taskManager.createTask(taskData);
-      }
+      await taskManager.createTask(taskData);
       await loadData(); // Refresh data
       setActiveView('library');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to import tasks');
+      setError(err instanceof Error ? err.message : 'Failed to create task');
     }
   };
 
@@ -217,23 +231,24 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
     <div className="task-management">
       <div className="task-management-header">
         <h2>Task Management</h2>
-        <div className="header-actions">
-          <button
-            className={`btn ${activeView === 'library' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveView('library')}
-          >
-            Library
-          </button>
-          <button
-            className={`btn ${activeView === 'import' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveView('import')}
-          >
-            Import
-          </button>
-          <button className="btn btn-secondary" onClick={onClose}>
-            <CloseIcon size={16} /> Close
-          </button>
-        </div>
+        <button className="btn btn-secondary close-button" onClick={onClose}>
+          <CloseIcon size={16} />
+        </button>
+      </div>
+      
+      <div className="task-actions">
+        <button
+          className="btn btn-primary"
+          onClick={() => setActiveView('create')}
+        >
+          + Create Task
+        </button>
+        <button
+          className={`btn ${activeView === 'library' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveView('library')}
+        >
+          Library
+        </button>
       </div>
 
       {error && (
@@ -256,6 +271,13 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
         />
       )}
 
+      {activeView === 'create' && (
+        <TaskCreateModal
+          onSave={handleCreateTask}
+          onCancel={() => setActiveView('library')}
+        />
+      )}
+
       {activeView === 'stats' && selectedTask && (
         <TaskStatsModal
           task={selectedTask}
@@ -273,12 +295,6 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
         />
       )}
 
-      {activeView === 'import' && (
-        <TaskImportModal
-          onImport={handleImportTasks}
-          onClose={() => setActiveView('library')}
-        />
-      )}
     </div>
   );
 };
@@ -349,7 +365,7 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
           comparison = a.name.localeCompare(b.name);
           break;
         case 'created':
-          comparison = a.createdAt.getTime() - b.createdAt.getTime();
+          comparison = ensureDate(a.createdAt).getTime() - ensureDate(b.createdAt).getTime();
           break;
         case 'usage':
           const aUsage = usageStats[a.id]?.usageCount || 0;
@@ -662,8 +678,8 @@ const TaskCard: React.FC<TaskCardProps> = ({
         </div>
         
         <div className="task-dates">
-          <small>Created: {task.createdAt.toLocaleDateString()}</small>
-          <small>Updated: {task.updatedAt.toLocaleDateString()}</small>
+          <small>Created: {ensureDate(task.createdAt).toLocaleDateString()}</small>
+          <small>Updated: {ensureDate(task.updatedAt).toLocaleDateString()}</small>
         </div>
       </div>
       
@@ -708,8 +724,8 @@ const convertTasksToCSV = (tasks: CustomTask[]): string => {
     task.websitePatterns.join('; '),
     task.outputFormat,
     task.tags.join('; '),
-    task.createdAt.toISOString(),
-    task.updatedAt.toISOString(),
+    ensureDate(task.createdAt).toISOString(),
+    ensureDate(task.updatedAt).toISOString(),
     task.usageCount.toString(),
     task.isEnabled.toString()
   ]);
@@ -721,7 +737,252 @@ const convertTasksToCSV = (tasks: CustomTask[]): string => {
   return csvContent;
 };
 
-export default FullTaskManagement;
+// ============================================================================
+// TASK CREATE MODAL
+// ============================================================================
+
+const TaskCreateModal: React.FC<TaskCreateModalProps> = ({ onSave, onCancel }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    promptTemplate: '',
+    websitePatterns: '',
+    outputFormat: OutputFormat.PLAIN_TEXT as OutputFormat,
+    tags: ''
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('custom');
+
+  // Simple template options - website-specific templates are now automatically available as suggestions
+  const taskTemplates = {
+    custom: {
+      name: '',
+      description: '',
+      promptTemplate: '',
+      websitePatterns: '',
+      tags: ''
+    },
+    quickStart: {
+      name: 'Quick Task',
+      description: 'A simple task for getting started',
+      promptTemplate: `Help me with this task:
+
+Current Page: {{title}}
+Content: {{textContent}}
+
+Please:
+1. Analyze what I'm looking at
+2. Provide relevant assistance
+3. Suggest next steps`,
+      websitePatterns: '',
+      tags: 'general, quick, assistant'
+    }
+  };
+
+  const handleTemplateChange = (templateKey: string) => {
+    setSelectedTemplate(templateKey);
+    const template = taskTemplates[templateKey as keyof typeof taskTemplates];
+    setFormData(prev => ({
+      ...prev,
+      ...template
+    }));
+    setErrors({}); // Clear errors when changing template
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Task name is required';
+    } else if (formData.name.trim().length < 3) {
+      newErrors.name = 'Task name must be at least 3 characters';
+    }
+
+    if (!formData.description.trim()) {
+      newErrors.description = 'Description is required';
+    } else if (formData.description.trim().length < 10) {
+      newErrors.description = 'Description must be at least 10 characters';
+    }
+
+    if (!formData.promptTemplate.trim()) {
+      newErrors.promptTemplate = 'Prompt template is required';
+    } else if (formData.promptTemplate.trim().length < 10) {
+      newErrors.promptTemplate = 'Prompt template must be at least 10 characters';
+    }
+
+    if (!formData.websitePatterns.trim()) {
+      newErrors.websitePatterns = 'At least one website pattern is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    const taskData: Partial<CustomTask> = {
+      name: formData.name.trim(),
+      description: formData.description.trim(),
+      promptTemplate: formData.promptTemplate.trim(),
+      websitePatterns: formData.websitePatterns.split(',').map(p => p.trim()).filter(p => p),
+      outputFormat: formData.outputFormat,
+      tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
+      isEnabled: true,
+      automationSteps: [],
+      usageCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    onSave(taskData);
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    // Clear error for this field when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal create-task-modal">
+        <div className="modal-header">
+          <h3>Create New Task</h3>
+          <button className="btn btn-secondary" onClick={onCancel}>
+            <CloseIcon size={16} />
+          </button>
+        </div>
+
+        <div className="modal-content">
+          <form onSubmit={handleSubmit}>
+            {/* Template Selection */}
+            <div className="form-group">
+              <label>Template:</label>
+              <select 
+                value={selectedTemplate} 
+                onChange={(e) => handleTemplateChange(e.target.value)}
+                className="template-select"
+              >
+                <option value="custom">Custom Task</option>
+                <option value="quickStart">Quick Start Template</option>
+              </select>
+              <small>Website-specific tasks (Google, LeetCode, GitHub, etc.) are automatically available in suggestions when you visit those sites.</small>
+            </div>
+
+            {/* Task Name */}
+            <div className="form-group">
+              <label htmlFor="task-name">Task Name *</label>
+              <input
+                id="task-name"
+                type="text"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                className={errors.name ? 'error' : ''}
+                placeholder="Enter task name"
+              />
+              {errors.name && <span className="error-text">{errors.name}</span>}
+            </div>
+
+            {/* Description */}
+            <div className="form-group">
+              <label htmlFor="task-description">Description *</label>
+              <textarea
+                id="task-description"
+                value={formData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                className={errors.description ? 'error' : ''}
+                placeholder="Describe what this task does"
+                rows={3}
+              />
+              {errors.description && <span className="error-text">{errors.description}</span>}
+            </div>
+
+            {/* Website Patterns */}
+            <div className="form-group">
+              <label htmlFor="website-patterns">Website Patterns *</label>
+              <input
+                id="website-patterns"
+                type="text"
+                value={formData.websitePatterns}
+                onChange={(e) => handleInputChange('websitePatterns', e.target.value)}
+                className={errors.websitePatterns ? 'error' : ''}
+                placeholder="example.com, *.example.com/page/*"
+              />
+              {errors.websitePatterns && <span className="error-text">{errors.websitePatterns}</span>}
+              <small>Separate multiple patterns with commas. Use * as wildcard.</small>
+            </div>
+
+            {/* Prompt Template */}
+            <div className="form-group">
+              <label htmlFor="prompt-template">Prompt Template *</label>
+              <textarea
+                id="prompt-template"
+                value={formData.promptTemplate}
+                onChange={(e) => handleInputChange('promptTemplate', e.target.value)}
+                className={errors.promptTemplate ? 'error' : ''}
+                placeholder="Enter the AI prompt template..."
+                rows={6}
+              />
+              {errors.promptTemplate && <span className="error-text">{errors.promptTemplate}</span>}
+              <small>Use {`{{variable}}`} syntax for dynamic content like {`{{title}}`}, {`{{textContent}}`}</small>
+            </div>
+
+            {/* Output Format */}
+            <div className="form-group">
+              <label htmlFor="output-format">Output Format</label>
+              <select
+                id="output-format"
+                value={formData.outputFormat}
+                onChange={(e) => handleInputChange('outputFormat', e.target.value)}
+              >
+                <option value={OutputFormat.PLAIN_TEXT}>Plain Text</option>
+                <option value={OutputFormat.MARKDOWN}>Markdown</option>
+                <option value={OutputFormat.HTML}>HTML</option>
+                <option value={OutputFormat.JSON}>JSON</option>
+              </select>
+            </div>
+
+            {/* Tags */}
+            <div className="form-group">
+              <label htmlFor="tags">Tags</label>
+              <input
+                id="tags"
+                type="text"
+                value={formData.tags}
+                onChange={(e) => handleInputChange('tags', e.target.value)}
+                placeholder="tag1, tag2, tag3"
+              />
+              <small>Separate multiple tags with commas</small>
+            </div>
+
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={onCancel}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Create Task
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ============================================================================
 // TASK STATISTICS MODAL
@@ -766,7 +1027,7 @@ const TaskStatsModal: React.FC<TaskStatsModalProps> = ({ task, stats, onClose })
               <div className="stat-card">
                 <h4>Last Used</h4>
                 <div className="stat-value">
-                  {stats.lastUsed ? stats.lastUsed.toLocaleDateString() : 'Never'}
+                  {stats.lastUsed ? ensureDate(stats.lastUsed).toLocaleDateString() : 'Never'}
                 </div>
                 <small>Most recent execution</small>
               </div>
@@ -791,11 +1052,11 @@ const TaskStatsModal: React.FC<TaskStatsModalProps> = ({ task, stats, onClose })
             <div className="detail-grid">
               <div className="detail-item">
                 <label>Created:</label>
-                <span>{task.createdAt.toLocaleString()}</span>
+                <span>{ensureDate(task.createdAt).toLocaleString()}</span>
               </div>
               <div className="detail-item">
                 <label>Last Updated:</label>
-                <span>{task.updatedAt.toLocaleString()}</span>
+                <span>{ensureDate(task.updatedAt).toLocaleString()}</span>
               </div>
               <div className="detail-item">
                 <label>Output Format:</label>
@@ -1240,3 +1501,5 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
     </div>
   );
 };
+
+export default FullTaskManagement;
