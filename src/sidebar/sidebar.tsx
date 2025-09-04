@@ -665,14 +665,66 @@ const SidebarApp: React.FC = () => {
               </div>
             ) : (
               <div className="ai-status">
-                <h3>AI Service Connected</h3>
-                <p>Your AI service is configured and ready.</p>
-                <button
-                  className="reconfigure-ai-button"
-                  onClick={() => setShowAIConfig(true)}
-                >
-                  Update Configuration
-                </button>
+                <div className="ai-status-header">
+                  <h3>AI Service Connected</h3>
+                  <span className="ai-status-badge">Active</span>
+                </div>
+                
+                {aiConfig && (
+                  <div className="ai-config-details">
+                    <div className="config-section">
+                      <h4>Provider</h4>
+                      <div className="config-value">
+                        {aiConfig.baseUrl?.includes('anthropic') || aiConfig.model?.includes('claude') ? 'Claude' : 'OpenAI'}
+                      </div>
+                    </div>
+                    
+                    <div className="config-section">
+                      <h4>Model</h4>
+                      <div className="config-value">{aiConfig.model}</div>
+                    </div>
+                    
+                    <div className="config-row">
+                      <div className="config-section">
+                        <h4>Max Tokens</h4>
+                        <div className="config-value">{aiConfig.maxTokens?.toLocaleString()}</div>
+                      </div>
+                      
+                      <div className="config-section">
+                        <h4>Temperature</h4>
+                        <div className="config-value">{aiConfig.temperature}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="config-section">
+                      <h4>Status</h4>
+                      <div className="config-value">
+                        {aiConfig.apiKey ? 'API Key Configured' : 'No API Key'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="ai-actions">
+                  <button
+                    className="reconfigure-ai-button"
+                    onClick={() => setShowAIConfig(true)}
+                  >
+                    Update Configuration
+                  </button>
+                  
+                  <button
+                    className="test-ai-button"
+                    onClick={async () => {
+                      if (aiConfig) {
+                        const success = await handleAITest(aiConfig);
+                        alert(success ? 'Connection test successful!' : 'Connection test failed!');
+                      }
+                    }}
+                  >
+                    Test Connection
+                  </button>
+                </div>
               </div>
             )}
           </div>
