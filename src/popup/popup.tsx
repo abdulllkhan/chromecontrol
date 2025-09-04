@@ -12,9 +12,7 @@ import {
   OutputFormat,
   WebsiteCategory,
   PageContent,
-  SecurityLevel,
-  PageType,
-  TaskType
+  PageType
 } from '../types';
 import type { TaskResult } from '../types';
 import {
@@ -1780,31 +1778,8 @@ export const PopupApp: React.FC = () => {
   const handleTestAIConfig = useCallback(async (config: AIServiceConfig): Promise<boolean> => {
     try {
       const testService = new AIService(config);
-
-      // Test with a simple request
-      const testRequest = {
-        prompt: 'Say "Hello" to test the connection.',
-        context: {
-          domain: 'test.com',
-          category: WebsiteCategory.PRODUCTIVITY,
-          pageType: PageType.OTHER,
-          extractedData: {},
-          securityLevel: SecurityLevel.PUBLIC,
-          timestamp: new Date()
-        },
-        taskType: TaskType.GENERATE_TEXT,
-        outputFormat: OutputFormat.PLAIN_TEXT,
-        constraints: {
-          allowSensitiveData: false,
-          maxContentLength: 100,
-          allowedDomains: [],
-          restrictedSelectors: []
-        },
-        timestamp: new Date()
-      };
-
-      const response = await testService.processRequest(testRequest);
-      return !!(response.content && response.content.length > 0);
+      // Use the dedicated test connection method
+      return await testService.testConnection();
     } catch (error) {
       console.error('AI config test failed:', error);
       return false;

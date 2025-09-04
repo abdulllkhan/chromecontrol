@@ -408,8 +408,8 @@ const SidebarApp: React.FC = () => {
   const handleAITest = useCallback(async (config: AIServiceConfig): Promise<boolean> => {
     try {
       const testService = new AIService(config);
-      // Add a simple test here
-      return true;
+      // Use the dedicated test connection method
+      return await testService.testConnection();
     } catch (error) {
       console.error('AI config test failed:', error);
       return false;

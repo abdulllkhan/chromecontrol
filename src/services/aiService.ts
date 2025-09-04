@@ -82,8 +82,8 @@ export class AIService {
   constructor(config: AIServiceConfig) {
     this.config = {
       baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-5', // Updated to GPT-5 (latest available)
-      maxTokens: 8000, // Increased for GPT-5's larger context window
+      model: 'gpt-5', // GPT-5 is the latest and most reliable
+      maxTokens: 8000,
       temperature: 0.7,
       timeout: 30000,
       maxRetries: 3,
@@ -275,6 +275,129 @@ export class AIService {
    */
   updateConfig(newConfig: Partial<AIServiceConfig>): void {
     this.config = { ...this.config, ...newConfig };
+  }
+
+  /**
+   * Test API connection with a simple request to validate credentials
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      // Validate basic config first
+      if (!this.config.apiKey || !this.config.apiKey.trim()) {
+        console.error('API test failed: No API key provided');
+        return false;
+      }
+
+      // Try with the configured model first, then fallback
+      const modelsToTry = [this.config.model, 'gpt-4o', 'gpt-4o-mini'];
+      
+      for (const model of modelsToTry) {
+        const result = await this.tryTestWithModel(model);
+        if (result) {
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Connection test failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Try testing connection with a specific model
+   */
+  private async tryTestWithModel(model: string): Promise<boolean> {
+    try {
+      // Create test request - use different parameter based on model
+      const testRequest: any = {
+        messages: [
+          {
+            role: 'user' as const,
+            content: 'Hi'
+          }
+        ],
+        model: model
+      };
+
+      // GPT-5 and newer models have different parameter requirements
+      if (model.includes('gpt-5') || model.includes('o1') || model.includes('o4')) {
+        testRequest.max_completion_tokens = 5;
+        // GPT-5 only supports default temperature (1)
+      } else {
+        testRequest.max_tokens = 5;
+        testRequest.temperature = 0.1;
+      }
+
+      // Make direct API call without going through the queue system
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout for test
+
+      try {
+        const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.config.apiKey.trim()}`
+          },
+          body: JSON.stringify(testRequest),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          // Log detailed error information only for debugging
+          const errorText = await response.text().catch(() => 'Unknown error');
+          console.warn(`API test with model ${model} failed: ${response.status} ${response.statusText}`);
+          return false;
+        }
+
+        const data = await response.json();
+        
+        // Check if response has expected structure and content
+        const isValid = !!(
+          data && 
+          data.choices && 
+          data.choices.length > 0 && 
+          data.choices[0] &&
+          data.choices[0].message &&
+          data.choices[0].message.content &&
+          typeof data.choices[0].message.content === 'string' &&
+          data.choices[0].message.content.trim().length > 0
+        );
+
+        if (isValid) {
+          console.log(`✅ API test successful with model: ${model}`);
+        }
+
+        return isValid;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        console.warn(`API test with model ${model} failed:`, fetchError.message);
+        return false;
+      }
+    } catch (error) {
+      console.warn(`Model ${model} test failed:`, error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Get a reliable model for testing API connection
+   */
+  private getTestModel(): string {
+    // List of known working models for testing (in order of preference)
+    const testModels = ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'];
+    
+    // If current model is in the list of known working models, use it
+    if (testModels.includes(this.config.model)) {
+      return this.config.model;
+    }
+    
+    // Otherwise, use the most reliable and cheapest model for testing
+    return 'gpt-4o-mini';
   }
 
   /**
@@ -895,8 +1018,8 @@ export function createAIService(config: AIServiceConfig): AIService {
  */
 export const DEFAULT_AI_CONFIG: Omit<AIServiceConfig, 'apiKey'> = {
   baseUrl: 'https://api.openai.com/v1',
-  model: 'gpt-5', // Updated to GPT-5 (latest available)
-  maxTokens: 8000, // Increased for GPT-5's larger context window
+  model: 'gpt-5', // GPT-5 is the latest and most reliable
+  maxTokens: 8000,
   temperature: 0.7,
   timeout: 30000,
   maxRetries: 3,
