@@ -734,29 +734,8 @@ export const ModernPopupApp: React.FC = () => {
   const handleTestAIConfig = useCallback(async (config: AIServiceConfig): Promise<boolean> => {
     try {
       const testService = new AIService(config);
-      const testRequest = {
-        prompt: 'Test connection',
-        context: {
-          domain: 'test.com',
-          category: WebsiteCategory.PRODUCTIVITY,
-          pageType: PageType.OTHER,
-          extractedData: {},
-          securityLevel: SecurityLevel.PUBLIC,
-          timestamp: new Date()
-        },
-        taskType: TaskType.GENERATE_TEXT,
-        outputFormat: OutputFormat.PLAIN_TEXT,
-        constraints: {
-          allowSensitiveData: false,
-          maxContentLength: 100,
-          allowedDomains: [],
-          restrictedSelectors: []
-        },
-        timestamp: new Date()
-      };
-
-      const response = await testService.processRequest(testRequest);
-      return response.success !== false;
+      // Use the dedicated test connection method
+      return await testService.testConnection();
     } catch (error) {
       return false;
     }

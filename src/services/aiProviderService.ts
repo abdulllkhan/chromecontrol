@@ -165,27 +165,14 @@ export class AIProviderService {
         throw new Error(`${provider} service not configured`);
       }
 
-      // Create a simple test request
-      const testRequest: AIRequest = {
-        taskType: 'GENERATE_TEXT' as any,
-        prompt: 'Say "Hello, this is a test" and nothing else.',
-        outputFormat: 'PLAIN_TEXT' as any,
-        context: {
-          domain: 'test.com',
-          category: 'CUSTOM' as any,
-          pageType: 'article' as any,
-          securityLevel: 'PUBLIC' as any,
-          extractedData: {}
-        },
-        constraints: {
-          maxContentLength: 1000,
-          allowedDomains: ['test.com'],
-          restrictedContent: []
-        }
-      };
+      // Use the dedicated testConnection method for each service
+      if ('testConnection' in service) {
+        return await service.testConnection();
+      }
 
-      const response = await service.processRequest(testRequest);
-      return response.content.toLowerCase().includes('hello') && response.content.toLowerCase().includes('test');
+      // Fallback to old method if testConnection is not available
+      console.warn(`${provider} service does not have testConnection method, using fallback`);
+      return false;
     } catch (error) {
       console.error(`Connection test failed for ${provider}:`, error);
       return false;

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Sidebar AI Config Persistence</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #00ff00;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            cursor: pointer;
+            font-family: monospace;
+        }
+        button:hover {
+            background: #444;
+        }
+        .log {
+            background: #000;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+        .warning { color: #ff0; }
+        .info { color: #0ff; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Sidebar AI Configuration Persistence</h1>
+    
+    <div class="test-section">
+        <h2>Step 1: Check Current Storage</h2>
+        <button onclick="checkStorage()">Check Storage</button>
+        <div id="storage-log" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Step 2: Save Test Configuration</h2>
+        <input type="text" id="test-api-key" placeholder="Enter test API key" style="width: 400px; padding: 5px;">
+        <button onclick="saveTestConfig()">Save Config</button>
+        <div id="save-log" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Step 3: Verify Persistence</h2>
+        <button onclick="verifyPersistence()">Verify Config Persists</button>
+        <div id="verify-log" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Step 4: Clear Storage (Reset)</h2>
+        <button onclick="clearStorage()">Clear All Storage</button>
+        <div id="clear-log" class="log"></div>
+    </div>
+
+    <script>
+        function log(elementId, message, type = 'info') {
+            const logDiv = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        async function checkStorage() {
+            log('storage-log', 'Checking chrome.storage.local...', 'info');
+            
+            try {
+                const result = await chrome.storage.local.get(null);
+                log('storage-log', 'Storage contents:', 'info');
+                
+                if (Object.keys(result).length === 0) {
+                    log('storage-log', '❌ Storage is empty', 'warning');
+                } else {
+                    log('storage-log', `✅ Found ${Object.keys(result).length} items in storage`, 'success');
+                    
+                    // Check for userPreferences
+                    if (result.userPreferences) {
+                        log('storage-log', '📋 userPreferences found:', 'info');
+                        log('storage-log', JSON.stringify(result.userPreferences, null, 2), 'info');
+                        
+                        if (result.userPreferences.aiConfig) {
+                            log('storage-log', '🔧 AI Config found:', 'success');
+                            const config = result.userPreferences.aiConfig;
+                            log('storage-log', `API Key: ${config.apiKey ? config.apiKey.substring(0, 15) + '...' : 'NOT SET'}`, 'info');
+                            log('storage-log', `Model: ${config.model || 'NOT SET'}`, 'info');
+                            log('storage-log', `Max Tokens: ${config.maxTokens || 'NOT SET'}`, 'info');
+                        } else {
+                            log('storage-log', '❌ No AI config in userPreferences', 'error');
+                        }
+                    } else {
+                        log('storage-log', '❌ No userPreferences found', 'error');
+                    }
+                }
+            } catch (error) {
+                log('storage-log', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function saveTestConfig() {
+            const apiKey = document.getElementById('test-api-key').value.trim();
+            
+            if (!apiKey) {
+                log('save-log', '❌ Please enter an API key', 'error');
+                return;
+            }
+            
+            log('save-log', '💾 Saving test configuration...', 'info');
+            
+            try {
+                // Get current preferences
+                const result = await chrome.storage.local.get(['userPreferences']);
+                const currentPrefs = result.userPreferences || {
+                    enabledCategories: [],
+                    customPatterns: [],
+                    privacySettings: {
+                        allowDataCollection: false,
+                        shareAnalytics: false
+                    },
+                    automationPermissions: {},
+                    aiProvider: 'openai',
+                    theme: 'light'
+                };
+                
+                log('save-log', 'Current preferences loaded', 'info');
+                
+                // Add AI config
+                const testConfig = {
+                    apiKey: apiKey,
+                    model: 'gpt-5',
+                    maxTokens: 8000,
+                    temperature: 0.7,
+                    baseUrl: 'https://api.openai.com/v1'
+                };
+                
+                const updatedPrefs = {
+                    ...currentPrefs,
+                    aiConfig: testConfig
+                };
+                
+                log('save-log', 'Saving to chrome.storage.local...', 'info');
+                await chrome.storage.local.set({ userPreferences: updatedPrefs });
+                
+                log('save-log', '✅ Configuration saved successfully!', 'success');
+                log('save-log', `Saved config: ${JSON.stringify(testConfig, null, 2)}`, 'info');
+                
+                // Verify it was saved
+                const verification = await chrome.storage.local.get(['userPreferences']);
+                if (verification.userPreferences?.aiConfig?.apiKey === apiKey) {
+                    log('save-log', '✅ Verified: Config is in storage', 'success');
+                } else {
+                    log('save-log', '❌ Verification failed: Config not found in storage', 'error');
+                }
+                
+            } catch (error) {
+                log('save-log', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function verifyPersistence() {
+            log('verify-log', '🔍 Verifying configuration persistence...', 'info');
+            
+            try {
+                // Check storage
+                const result = await chrome.storage.local.get(['userPreferences']);
+                
+                if (!result.userPreferences) {
+                    log('verify-log', '❌ No userPreferences in storage', 'error');
+                    return;
+                }
+                
+                if (!result.userPreferences.aiConfig) {
+                    log('verify-log', '❌ No aiConfig in userPreferences', 'error');
+                    return;
+                }
+                
+                const config = result.userPreferences.aiConfig;
+                
+                log('verify-log', '✅ AI Configuration found in storage:', 'success');
+                log('verify-log', `API Key: ${config.apiKey ? '✅ Present (' + config.apiKey.substring(0, 15) + '...)' : '❌ Missing'}`, config.apiKey ? 'success' : 'error');
+                log('verify-log', `Model: ${config.model || '❌ Missing'}`, config.model ? 'info' : 'error');
+                log('verify-log', `Max Tokens: ${config.maxTokens || '❌ Missing'}`, config.maxTokens ? 'info' : 'error');
+                log('verify-log', `Temperature: ${config.temperature !== undefined ? config.temperature : '❌ Missing'}`, config.temperature !== undefined ? 'info' : 'error');
+                log('verify-log', `Base URL: ${config.baseUrl || '❌ Missing'}`, config.baseUrl ? 'info' : 'error');
+                
+                // Test if this would work in sidebar
+                log('verify-log', '\n📱 Simulating sidebar load:', 'info');
+                log('verify-log', 'Sidebar would receive config: ' + (config.apiKey ? '✅ YES' : '❌ NO'), config.apiKey ? 'success' : 'error');
+                
+                if (config.apiKey) {
+                    log('verify-log', '🎉 Configuration should persist in sidebar!', 'success');
+                    log('verify-log', 'The sidebar AI config form should show the saved values', 'success');
+                } else {
+                    log('verify-log', '⚠️ Configuration exists but API key is missing', 'warning');
+                }
+                
+            } catch (error) {
+                log('verify-log', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function clearStorage() {
+            if (!confirm('This will clear ALL extension storage. Continue?')) {
+                return;
+            }
+            
+            log('clear-log', '🗑️ Clearing all storage...', 'warning');
+            
+            try {
+                await chrome.storage.local.clear();
+                log('clear-log', '✅ Storage cleared successfully', 'success');
+                
+                // Verify
+                const result = await chrome.storage.local.get(null);
+                if (Object.keys(result).length === 0) {
+                    log('clear-log', '✅ Verified: Storage is empty', 'success');
+                } else {
+                    log('clear-log', `⚠️ Storage still has ${Object.keys(result).length} items`, 'warning');
+                }
+            } catch (error) {
+                log('clear-log', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-check storage on load
+        window.addEventListener('DOMContentLoaded', () => {
+            checkStorage();
+        });
+    </script>
+</body>
+</html>

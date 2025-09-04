@@ -256,9 +256,16 @@ export class ChromeStorageService {
   /**
    * Decrypts data if it's encrypted
    */
-  private async decryptData(data: EncryptedData | string): Promise<string | null> {
+  private async decryptData(data: EncryptedData | string | any): Promise<string | null> {
     if (typeof data === 'string') {
       return data;
+    }
+    
+    // Check if it's actually a plain object (not encrypted)
+    if (data && typeof data === 'object' && !data.encrypted && !data.iv) {
+      // It's already decrypted/plain data, return as JSON string
+      console.log('Data is already in plain format, returning as-is');
+      return JSON.stringify(data);
     }
 
     // If encryption is disabled, we should not have encrypted data at this point
@@ -283,15 +290,25 @@ export class ChromeStorageService {
    * Stores data in appropriate storage area (local or sync)
    */
   private async storeData(key: string, data: unknown, useSync: boolean = false): Promise<void> {
-    const serializedData = JSON.stringify(data);
-    const processedData = await this.encryptData(serializedData);
-
     const storageArea = (useSync && this.config.syncEnabled) ? chrome.storage.sync : chrome.storage.local;
+    
+    let processedData: any;
+    
+    if (this.config.encryptionEnabled && this.encryptionKey) {
+      // Encrypt the data
+      const serializedData = JSON.stringify(data);
+      processedData = await this.encryptData(serializedData);
+    } else {
+      // Store as plain object (not stringified)
+      processedData = data;
+      console.log(`Storing plain data for key ${key}`);
+    }
 
     try {
       await storageArea.set({
         [key]: processedData
       });
+      console.log(`Successfully stored data for key ${key}`);
     } catch (error) {
       console.error(`Storage: failed to store data for key: ${key}`, error);
       throw error;
@@ -311,22 +328,30 @@ export class ChromeStorageService {
     }
 
     try {
-      // Check if we have encrypted data but encryption is disabled
-      if (typeof result[key] === 'object' && result[key].encrypted && !this.config.encryptionEnabled) {
-        console.warn(`Found encrypted data for key ${key} but encryption is disabled. Clearing and using defaults.`);
-        // Clear the encrypted data
-        await storageArea.remove(key);
-        return null;
+      const storedData = result[key];
+      
+      // Check if we have encrypted data
+      if (typeof storedData === 'object' && storedData.encrypted && storedData.iv) {
+        // It's encrypted data
+        if (!this.config.encryptionEnabled) {
+          console.warn(`Found encrypted data for key ${key} but encryption is disabled. Clearing and using defaults.`);
+          await storageArea.remove(key);
+          return null;
+        }
+        // Decrypt the data
+        const decryptedData = await this.decryptData(storedData);
+        if (decryptedData === null) {
+          return null;
+        }
+        const parsed = JSON.parse(decryptedData) as T;
+        return this.reviveDates(parsed);
+      } else {
+        // It's plain data - directly use it
+        console.log(`Retrieved plain data for key ${key}`);
+        // If it's a string, parse it; if it's already an object, use as-is
+        const parsed = typeof storedData === 'string' ? JSON.parse(storedData) : storedData;
+        return this.reviveDates(parsed) as T;
       }
-
-      const decryptedData = await this.decryptData(result[key]);
-      if (decryptedData === null) {
-        return null;
-      }
-      const parsed = JSON.parse(decryptedData) as T;
-
-      // Convert ISO date strings back to Date objects
-      return this.reviveDates(parsed);
     } catch (error) {
       console.error(`Failed to retrieve data for key ${key}:`, error);
       // If there's an error (e.g., corrupted encrypted data), clear it and return null

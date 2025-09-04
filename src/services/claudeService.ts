@@ -122,6 +122,88 @@ export class ClaudeService {
   }
 
   /**
+   * Test API connection with a simple request to validate credentials
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      // Validate basic config first
+      if (!this.config.apiKey || !this.config.apiKey.trim()) {
+        console.error('Claude API test failed: No API key provided');
+        return false;
+      }
+
+      // Create a minimal test request for Claude
+      const testRequest = {
+        model: this.config.model,
+        max_tokens: 5,
+        temperature: 0.1,
+        messages: [
+          {
+            role: 'user' as const,
+            content: 'Hi'
+          }
+        ]
+      };
+
+      // Make direct API call without going through the queue system
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout for test
+
+      try {
+        const response = await fetch(`${this.config.baseUrl}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.config.apiKey.trim(),
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify(testRequest),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          // Log detailed error information for debugging
+          const errorText = await response.text().catch(() => 'Unknown error');
+          console.error(`Claude API test failed with status ${response.status}: ${response.statusText}`);
+          console.error('Error details:', errorText);
+          return false;
+        }
+
+        const data = await response.json();
+        
+        // Check if response has expected Claude structure and content
+        const isValid = !!(
+          data && 
+          data.content && 
+          Array.isArray(data.content) &&
+          data.content.length > 0 && 
+          data.content[0] &&
+          data.content[0].text &&
+          typeof data.content[0].text === 'string' &&
+          data.content[0].text.trim().length > 0
+        );
+
+        if (isValid) {
+          console.log(`✅ Claude API test successful with model: ${this.config.model}`);
+        } else {
+          console.error('Claude API test failed: Invalid response structure', data);
+        }
+
+        return isValid;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        console.error('Claude API test request failed:', fetchError);
+        return false;
+      }
+    } catch (error) {
+      console.error('Claude connection test failed:', error);
+      return false;
+    }
+  }
+
+  /**
    * Process an AI request with Claude API
    */
   async processRequest(request: AIRequest): Promise<AIResponse> {

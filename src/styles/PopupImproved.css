@@ -269,6 +269,10 @@
 /* AI Configuration */
 .ai-config {
   padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .ai-config-header {
@@ -329,6 +333,8 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  flex: 1;
+  min-height: 0; /* Allow flex item to shrink */
 }
 
 .form-group {
@@ -505,6 +511,27 @@
 }
 
 /* Responsive Design */
+
+/* Height-constrained screens (like MacBook or when popup height is limited) */
+@media (max-height: 700px) {
+  .ai-config {
+    padding: 16px;
+    max-height: 480px; /* Ensure it fits in smaller popup heights */
+  }
+  
+  .ai-config-info {
+    margin-bottom: 16px;
+  }
+  
+  .ai-config-form {
+    gap: 16px;
+  }
+  
+  .form-group {
+    gap: 4px;
+  }
+}
+
 @media (max-width: 420px) {
   .popup-container {
     width: 100vw;
@@ -514,6 +541,19 @@
   .form-row {
     grid-template-columns: 1fr;
   }
+  
+  .ai-config {
+    padding: 16px;
+  }
+  
+  .ai-config-info {
+    margin-bottom: 16px;
+  }
+  
+  .ai-config-form {
+    gap: 16px;
+  }
+}
   
   .suggestions-controls {
     flex-direction: column;

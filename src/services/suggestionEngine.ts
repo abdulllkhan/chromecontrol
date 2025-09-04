@@ -9,11 +9,9 @@ import {
   Suggestion,
   CustomTask,
   WebsiteContext,
-  Pattern,
   WebsiteCategory,
   PageType,
-  SecurityLevel,
-  ValidationUtils
+  SecurityLevel
 } from '../types/index.js';
 
 import { PatternEngine } from './patternEngine.js';
@@ -68,7 +66,7 @@ export interface SuggestionContext {
 export interface PrioritizedSuggestion extends Suggestion {
   priority: number;
   relevanceScore: number;
-  source: 'builtin' | 'custom' | 'pattern';
+  source: 'builtin' | 'custom' | 'pattern' | 'fallback';
   matchingPatterns: string[];
 }
 
@@ -178,7 +176,16 @@ export class SuggestionGenerator {
       console.error('Failed to generate suggestions:', error);
       
       // Return fallback suggestions if available
-      return this.getFallbackSuggestions(context);
+      const fallbackService = fallbackSuggestions;
+      const fallbackSuggestionList = fallbackService.getFallbackSuggestions(context.websiteContext);
+      
+      return fallbackSuggestionList.map(suggestion => ({
+        ...suggestion,
+        priority: 0.5, // Lower priority than AI suggestions
+        relevanceScore: 0.3, // Simple fixed relevance score for fallback suggestions
+        source: 'fallback' as const,
+        matchingPatterns: []
+      }));
     }
   }
 
@@ -613,7 +620,7 @@ export class SuggestionGenerator {
 // SUGGESTION FILTER AND CATEGORIZER
 // ============================================================================
 
-export class SuggestionFilter {
+export class SuggestionFilterUtil {
   /**
    * Filters suggestions based on criteria
    */
@@ -710,21 +717,6 @@ export class SuggestionFilter {
     };
   }
 
-  /**
-   * Get fallback suggestions when AI is unavailable
-   */
-  private getFallbackSuggestions(context: SuggestionContext): PrioritizedSuggestion[] {
-    const fallbackService = fallbackSuggestions;
-    const fallbackSuggestionList = fallbackService.getFallbackSuggestions(context.websiteContext);
-    
-    return fallbackSuggestionList.map(suggestion => ({
-      ...suggestion,
-      priority: 0.5, // Lower priority than AI suggestions
-      relevanceScore: this.calculateRelevanceScore(suggestion, context.websiteContext),
-      source: 'fallback' as const,
-      matchingPatterns: []
-    }));
-  }
 }
 
 // ============================================================================
@@ -733,12 +725,12 @@ export class SuggestionFilter {
 
 export class SuggestionEngine {
   private generator: SuggestionGenerator;
-  private filter: typeof SuggestionFilter;
+  private filter: typeof SuggestionFilterUtil;
   private fallbackService: FallbackSuggestionsService;
 
   constructor(config: SuggestionEngineConfig) {
     this.generator = new SuggestionGenerator(config);
-    this.filter = SuggestionFilter;
+    this.filter = SuggestionFilterUtil;
     this.fallbackService = fallbackSuggestions;
   }
 
@@ -782,20 +774,6 @@ export class SuggestionEngine {
     return this.filter.getFilterOptions(suggestions);
   }
 
-  /**
-   * Get fallback suggestions when AI is unavailable
-   */
-  private getFallbackSuggestions(context: SuggestionContext): PrioritizedSuggestion[] {
-    const fallbackSuggestions = this.fallbackService.getFallbackSuggestions(context.websiteContext);
-    
-    return fallbackSuggestions.map(suggestion => ({
-      ...suggestion,
-      priority: 0.5, // Lower priority than AI suggestions
-      relevanceScore: 0.3, // Simple fixed relevance score for fallback suggestions
-      source: 'fallback' as const,
-      matchingPatterns: []
-    }));
-  }
 
   /**
    * Check if AI service is available

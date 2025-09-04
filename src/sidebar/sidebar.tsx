@@ -95,6 +95,7 @@ const SidebarApp: React.FC = () => {
   const [showPreferences, setShowPreferences] = useState(false);
   const [showAIConfig, setShowAIConfig] = useState(false);
   const [aiService, setAIService] = useState<AIService | null>(null);
+  const [aiConfig, setAIConfig] = useState<AIServiceConfig | null>(null);
   const [provider, setProvider] = useState<'openai' | 'claude'>('openai');
 
   // Enhanced error handling
@@ -119,15 +120,34 @@ const SidebarApp: React.FC = () => {
       } catch (error) {
         console.warn('Failed to get active tab, trying alternative approach:', error);
         // Fallback: get all tabs and find the active one
-        const allTabs = await chrome.tabs.query({ active: true });
-        tab = allTabs[0];
+        try {
+          const allTabs = await chrome.tabs.query({ active: true });
+          tab = allTabs[0];
+        } catch (fallbackError) {
+          console.warn('Fallback tab query also failed:', fallbackError);
+          // Last resort: get any tab
+          const anyTabs = await chrome.tabs.query({});
+          tab = anyTabs.find(t => t.active) || anyTabs[0];
+        }
       }
       
       if (!tab?.url) {
-        throw new Error('No active tab found');
+        // Create a minimal fallback tab context instead of throwing
+        console.warn('No active tab found, using fallback context');
+        tab = {
+          id: undefined,
+          url: 'https://example.com',
+          title: 'No Active Tab',
+          active: false,
+          windowId: 0,
+          index: 0,
+          highlighted: false,
+          incognito: false,
+          pinned: false
+        };
       }
       
-      console.log('Current tab:', { id: tab.id, url: tab.url, title: tab.title });
+      console.log('Current tab:', { id: tab.id, url: tab.url, title: tab.title, isValidTab: !!tab.id });
 
       // Extract page title properly
       const pageTitle = tab.title || '';
@@ -137,14 +157,21 @@ const SidebarApp: React.FC = () => {
       await storageService.initialize();
 
       // Check AI configuration from user preferences
+      console.log('🔍 SIDEBAR: Loading AI configuration from storage...');
       const preferences = await storageService.getUserPreferences();
-      const aiConfig = preferences?.aiConfig;
-      const hasAIConfig = !!(aiConfig?.apiKey);
+      console.log('📋 SIDEBAR: Loaded preferences:', preferences);
+      const loadedAiConfig = preferences?.aiConfig || null;
+      console.log('🔧 SIDEBAR: AI Config from storage:', loadedAiConfig);
+      const hasAIConfig = !!(loadedAiConfig?.apiKey);
+      console.log('✅ SIDEBAR: AI Configured:', hasAIConfig);
+      
+      // Store the config in state for the AI config component
+      setAIConfig(loadedAiConfig);
 
       // Initialize AI service if configured
       let currentAIService = null;
       if (hasAIConfig) {
-        currentAIService = new AIService(aiConfig);
+        currentAIService = new AIService(loadedAiConfig);
       } else {
         currentAIService = demoAIService;
       }
@@ -155,10 +182,16 @@ const SidebarApp: React.FC = () => {
       let pageContent: PageContent | null = null;
 
       try {
-        if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://') && !tab.url.startsWith('moz-extension://')) {
+        if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://') && !tab.url.startsWith('moz-extension://') && tab.url !== 'https://example.com') {
           console.log('Attempting content extraction for tab:', tab.id, tab.url);
           
-          // First, try to ping the content script to see if it's available
+          // First check if we have a valid tab ID
+          if (!tab.id) {
+            console.warn('No valid tab ID, skipping content script interaction');
+            throw new Error('No valid tab ID for content extraction');
+          }
+          
+          // Try to ping the content script to see if it's available
           try {
             await chrome.tabs.sendMessage(tab.id, { type: 'PING' });
             console.log('Content script is responsive');
@@ -204,15 +237,28 @@ const SidebarApp: React.FC = () => {
         }
       } catch (error) {
         console.warn('Content extraction failed:', error);
-        // Create basic context from tab info
-        websiteContext = {
-          domain: new URL(tab.url).hostname,
-          category: WebsiteCategory.CUSTOM,
-          pageType: PageType.ARTICLE,
-          securityLevel: SecurityLevel.CAUTIOUS,
-          extractedData: { title: pageTitle, url: tab.url },
-          timestamp: new Date()
-        };
+        // Create basic context from tab info - handle URL parsing safely
+        try {
+          const domain = tab.url ? new URL(tab.url).hostname : 'example.com';
+          websiteContext = {
+            domain: domain,
+            category: WebsiteCategory.CUSTOM,
+            pageType: PageType.ARTICLE,
+            securityLevel: SecurityLevel.CAUTIOUS,
+            extractedData: { title: pageTitle, url: tab.url },
+            timestamp: new Date()
+          };
+        } catch (urlError) {
+          console.warn('URL parsing failed:', urlError);
+          websiteContext = {
+            domain: 'example.com',
+            category: WebsiteCategory.CUSTOM,
+            pageType: PageType.ARTICLE,
+            securityLevel: SecurityLevel.CAUTIOUS,
+            extractedData: { title: pageTitle || 'Unknown', url: 'https://example.com' },
+            timestamp: new Date()
+          };
+        }
       }
 
       // Initialize pattern engine
@@ -375,19 +421,39 @@ const SidebarApp: React.FC = () => {
 
   // Handle AI configuration
   const handleAISave = useCallback(async (config: AIServiceConfig) => {
+    console.log('🎯 SIDEBAR: handleAISave called with config:', config);
+    
     if (!storageService) {
-      console.error('Storage service not available');
+      console.error('❌ SIDEBAR: Storage service not available');
       setState(prev => ({ ...prev, error: 'Storage service not available' }));
+      alert('Storage service not available!');
       return;
     }
 
     try {
+      console.log('💾 SIDEBAR: Starting save process...');
+      console.log('💾 SIDEBAR: Config to save:', JSON.stringify(config, null, 2));
+      
       // Save AI config to user preferences
       const preferences = await storageService.getUserPreferences();
-      await storageService.updateUserPreferences({
+      console.log('📋 SIDEBAR: Current preferences:', JSON.stringify(preferences, null, 2));
+      
+      const updatedPreferences = {
         ...preferences,
         aiConfig: config
-      });
+      };
+      console.log('💾 SIDEBAR: Updated preferences to save:', JSON.stringify(updatedPreferences, null, 2));
+      
+      await storageService.updateUserPreferences(updatedPreferences);
+      console.log('✅ SIDEBAR: Preferences saved to storage');
+      
+      // Verify the save
+      const verifyPrefs = await storageService.getUserPreferences();
+      console.log('🔍 SIDEBAR: Verification - saved config:', verifyPrefs?.aiConfig);
+      
+      // Update local state
+      console.log('🔧 SIDEBAR: Updating React state...');
+      setAIConfig(config);
       
       // Initialize new AI service
       const newAIService = new AIService(config);
@@ -396,20 +462,24 @@ const SidebarApp: React.FC = () => {
       setState(prev => ({ ...prev, hasAIConfig: true, error: null }));
       setShowAIConfig(false);
       
+      console.log('✅ SIDEBAR: AI configuration saved successfully!');
+      alert('AI Configuration saved successfully! Close and reopen sidebar to verify persistence.');
+      
       // Reinitialize with new AI service
       await initializeSidebar();
     } catch (error) {
-      console.error('Failed to save AI config:', error);
+      console.error('❌ SIDEBAR: Failed to save AI config:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to save AI configuration';
       setState(prev => ({ ...prev, error: errorMessage }));
+      alert('Failed to save configuration: ' + errorMessage);
     }
   }, [storageService, initializeSidebar]);
 
   const handleAITest = useCallback(async (config: AIServiceConfig): Promise<boolean> => {
     try {
       const testService = new AIService(config);
-      // Add a simple test here
-      return true;
+      // Use the dedicated test connection method
+      return await testService.testConnection();
     } catch (error) {
       console.error('AI config test failed:', error);
       return false;
@@ -647,6 +717,8 @@ const SidebarApp: React.FC = () => {
       {showAIConfig && storageService && (
         <div className="modal-overlay">
           <AIConfigComponent
+            key={aiConfig?.apiKey ? `configured-${aiConfig.apiKey.substring(0, 8)}` : 'unconfigured'}
+            config={aiConfig}
             onSave={handleAISave}
             onCancel={() => setShowAIConfig(false)}
             onTest={handleAITest}
@@ -683,25 +755,113 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Update form data when provider changes
+  // Force form update when config prop changes with multiple checks (SIDEBAR VERSION)
   useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      model: provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022',
-      baseUrl: provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1',
-      apiKey: '' // Clear API key when switching providers
-    }));
-  }, [provider]);
+    console.log('🔧 SIDEBAR AIConfig useEffect triggered, config:', config);
+    
+    const updateFormFromConfig = () => {
+      if (config && config.apiKey) {
+        console.log('✅ SIDEBAR: Config exists with API key, updating form data');
+        
+        // Detect provider first
+        const isClaudeProvider = config.baseUrl?.includes('anthropic') || config.model?.includes('claude');
+        const newProvider = isClaudeProvider ? 'claude' : 'openai';
+        
+        console.log('🔧 SIDEBAR: Detected provider:', newProvider);
+        
+        const newFormData = {
+          apiKey: config.apiKey || '',
+          model: config.model || (newProvider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
+          maxTokens: config.maxTokens || 8000,
+          temperature: config.temperature || 0.7,
+          baseUrl: config.baseUrl || (newProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
+        };
+        
+        console.log('🔧 SIDEBAR: Setting form data:', newFormData);
+        console.log('🔧 SIDEBAR: Setting provider to:', newProvider);
+        
+        // Update state with both form data and provider
+        setProvider(newProvider);
+        setFormData(newFormData);
+        
+        // Force a second update after a small delay to handle timing issues
+        setTimeout(() => {
+          console.log('🔄 SIDEBAR: Force refreshing form data to ensure it stuck');
+          setFormData(prev => {
+            console.log('🔄 SIDEBAR: Current form data in timeout:', prev);
+            console.log('🔄 SIDEBAR: Expected form data:', newFormData);
+            if (prev.apiKey !== newFormData.apiKey) {
+              console.log('⚠️ SIDEBAR: Form data mismatch detected, forcing update');
+              return newFormData;
+            }
+            return prev;
+          });
+        }, 100);
+        
+      } else if (config && !config.apiKey) {
+        console.log('⚠️ SIDEBAR: Config exists but no API key');
+      } else {
+        console.log('❌ SIDEBAR: Config is null/undefined');
+      }
+    };
+    
+    // Initial update
+    updateFormFromConfig();
+    
+    // Also try updating after a short delay to handle async loading
+    const delayedUpdate = setTimeout(() => {
+      console.log('⏰ SIDEBAR: Delayed form update check');
+      updateFormFromConfig();
+    }, 50);
+    
+    return () => clearTimeout(delayedUpdate);
+  }, [config]);
+
+  // Update form data when provider changes (but preserve saved config) - SIDEBAR VERSION
+  useEffect(() => {
+    console.log('🔧 SIDEBAR: Provider useEffect triggered, provider:', provider, 'config:', config);
+    
+    // Don't update form if we have a saved config and the provider matches
+    if (config && config.apiKey) {
+      const configProvider = (config.baseUrl?.includes('anthropic') || config.model?.includes('claude')) ? 'claude' : 'openai';
+      if (provider === configProvider) {
+        console.log('✅ SIDEBAR: Provider matches saved config, keeping saved values');
+        return;
+      }
+    }
+    
+    setFormData(prev => {
+      const newFormData = {
+        ...prev,
+        model: provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022',
+        baseUrl: provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1',
+        // Preserve API key from config if available, otherwise keep current
+        apiKey: config?.apiKey || prev.apiKey
+      };
+      console.log('🔧 SIDEBAR: Provider change - updating form data:', newFormData);
+      return newFormData;
+    });
+  }, [provider, config]);
 
   const validateForm = (): boolean => {
+    console.log('🔍 SIDEBAR: Validating form...');
+    console.log('🔑 SIDEBAR: API Key present:', !!formData.apiKey);
+    console.log('🎭 SIDEBAR: Provider:', provider);
+    
     const newErrors: Record<string, string> = {};
 
     if (!formData.apiKey.trim()) {
       newErrors.apiKey = 'API key is required';
+      console.log('❌ SIDEBAR: Validation error - API key is empty');
     } else if (provider === 'openai' && !formData.apiKey.startsWith('sk-')) {
-      newErrors.apiKey = 'OpenAI API key should start with "sk-"';
+      // OpenAI keys can now start with 'sk-proj-' as well
+      if (!formData.apiKey.startsWith('sk-proj-')) {
+        newErrors.apiKey = 'OpenAI API key should start with "sk-" or "sk-proj-"';
+        console.log('❌ SIDEBAR: Validation error - Invalid OpenAI key format');
+      }
     } else if (provider === 'claude' && !formData.apiKey.startsWith('sk-ant-')) {
       newErrors.apiKey = 'Claude API key should start with "sk-ant-"';
+      console.log('❌ SIDEBAR: Validation error - Invalid Claude key format');
     }
 
     if (formData.maxTokens < 1 || formData.maxTokens > 200000) {
@@ -718,16 +878,33 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🚀 SIDEBAR: Save button clicked!');
+    console.log('📝 SIDEBAR: Form data to save:', formData);
+    
     if (validateForm()) {
+      console.log('✅ SIDEBAR: Form validation passed');
+      setTestResult({ success: true, message: 'Saving configuration...' });
+      
       try {
+        console.log('💾 SIDEBAR: Calling onSave with config:', formData);
         await onSave(formData as AIServiceConfig);
+        console.log('✅ SIDEBAR: onSave completed successfully');
+        setTestResult({ success: true, message: 'Configuration saved successfully!' });
+        
+        // Add a delay before the success message disappears
+        setTimeout(() => {
+          setTestResult(null);
+        }, 3000);
       } catch (error) {
-        console.error('Failed to save configuration:', error);
+        console.error('❌ SIDEBAR: Failed to save configuration:', error);
         setTestResult({
           success: false,
           message: 'Failed to save configuration: ' + (error instanceof Error ? error.message : 'Unknown error')
         });
       }
+    } else {
+      console.log('❌ SIDEBAR: Form validation failed');
+      setTestResult({ success: false, message: 'Please fix the errors above' });
     }
   };
 
