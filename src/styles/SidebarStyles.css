@@ -464,6 +464,8 @@
 .ai-config-modal {
   width: 550px;
   max-width: 95vw;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .ai-config-info {
@@ -630,6 +632,12 @@
   transform: translateY(-50%);
   color: #a0aec0;
   pointer-events: none;
+}
+
+.input-with-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .password-toggle {

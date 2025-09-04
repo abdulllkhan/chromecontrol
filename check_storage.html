@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chrome Extension Storage Inspector</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5;
+        }
+        .container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .storage-section { 
+            margin-bottom: 30px; 
+        }
+        .storage-title { 
+            font-size: 18px; 
+            font-weight: bold; 
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .storage-content { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 4px; 
+            border-left: 4px solid #007bff;
+        }
+        pre { 
+            margin: 0; 
+            white-space: pre-wrap; 
+            word-break: break-all;
+        }
+        .error { 
+            color: #dc3545; 
+            border-left-color: #dc3545;
+        }
+        .empty {
+            color: #6c757d;
+            font-style: italic;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Chrome Extension Storage Inspector</h1>
+        
+        <div class="storage-section">
+            <div class="storage-title">Chrome Storage (Local)</div>
+            <div id="chromeStorage" class="storage-content empty">
+                Click "Refresh" to load storage data...
+            </div>
+        </div>
+
+        <div class="storage-section">
+            <div class="storage-title">User Preferences (with AI Config)</div>
+            <div id="userPreferences" class="storage-content empty">
+                Click "Refresh" to load user preferences...
+            </div>
+        </div>
+
+        <div class="storage-section">
+            <div class="storage-title">AI Configuration Only</div>
+            <div id="aiConfig" class="storage-content empty">
+                Click "Refresh" to load AI configuration...
+            </div>
+        </div>
+
+        <button onclick="refreshStorage()">🔄 Refresh Storage</button>
+        <button onclick="clearStorage()">🗑️ Clear All Storage</button>
+        <button onclick="testSaveConfig()">💾 Test Save AI Config</button>
+        <button onclick="exportStorage()">📁 Export Storage</button>
+    </div>
+
+    <script>
+        // Check if we're in a Chrome extension context
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+            console.log('✅ Chrome extension APIs available');
+        } else {
+            console.error('❌ Chrome extension APIs not available');
+            document.body.innerHTML += '<div style="color: red; margin-top: 20px;"><strong>Error:</strong> This page must be opened from within the Chrome extension context to access storage APIs.</div>';
+        }
+
+        async function refreshStorage() {
+            try {
+                // Get all Chrome local storage
+                console.log('📡 Fetching Chrome storage...');
+                const allStorage = await chrome.storage.local.get(null);
+                
+                document.getElementById('chromeStorage').innerHTML = 
+                    `<pre>${JSON.stringify(allStorage, null, 2)}</pre>`;
+                document.getElementById('chromeStorage').className = 'storage-content';
+
+                // Extract user preferences
+                const userPrefs = allStorage.userPreferences;
+                if (userPrefs) {
+                    document.getElementById('userPreferences').innerHTML = 
+                        `<pre>${JSON.stringify(userPrefs, null, 2)}</pre>`;
+                    document.getElementById('userPreferences').className = 'storage-content';
+
+                    // Extract AI config specifically
+                    if (userPrefs.aiConfig) {
+                        const maskedConfig = { ...userPrefs.aiConfig };
+                        if (maskedConfig.apiKey) {
+                            maskedConfig.apiKey = maskedConfig.apiKey.substring(0, 10) + '***MASKED***';
+                        }
+                        document.getElementById('aiConfig').innerHTML = 
+                            `<pre>${JSON.stringify(maskedConfig, null, 2)}</pre>`;
+                        document.getElementById('aiConfig').className = 'storage-content';
+                    } else {
+                        document.getElementById('aiConfig').innerHTML = 
+                            '<span class="empty">❌ No AI configuration found</span>';
+                        document.getElementById('aiConfig').className = 'storage-content empty';
+                    }
+                } else {
+                    document.getElementById('userPreferences').innerHTML = 
+                        '<span class="empty">❌ No user preferences found</span>';
+                    document.getElementById('userPreferences').className = 'storage-content empty';
+                    
+                    document.getElementById('aiConfig').innerHTML = 
+                        '<span class="empty">❌ No AI configuration found</span>';
+                    document.getElementById('aiConfig').className = 'storage-content empty';
+                }
+
+                console.log('✅ Storage data loaded successfully');
+            } catch (error) {
+                console.error('❌ Failed to load storage:', error);
+                document.getElementById('chromeStorage').innerHTML = 
+                    `<span class="error">Error: ${error.message}</span>`;
+                document.getElementById('chromeStorage').className = 'storage-content error';
+            }
+        }
+
+        async function clearStorage() {
+            if (confirm('⚠️ Are you sure you want to clear ALL extension storage? This cannot be undone.')) {
+                try {
+                    await chrome.storage.local.clear();
+                    console.log('✅ Storage cleared');
+                    alert('✅ Storage cleared successfully!');
+                    refreshStorage();
+                } catch (error) {
+                    console.error('❌ Failed to clear storage:', error);
+                    alert('❌ Failed to clear storage: ' + error.message);
+                }
+            }
+        }
+
+        async function testSaveConfig() {
+            try {
+                console.log('🧪 Testing AI config save...');
+                
+                // Create test AI config
+                const testConfig = {
+                    apiKey: 'test-key-12345',
+                    model: 'gpt-4o',
+                    maxTokens: 4000,
+                    temperature: 0.7,
+                    baseUrl: 'https://api.openai.com/v1'
+                };
+
+                // Get current preferences or create new ones
+                const result = await chrome.storage.local.get(['userPreferences']);
+                const currentPrefs = result.userPreferences || {
+                    enabledCategories: [],
+                    customPatterns: [],
+                    privacySettings: {
+                        allowDataCollection: false,
+                        shareAnalytics: false
+                    },
+                    automationPermissions: {},
+                    aiProvider: 'openai',
+                    theme: 'light'
+                };
+
+                // Update with AI config
+                const updatedPrefs = {
+                    ...currentPrefs,
+                    aiConfig: testConfig
+                };
+
+                // Save to storage
+                await chrome.storage.local.set({ userPreferences: updatedPrefs });
+                
+                console.log('✅ Test config saved');
+                alert('✅ Test AI configuration saved successfully!');
+                refreshStorage();
+            } catch (error) {
+                console.error('❌ Failed to save test config:', error);
+                alert('❌ Failed to save test config: ' + error.message);
+            }
+        }
+
+        async function exportStorage() {
+            try {
+                const allStorage = await chrome.storage.local.get(null);
+                const dataStr = JSON.stringify(allStorage, null, 2);
+                
+                // Create downloadable file
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                
+                // Trigger download
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `chromecontrol-storage-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                console.log('✅ Storage exported');
+                alert('✅ Storage data exported successfully!');
+            } catch (error) {
+                console.error('❌ Failed to export storage:', error);
+                alert('❌ Failed to export storage: ' + error.message);
+            }
+        }
+
+        // Auto-refresh on page load
+        document.addEventListener('DOMContentLoaded', refreshStorage);
+    </script>
+</body>
+</html>

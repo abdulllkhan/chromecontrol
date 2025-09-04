@@ -915,15 +915,93 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Update form data when provider changes
+  // Force form update when config prop changes with multiple checks
   useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      model: provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022',
-      baseUrl: provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1',
-      apiKey: '' // Clear API key when switching providers
-    }));
-  }, [provider]);
+    console.log('🔧 AIConfig useEffect triggered, config:', config);
+    
+    const updateFormFromConfig = () => {
+      if (config && config.apiKey) {
+        console.log('✅ Config exists with API key, updating form data');
+        
+        // Detect provider first
+        const isClaudeProvider = config.baseUrl?.includes('anthropic') || config.model?.includes('claude');
+        const newProvider = isClaudeProvider ? 'claude' : 'openai';
+        
+        console.log('🔧 Detected provider:', newProvider);
+        
+        const newFormData = {
+          apiKey: config.apiKey || '',
+          model: config.model || (newProvider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
+          maxTokens: config.maxTokens || 8000,
+          temperature: config.temperature || 0.7,
+          baseUrl: config.baseUrl || (newProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
+        };
+        
+        console.log('🔧 Setting form data:', newFormData);
+        console.log('🔧 Setting provider to:', newProvider);
+        
+        // Update state with both form data and provider
+        setProvider(newProvider);
+        setFormData(newFormData);
+        
+        // Force a second update after a small delay to handle timing issues
+        setTimeout(() => {
+          console.log('🔄 Force refreshing form data to ensure it stuck');
+          setFormData(prev => {
+            console.log('🔄 Current form data in timeout:', prev);
+            console.log('🔄 Expected form data:', newFormData);
+            if (prev.apiKey !== newFormData.apiKey) {
+              console.log('⚠️ Form data mismatch detected, forcing update');
+              return newFormData;
+            }
+            return prev;
+          });
+        }, 100);
+        
+      } else if (config && !config.apiKey) {
+        console.log('⚠️ Config exists but no API key');
+      } else {
+        console.log('❌ Config is null/undefined');
+      }
+    };
+    
+    // Initial update
+    updateFormFromConfig();
+    
+    // Also try updating after a short delay to handle async loading
+    const delayedUpdate = setTimeout(() => {
+      console.log('⏰ Delayed form update check');
+      updateFormFromConfig();
+    }, 50);
+    
+    return () => clearTimeout(delayedUpdate);
+  }, [config]);
+
+  // Update form data when provider changes (but preserve saved config)
+  useEffect(() => {
+    console.log('🔧 Provider useEffect triggered, provider:', provider, 'config:', config);
+    
+    // Don't update form if we have a saved config and the provider matches
+    if (config && config.apiKey) {
+      const configProvider = (config.baseUrl?.includes('anthropic') || config.model?.includes('claude')) ? 'claude' : 'openai';
+      if (provider === configProvider) {
+        console.log('✅ Provider matches saved config, keeping saved values');
+        return;
+      }
+    }
+    
+    setFormData(prev => {
+      const newFormData = {
+        ...prev,
+        model: provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022',
+        baseUrl: provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1',
+        // Preserve API key from config if available, otherwise keep current
+        apiKey: config?.apiKey || prev.apiKey
+      };
+      console.log('🔧 Provider change - updating form data:', newFormData);
+      return newFormData;
+    });
+  }, [provider, config]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -1305,9 +1383,13 @@ export const PopupApp: React.FC = () => {
         console.log('Storage service initialized');
 
         // Check for existing AI configuration
+        console.log('🔍 Loading AI configuration from storage...');
         const preferences = await storageService.getUserPreferences();
+        console.log('📖 Loaded preferences:', preferences);
         const aiConfig = preferences?.aiConfig || null;
+        console.log('🔧 AI Config from storage:', aiConfig);
         const aiConfigured = !!(aiConfig?.apiKey);
+        console.log('✅ AI Configured:', aiConfigured);
 
         const aiService = aiConfigured && aiConfig
           ? new AIService(aiConfig)
@@ -1746,18 +1828,25 @@ export const PopupApp: React.FC = () => {
 
   const handleSaveAIConfig = useCallback(async (config: AIServiceConfig) => {
     try {
+      console.log('💾 Saving AI configuration:', config);
       if (!storageService) {
         throw new Error('Storage service not initialized');
       }
 
       // Update user preferences with AI config
       const preferences = await storageService.getUserPreferences();
-      await storageService.updateUserPreferences({
+      console.log('📖 Current preferences before save:', preferences);
+      
+      const updatedPreferences = {
         ...preferences,
         aiConfig: config
-      });
+      };
+      console.log('💾 Updating preferences with:', updatedPreferences);
+      
+      await storageService.updateUserPreferences(updatedPreferences);
 
       // Update state
+      console.log('🔧 Updating React state with config:', config);
       setState(prev => ({
         ...prev,
         aiConfig: config,
@@ -1765,7 +1854,7 @@ export const PopupApp: React.FC = () => {
         activeView: 'suggestions'
       }));
 
-      console.log('AI configuration saved successfully');
+      console.log('✅ AI configuration saved successfully');
     } catch (error) {
       console.error('Failed to save AI configuration:', error);
       setState(prev => ({
@@ -2052,6 +2141,7 @@ export const PopupApp: React.FC = () => {
 
           {state.activeView === 'ai-config' && (
             <AIConfigComponent
+              key={state.aiConfig?.apiKey ? `configured-${state.aiConfig.apiKey.substring(0, 8)}` : 'unconfigured'}
               config={state.aiConfig}
               onSave={handleSaveAIConfig}
               onCancel={() => setState(prev => ({ ...prev, activeView: 'suggestions' }))}
