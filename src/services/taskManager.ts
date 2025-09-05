@@ -804,17 +804,17 @@ export class TaskManager {
   private injectContextIntoPrompt(template: string, context: ExecutionContext): string {
     let injectedPrompt = template;
     
-    // Define available context variables
+    // Define available context variables with null checks
     const contextVars = {
-      domain: context.websiteContext.domain,
-      category: context.websiteContext.category,
-      pageType: context.websiteContext.pageType,
-      title: context.pageContent.title,
-      url: context.pageContent.url,
-      headings: context.pageContent.headings.join(', '),
-      textContent: context.pageContent.textContent.slice(0, 1000), // Limit length
-      formCount: context.pageContent.forms.length,
-      linkCount: context.pageContent.links.length,
+      domain: context.websiteContext?.domain || 'unknown',
+      category: context.websiteContext?.category || 'unknown',
+      pageType: context.websiteContext?.pageType || 'unknown',
+      title: context.pageContent?.title || 'No title',
+      url: context.pageContent?.url || 'unknown',
+      headings: context.pageContent?.headings?.join(', ') || 'No headings',
+      textContent: (context.pageContent?.textContent || 'No content').slice(0, 1000), // Limit length
+      formCount: context.pageContent?.forms?.length || 0,
+      linkCount: context.pageContent?.links?.length || 0,
       userInput: JSON.stringify(context.userInput || {})
     };
     
@@ -927,7 +927,7 @@ export class TaskManager {
     
     return {
       success: true,
-      content: `[SIMULATED] Task "${task.name}" would execute with context from ${context.websiteContext.domain}`,
+      content: `[SIMULATED] Task "${task.name}" would execute with context from ${context.websiteContext?.domain || 'unknown'}`,
       format: task.outputFormat,
       timestamp: new Date(),
       executionTime: 100
@@ -966,9 +966,9 @@ export class TaskManager {
    */
   private generateExecutionCacheKey(taskId: string, context: ExecutionContext): string {
     const contextHash = this.hashObject({
-      domain: context.websiteContext.domain,
-      url: context.pageContent.url,
-      title: context.pageContent.title,
+      domain: context.websiteContext?.domain || 'unknown',
+      url: context.pageContent?.url || 'unknown',
+      title: context.pageContent?.title || 'unknown',
       userInput: context.userInput
     });
     
@@ -1088,7 +1088,7 @@ export class TaskAdditionWorkflow {
       this.existingTasks = await this.storageService.getTasksForWebsite(this.websiteContext.domain);
 
       const privacyWarnings = [];
-      if (this.websiteContext.securityLevel === SecurityLevel.RESTRICTED) {
+      if (this.websiteContext && this.websiteContext.securityLevel === SecurityLevel.RESTRICTED) {
         privacyWarnings.push('This appears to be a sensitive website');
       }
 

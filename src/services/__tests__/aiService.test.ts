@@ -418,8 +418,8 @@ describe('Default Configuration', () => {
   it('should have valid default configuration', () => {
     expect(DEFAULT_AI_CONFIG).toMatchObject({
       baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4',
-      maxTokens: 2000,
+      model: 'gpt-4o-mini',
+      maxTokens: 4000,
       temperature: 0.7,
       timeout: 30000,
       maxRetries: 3,
