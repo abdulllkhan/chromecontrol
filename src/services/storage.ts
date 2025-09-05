@@ -435,7 +435,7 @@ export class ChromeStorageService {
     for (const [taskId, metric] of Object.entries(stats)) {
       sanitized[taskId] = {
         ...metric,
-        lastUsed: metric.lastUsed ? this.ensureDateObject(metric.lastUsed) : undefined
+        lastUsed: metric.lastUsed ? this.ensureDateObject(metric.lastUsed) : new Date()
       };
     }
     
@@ -525,8 +525,11 @@ export class ChromeStorageService {
       const taskId = crypto.randomUUID();
       const now = new Date();
 
+      // Create task without dates first, then add system fields
+      const { createdAt: _, updatedAt: __, ...taskWithoutDates } = task as any;
+      
       const fullTask: CustomTask = {
-        ...task,
+        ...taskWithoutDates,
         id: taskId,
         createdAt: now,
         updatedAt: now,
@@ -601,16 +604,19 @@ export class ChromeStorageService {
    */
   async updateCustomTask(taskId: string, updates: Partial<Omit<CustomTask, 'id' | 'createdAt'>>): Promise<boolean> {
     try {
-      const tasks = await this.retrieveData<Record<string, CustomTask>>(STORAGE_KEYS.CUSTOM_TASKS) || {};
+      const tasks = await this.getAllCustomTasks(); // Use getAllCustomTasks to get sanitized dates
 
       if (!tasks[taskId]) {
         throw new Error(`Task with ID ${taskId} not found`);
       }
 
-      // Update the task
+      // Update the task with properly sanitized dates
+      const existingTask = tasks[taskId];
       const updatedTask: CustomTask = {
-        ...tasks[taskId],
+        ...existingTask,
         ...updates,
+        id: existingTask.id, // Ensure ID doesn't get overwritten
+        createdAt: existingTask.createdAt, // Ensure createdAt doesn't get overwritten
         updatedAt: new Date()
       };
 
@@ -1160,7 +1166,7 @@ export class ChromeStorageService {
   /**
    * Gets storage usage information
    */
-  async getStorageInfo(): Promise<{ local: chrome.storage.StorageAreaInfo; sync: chrome.storage.StorageAreaInfo }> {
+  async getStorageInfo(): Promise<{ local: { bytesInUse: number }; sync: { bytesInUse: number } }> {
     try {
       const [localInfo, syncInfo] = await Promise.all([
         chrome.storage.local.getBytesInUse(),

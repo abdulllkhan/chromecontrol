@@ -82,8 +82,8 @@ export class AIService {
   constructor(config: AIServiceConfig) {
     this.config = {
       baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-5', // GPT-5 is the latest and most reliable
-      maxTokens: 8000,
+      model: 'gpt-4o-mini', // Use a valid, cost-effective model
+      maxTokens: 4000,
       temperature: 0.7,
       timeout: 30000,
       maxRetries: 3,
@@ -321,10 +321,10 @@ export class AIService {
         model: model
       };
 
-      // GPT-5 and newer models have different parameter requirements
-      if (model.includes('gpt-5') || model.includes('o1') || model.includes('o4')) {
+      // Newer models have different parameter requirements
+      if (model.includes('gpt-4o') || model.includes('gpt-4.1') || model.includes('gpt-5') || model.includes('o1') || model.includes('o4')) {
         testRequest.max_completion_tokens = 5;
-        // GPT-5 only supports default temperature (1)
+        // Newer models only support default temperature (1), so don't include it
       } else {
         testRequest.max_tokens = 5;
         testRequest.temperature = 0.1;
@@ -571,7 +571,14 @@ export class AIService {
    * Build API request payload
    */
   private buildAPIRequest(prompt: string, request: AIRequest): any {
-    return {
+    // Use the correct token parameter based on the model
+    const isNewerModel = this.config.model.includes('gpt-4o') || 
+                        this.config.model.includes('gpt-4.1') || 
+                        this.config.model.includes('gpt-5') ||
+                        this.config.model.includes('o1') ||
+                        this.config.model.includes('o4');
+    
+    const apiRequest: any = {
       model: this.config.model,
       messages: [
         {
@@ -579,20 +586,42 @@ export class AIService {
           content: prompt
         }
       ],
-      max_tokens: this.config.maxTokens,
-      temperature: this.config.temperature,
       stream: false
     };
+    
+    // Use the appropriate token parameter based on model
+    if (isNewerModel) {
+      apiRequest.max_completion_tokens = this.config.maxTokens;
+      // Newer models only support default temperature (1), so don't include it
+      // This allows the API to use its default value
+    } else {
+      apiRequest.max_tokens = this.config.maxTokens;
+      // Older models support custom temperature
+      apiRequest.temperature = this.config.temperature;
+    }
+    
+    return apiRequest;
   }
 
   /**
    * Make API call to OpenAI
    */
   private async makeAPICall(apiRequest: any): Promise<any> {
+    // Validate API key before making request
+    if (!this.config.apiKey || this.config.apiKey.trim() === '') {
+      throw new AIError(
+        'API key is missing. Please configure your OpenAI API key in the settings.',
+        'NO_API_KEY',
+        401,
+        false
+      );
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
+      console.log('Making AI API request to:', `${this.config.baseUrl}/chat/completions`);
       const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -606,15 +635,27 @@ export class AIService {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error && errorData.error.message) {
+            errorMessage = `API Error: ${errorData.error.message}`;
+          }
+        } catch (parseError) {
+          // Ignore JSON parsing errors for error response
+        }
+        
         throw new AIError(
-          `API request failed: ${response.statusText}`,
+          errorMessage,
           'API_ERROR',
           response.status,
           response.status >= 500 || response.status === 429
         );
       }
 
-      return await response.json();
+      const result = await response.json();
+      console.log('AI API request successful');
+      return result;
     } catch (error) {
       clearTimeout(timeoutId);
       
@@ -1018,8 +1059,8 @@ export function createAIService(config: AIServiceConfig): AIService {
  */
 export const DEFAULT_AI_CONFIG: Omit<AIServiceConfig, 'apiKey'> = {
   baseUrl: 'https://api.openai.com/v1',
-  model: 'gpt-5', // GPT-5 is the latest and most reliable
-  maxTokens: 8000,
+  model: 'gpt-4o-mini', // Use the same reliable, cost-effective model
+  maxTokens: 4000,
   temperature: 0.7,
   timeout: 30000,
   maxRetries: 3,

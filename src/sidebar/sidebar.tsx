@@ -175,7 +175,7 @@ const SidebarApp: React.FC = () => {
       } else {
         currentAIService = demoAIService;
       }
-      setAIService(currentAIService);
+      setAIService(currentAIService as AIService);
 
       // Send content script to extract page data
       let websiteContext: WebsiteContext | null = null;
@@ -225,7 +225,7 @@ const SidebarApp: React.FC = () => {
               category: WebsiteCategory.CUSTOM,
               pageType: PageType.ARTICLE,
               securityLevel: SecurityLevel.CAUTIOUS,
-              extractedData: pageContent || {},
+              extractedData: pageContent ? { title: pageContent.title, url: pageContent.url } : {},
               timestamp: new Date()
             };
             console.log('Content extraction successful');
@@ -272,15 +272,14 @@ const SidebarApp: React.FC = () => {
       // Initialize task manager
       const taskManager = new TaskManager({
         storageService,
-        aiService: currentAIService,
-        maxConcurrentTasks: 3,
-        enableTaskHistory: true,
-        defaultTimeout: 30000,
-        securityConstraints: {
+        aiService: currentAIService as AIService,
+        enableValidation: true,
+        enableTesting: false,
+        maxExecutionTime: 30000,
+        defaultSecurityConstraints: {
+          allowSensitiveData: false,
           maxContentLength: 10000,
           allowedDomains: [],
-          restrictedContent: [],
-          requireUserConfirmation: false,
           restrictedSelectors: ['input[type="password"]', '[data-sensitive]']
         }
       });
@@ -305,26 +304,18 @@ const SidebarApp: React.FC = () => {
       setStorageService(storageService);
 
       // Load tasks and generate suggestions
-      const tasks = await taskManager.getAllTasks();
+      const tasksRecord = await taskManager.getAllTasks();
+      const tasks = Object.values(tasksRecord);
       let suggestions: PrioritizedSuggestion[] = [];
 
       if (websiteContext) {
+        const userPrefs = await storageService.getUserPreferences();
         const suggestionContext: SuggestionContext = {
           websiteContext,
-          pageContent,
-          userPreferences: await storageService.getUserPreferences() || {
-            enabledCategories: Object.values(WebsiteCategory),
-            customPatterns: [],
-            privacySettings: {
-              sharePageContent: true,
-              shareFormData: false,
-              allowAutomation: true,
-              securityLevel: SecurityLevel.CAUTIOUS,
-              excludedDomains: []
-            },
-            automationPermissions: {},
-            aiProvider: 'openai',
-            theme: 'auto'
+          userPreferences: {
+            enabledCategories: userPrefs?.enabledCategories || Object.values(WebsiteCategory),
+            disabledSuggestions: [],
+            preferredOutputFormats: ['plain_text', 'markdown']
           }
         };
 
@@ -395,9 +386,7 @@ const SidebarApp: React.FC = () => {
       if (suggestion.taskId && suggestion.isCustom) {
         const taskResult = await taskManager.executeTask(
           suggestion.taskId,
-          executionContext.websiteContext,
-          executionContext.pageContent,
-          executionContext.userInput
+          executionContext
         );
         setTestResult(taskResult);
       } else {
@@ -770,7 +759,7 @@ const SidebarApp: React.FC = () => {
         <div className="modal-overlay">
           <AIConfigComponent
             key={aiConfig?.apiKey ? `configured-${aiConfig.apiKey.substring(0, 8)}` : 'unconfigured'}
-            config={aiConfig}
+            config={aiConfig || undefined}
             onSave={handleAISave}
             onCancel={() => setShowAIConfig(false)}
             onTest={handleAITest}

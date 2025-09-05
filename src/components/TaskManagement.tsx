@@ -20,7 +20,7 @@ interface TaskManagementProps {
   taskManager: TaskManager;
   storageService: ChromeStorageService;
   onClose: () => void;
-  websiteContext?: WebsiteContext | null;
+  websiteContext: WebsiteContext | null;
 }
 
 interface TaskLibraryViewProps {
@@ -53,9 +53,9 @@ interface TaskImportModalProps {
 }
 
 interface TaskCreateModalProps {
-  onSave: (task: Partial<CustomTask>) => void;
+  onSave: (task: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => void;
   onCancel: () => void;
-  websiteContext?: WebsiteContext | null;
+  websiteContext: WebsiteContext | null;
 }
 
 interface TaskOrganizationOptions {
@@ -178,7 +178,7 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
     setActiveView('stats');
   };
 
-  const handleCreateTask = async (taskData: Partial<CustomTask>) => {
+  const handleCreateTask = async (taskData: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => {
     try {
       await taskManager.createTask(taskData);
       await loadData(); // Refresh data
@@ -859,18 +859,14 @@ Please:
       return;
     }
 
-    const taskData: Partial<CustomTask> = {
+    const taskData: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
       name: formData.name.trim(),
       description: formData.description.trim(),
       promptTemplate: formData.promptTemplate.trim(),
       websitePatterns: formData.websitePatterns.split(',').map(p => p.trim()).filter(p => p),
       outputFormat: formData.outputFormat,
       tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
-      isEnabled: true,
-      automationSteps: [],
-      usageCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      isEnabled: true
     };
 
     onSave(taskData);
