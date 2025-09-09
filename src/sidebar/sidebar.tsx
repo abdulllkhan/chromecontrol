@@ -92,6 +92,7 @@ const SidebarApp: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'categorized'>('list');
   const [executingTask, setExecutingTask] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<TaskResult | null>(null);
+  const [currentExecutingSuggestion, setCurrentExecutingSuggestion] = useState<TaskSuggestion | null>(null);
   const [showPreferences, setShowPreferences] = useState(false);
   const [showAIConfig, setShowAIConfig] = useState(false);
   const [aiService, setAIService] = useState<AIService | null>(null);
@@ -368,6 +369,7 @@ const SidebarApp: React.FC = () => {
   // Handle suggestion execution
   const handleExecuteSuggestion = useCallback(async (suggestion: PrioritizedSuggestion) => {
     setExecutingTask(suggestion.id);
+    setCurrentExecutingSuggestion(suggestion);
 
     await executeWithErrorHandling(async () => {
       if (!taskManager || !state.websiteContext || !state.pageContent) {
@@ -406,6 +408,7 @@ const SidebarApp: React.FC = () => {
     });
 
     setExecutingTask(null);
+    // Don't clear currentExecutingSuggestion here - keep it for the result display
   }, [taskManager, state.websiteContext, state.pageContent, executeWithErrorHandling]);
 
   // Handle AI configuration
@@ -720,28 +723,29 @@ const SidebarApp: React.FC = () => {
         )}
       </div>
 
-      {/* Test Result Modal */}
+      {/* Full-Space Execution Result */}
       {testResult && (
-        <div className="modal-overlay" onClick={() => setTestResult(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Execution Result</h3>
-              <button onClick={() => setTestResult(null)}>
-                <CloseIcon />
-              </button>
+        <div className="execution-result-overlay">
+          <div className="execution-result-header">
+            <h3>{currentExecutingSuggestion?.title || 'Execution Result'}</h3>
+            <button className="close-result-btn" onClick={() => {
+              setTestResult(null);
+              setCurrentExecutingSuggestion(null);
+            }}>
+              <CloseIcon />
+            </button>
+          </div>
+          <div className="execution-result-body">
+            <div className={`result-status ${testResult.success ? 'success' : 'error'}`}>
+              {testResult.success ? <CheckIcon /> : <ErrorIcon />}
+              {testResult.success ? 'Success' : 'Failed'}
             </div>
-            <div className="modal-body">
-              <div className={`result-status ${testResult.success ? 'success' : 'error'}`}>
-                {testResult.success ? <CheckIcon /> : <ErrorIcon />}
-                {testResult.success ? 'Success' : 'Failed'}
-              </div>
-              <div className="result-content">
-                <pre>{testResult.content}</pre>
-              </div>
-              <div className="result-meta">
-                <span>Execution time: {testResult.executionTime}ms</span>
-                <span>Format: {testResult.format}</span>
-              </div>
+            <div className="result-content">
+              <pre>{testResult.content}</pre>
+            </div>
+            <div className="result-meta">
+              <span>Execution time: {testResult.executionTime}ms</span>
+              <span>Format: {testResult.format}</span>
             </div>
           </div>
         </div>
