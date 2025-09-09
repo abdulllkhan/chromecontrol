@@ -515,10 +515,10 @@ export class AIService {
    * Build prompt from AI request
    */
   private buildPrompt(request: AIRequest): string {
-    const { context, taskType, prompt, userInput } = request;
+    const { context, pageContent, taskType, prompt, userInput } = request;
     
     let systemPrompt = this.getSystemPrompt(taskType, request.outputFormat);
-    let contextPrompt = this.buildContextPrompt(context);
+    let contextPrompt = this.buildContextPrompt(context, pageContent);
     let userPrompt = prompt;
 
     // Add user input if provided
@@ -556,15 +556,45 @@ export class AIService {
   }
 
   /**
-   * Build context prompt from website context
+   * Build context prompt from website context and page content
    */
-  private buildContextPrompt(context: WebsiteContext): string {
-    return `Website Context:
+  private buildContextPrompt(context: WebsiteContext, pageContent?: any): string {
+    let contextPrompt = `Website Context:
 - Domain: ${context.domain}
 - Category: ${context.category}
 - Page Type: ${context.pageType}
 - Security Level: ${context.securityLevel}
 - Extracted Data: ${JSON.stringify(context.extractedData, null, 2)}`;
+
+    // Include page content if available
+    if (pageContent) {
+      contextPrompt += `\n\nPage Content:
+- Title: ${pageContent.title || 'No title'}
+- URL: ${pageContent.url || 'Unknown URL'}`;
+      
+      // Include headings if available
+      if (pageContent.headings && pageContent.headings.length > 0) {
+        contextPrompt += `\n- Headings: ${pageContent.headings.join(', ')}`;
+      }
+      
+      // Include main text content (truncated for API limits)
+      if (pageContent.textContent) {
+        const truncatedText = pageContent.textContent.length > 2000 
+          ? pageContent.textContent.substring(0, 2000) + '...' 
+          : pageContent.textContent;
+        contextPrompt += `\n- Text Content: ${truncatedText}`;
+      }
+      
+      // Include form and link counts if available
+      if (pageContent.forms && pageContent.forms.length > 0) {
+        contextPrompt += `\n- Forms: ${pageContent.forms.length} form(s) found`;
+      }
+      if (pageContent.links && pageContent.links.length > 0) {
+        contextPrompt += `\n- Links: ${pageContent.links.length} link(s) found`;
+      }
+    }
+
+    return contextPrompt;
   }
 
   /**

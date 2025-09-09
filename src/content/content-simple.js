@@ -10,7 +10,11 @@
       url: window.location.href,
       title: document.title,
       headings: Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6')).map(h => h.textContent?.trim()).filter(Boolean),
-      pageText: document.body?.textContent?.substring(0, 5000) || '',
+      textContent: document.body?.textContent?.substring(0, 5000) || '', // Changed from pageText to textContent
+      forms: [], // Add forms array to match expected interface
+      links: [], // Add links array to match expected interface  
+      metadata: {}, // Add metadata object to match expected interface
+      extractedAt: new Date(), // Add extractedAt date to match expected interface
       domain: window.location.hostname,
       timestamp: new Date().toISOString()
     };

@@ -789,6 +789,7 @@ export class TaskManager {
     return {
       prompt: injectedPrompt,
       context: context.websiteContext,
+      pageContent: context.pageContent, // Pass page content for richer context
       taskType,
       outputFormat: task.outputFormat,
       constraints: securityConstraints,
