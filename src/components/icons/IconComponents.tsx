@@ -442,6 +442,29 @@ export const FilterIcon: React.FC<IconProps> = ({
   </svg>
 );
 
+export const SendIcon: React.FC<IconProps> = ({ 
+  size = 16, 
+  color = 'currentColor', 
+  className = '', 
+  onClick,
+  title = 'Send'
+}) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    className={`icon ${className}`}
+    onClick={onClick}
+    title={title}
+  >
+    <path 
+      d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" 
+      fill={color}
+    />
+  </svg>
+);
+
 export const SearchIcon: React.FC<IconProps> = ({ 
   size = 16, 
   color = 'currentColor', 

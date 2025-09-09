@@ -14,7 +14,8 @@ import {
   PageContent,
   SecurityLevel,
   PageType,
-  TaskType
+  TaskType,
+  SecurityConstraints
 } from '../types';
 import type { TaskResult } from '../types';
 import {
@@ -47,7 +48,8 @@ import {
   AIIcon,
   RefreshIcon,
   PlayIcon,
-  PauseIcon
+  PauseIcon,
+  SendIcon
 } from '../components/icons/IconComponents';
 
 // ============================================================================
@@ -93,6 +95,9 @@ const SidebarApp: React.FC = () => {
   const [executingTask, setExecutingTask] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<TaskResult | null>(null);
   const [currentExecutingSuggestion, setCurrentExecutingSuggestion] = useState<TaskSuggestion | null>(null);
+  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isProcessingChat, setIsProcessingChat] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
   const [showAIConfig, setShowAIConfig] = useState(false);
   const [aiService, setAIService] = useState<AIService | null>(null);
@@ -411,6 +416,63 @@ const SidebarApp: React.FC = () => {
     // Don't clear currentExecutingSuggestion here - keep it for the result display
   }, [taskManager, state.websiteContext, state.pageContent, executeWithErrorHandling]);
 
+  // Handle chat messages for follow-up questions
+  const handleSendChatMessage = useCallback(async () => {
+    if (!chatInput.trim() || !aiService || isProcessingChat) return;
+
+    const userMessage = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setIsProcessingChat(true);
+
+    try {
+      // Build context from the original result and previous messages
+      const context = `Original task: ${currentExecutingSuggestion?.title || 'Unknown'}
+Original result:
+${testResult?.content || 'No content'}
+
+Previous conversation:
+${chatMessages.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
+
+User's follow-up question: ${userMessage}`;
+
+      // Create default security constraints for chat
+      const securityConstraints: SecurityConstraints = {
+        allowSensitiveData: false,
+        maxContentLength: 50000,
+        allowedDomains: state.websiteContext ? [state.websiteContext.domain] : [],
+        restrictedSelectors: []
+      };
+
+      // Send to AI service
+      const response = await aiService.processRequest({
+        prompt: context,
+        context: state.websiteContext || {
+          url: window.location.href,
+          domain: window.location.hostname,
+          title: document.title || 'Unknown',
+          category: WebsiteCategory.OTHER,
+          securityLevel: SecurityLevel.MEDIUM,
+          pageType: PageType.OTHER,
+          timestamp: new Date()
+        },
+        taskType: TaskType.GENERATE_TEXT,
+        outputFormat: OutputFormat.PLAIN_TEXT,
+        constraints: securityConstraints,
+        timestamp: new Date()
+      });
+
+      setChatMessages(prev => [...prev, { role: 'assistant', content: response.content }]);
+    } catch (error) {
+      setChatMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: `Error: ${error instanceof Error ? error.message : 'Failed to process your question'}` 
+      }]);
+    } finally {
+      setIsProcessingChat(false);
+    }
+  }, [chatInput, aiService, isProcessingChat, currentExecutingSuggestion, testResult, chatMessages, state.websiteContext]);
+
   // Handle AI configuration
   const handleAISave = useCallback(async (config: AIServiceConfig) => {
     console.log('🎯 SIDEBAR: handleAISave called with config:', config);
@@ -723,7 +785,7 @@ const SidebarApp: React.FC = () => {
         )}
       </div>
 
-      {/* Full-Space Execution Result */}
+      {/* Full-Space Execution Result with Chat */}
       {testResult && (
         <div className="execution-result-overlay">
           <div className="execution-result-header">
@@ -731,6 +793,8 @@ const SidebarApp: React.FC = () => {
             <button className="close-result-btn" onClick={() => {
               setTestResult(null);
               setCurrentExecutingSuggestion(null);
+              setChatMessages([]);
+              setChatInput('');
             }}>
               <CloseIcon />
             </button>
@@ -746,6 +810,66 @@ const SidebarApp: React.FC = () => {
             <div className="result-meta">
               <span>Execution time: {testResult.executionTime}ms</span>
               <span>Format: {testResult.format}</span>
+            </div>
+            
+            {/* Chat Section */}
+            <div className="result-chat-section">
+              <div className="chat-header">
+                <h4>Ask Follow-up Questions</h4>
+              </div>
+              
+              {/* Chat Messages */}
+              <div className="chat-messages">
+                {chatMessages.map((message, index) => (
+                  <div key={index} className={`chat-message ${message.role}`}>
+                    <div className="message-role">
+                      {message.role === 'user' ? 'You' : 'Assistant'}
+                    </div>
+                    <div className="message-content">
+                      {message.content}
+                    </div>
+                  </div>
+                ))}
+                {isProcessingChat && (
+                  <div className="chat-message assistant processing">
+                    <div className="message-role">Assistant</div>
+                    <div className="message-content">
+                      <LoadingSpinner size="small" message="Thinking..." />
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Chat Input */}
+              <div className="chat-input-container">
+                <input
+                  type="text"
+                  className="chat-input"
+                  placeholder="Ask a follow-up question..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendChatMessage();
+                    }
+                  }}
+                  disabled={isProcessingChat || !aiService}
+                />
+                <button
+                  className="chat-send-btn"
+                  onClick={handleSendChatMessage}
+                  disabled={isProcessingChat || !chatInput.trim() || !aiService}
+                >
+                  {isProcessingChat ? <LoadingSpinner size="small" /> : <SendIcon />}
+                </button>
+              </div>
+              
+              {!aiService && (
+                <div className="chat-warning">
+                  Please configure AI settings to use chat feature
+                </div>
+              )}
             </div>
           </div>
         </div>
