@@ -396,6 +396,11 @@ const SidebarApp: React.FC = () => {
           executionContext
         );
         setTestResult(taskResult);
+        // Add result as first message in chat
+        setChatMessages([{
+          role: 'assistant',
+          content: taskResult.content
+        }]);
       } else {
         // Handle built-in suggestions
         console.log(`Executing built-in suggestion: ${suggestion.title}`);
@@ -409,6 +414,11 @@ const SidebarApp: React.FC = () => {
           executionTime: 500
         };
         setTestResult(mockResult);
+        // Add result as first message in chat
+        setChatMessages([{
+          role: 'assistant',
+          content: mockResult.content
+        }]);
       }
     });
 
@@ -785,11 +795,11 @@ User's follow-up question: ${userMessage}`;
         )}
       </div>
 
-      {/* Full-Space Execution Result with Chat */}
+      {/* Single Chat Interface for Results */}
       {testResult && (
         <div className="execution-result-overlay">
           <div className="execution-result-header">
-            <h3>{currentExecutingSuggestion?.title || 'Execution Result'}</h3>
+            <h3>{currentExecutingSuggestion?.title || 'Task Result'}</h3>
             <button className="close-result-btn" onClick={() => {
               setTestResult(null);
               setCurrentExecutingSuggestion(null);
@@ -799,78 +809,57 @@ User's follow-up question: ${userMessage}`;
               <CloseIcon />
             </button>
           </div>
-          <div className="execution-result-body">
-            <div className={`result-status ${testResult.success ? 'success' : 'error'}`}>
-              {testResult.success ? <CheckIcon /> : <ErrorIcon />}
-              {testResult.success ? 'Success' : 'Failed'}
-            </div>
-            <div className="result-content">
-              <pre>{testResult.content}</pre>
-            </div>
-            <div className="result-meta">
-              <span>Execution time: {testResult.executionTime}ms</span>
-              <span>Format: {testResult.format}</span>
-            </div>
-            
-            {/* Chat Section */}
-            <div className="result-chat-section">
-              <div className="chat-header">
-                <h4>Ask Follow-up Questions</h4>
-              </div>
-              
-              {/* Chat Messages */}
-              <div className="chat-messages">
-                {chatMessages.map((message, index) => (
-                  <div key={index} className={`chat-message ${message.role}`}>
-                    <div className="message-role">
-                      {message.role === 'user' ? 'You' : 'Assistant'}
-                    </div>
-                    <div className="message-content">
-                      {message.content}
-                    </div>
+          
+          {/* Single Chat Body - No separate sections */}
+          <div className="chat-only-body">
+            {/* All Messages in One Flow */}
+            <div className="chat-messages">
+              {chatMessages.map((message, index) => (
+                <div key={index} className={`chat-message ${message.role}`}>
+                  <div className="message-content">
+                    {message.content}
                   </div>
-                ))}
-                {isProcessingChat && (
-                  <div className="chat-message assistant processing">
-                    <div className="message-role">Assistant</div>
-                    <div className="message-content">
-                      <LoadingSpinner size="small" message="Thinking..." />
-                    </div>
+                </div>
+              ))}
+              {isProcessingChat && (
+                <div className="chat-message assistant processing">
+                  <div className="message-content">
+                    <LoadingSpinner size="small" message="Thinking..." />
                   </div>
-                )}
-              </div>
-              
-              {/* Chat Input */}
-              <div className="chat-input-container">
-                <input
-                  type="text"
-                  className="chat-input"
-                  placeholder="Ask a follow-up question..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendChatMessage();
-                    }
-                  }}
-                  disabled={isProcessingChat || !aiService}
-                />
-                <button
-                  className="chat-send-btn"
-                  onClick={handleSendChatMessage}
-                  disabled={isProcessingChat || !chatInput.trim() || !aiService}
-                >
-                  {isProcessingChat ? <LoadingSpinner size="small" /> : <SendIcon />}
-                </button>
-              </div>
-              
-              {!aiService && (
-                <div className="chat-warning">
-                  Please configure AI settings to use chat feature
                 </div>
               )}
             </div>
+            
+            {/* Chat Input */}
+            <div className="chat-input-container">
+              <input
+                type="text"
+                className="chat-input"
+                placeholder="Ask a follow-up question..."
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendChatMessage();
+                  }
+                }}
+                disabled={isProcessingChat || !aiService}
+              />
+              <button
+                className="chat-send-btn"
+                onClick={handleSendChatMessage}
+                disabled={isProcessingChat || !chatInput.trim() || !aiService}
+              >
+                {isProcessingChat ? <LoadingSpinner size="small" /> : <SendIcon />}
+              </button>
+            </div>
+            
+            {!aiService && (
+              <div className="chat-warning">
+                Please configure AI settings to use chat feature
+              </div>
+            )}
           </div>
         </div>
       )}
