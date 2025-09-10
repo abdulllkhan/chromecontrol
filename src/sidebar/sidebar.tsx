@@ -824,7 +824,7 @@ User's follow-up question: ${userMessage}`;
               {isProcessingChat && (
                 <div className="chat-message assistant processing">
                   <div className="message-content">
-                    <LoadingSpinner size="small" message="Thinking..." />
+                    <LoadingSpinner size="small" />
                   </div>
                 </div>
               )}

@@ -7,7 +7,7 @@ interface LoadingSpinnerProps {
 
 const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
   size = 'medium', 
-  message = 'Loading...' 
+  message
 }) => {
   const sizeMap = {
     small: '16px',
@@ -17,11 +17,10 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   return (
     <div style={{ 
-      display: 'flex', 
+      display: 'inline-flex', 
       flexDirection: 'column', 
       alignItems: 'center', 
-      gap: '8px',
-      padding: '16px'
+      gap: '8px'
     }}>
       <div 
         style={{
@@ -33,7 +32,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
           animation: 'spin 1s linear infinite'
         }}
       />
-      <span style={{ fontSize: '14px', color: '#5a67d8' }}>{message}</span>
+      {message && <span style={{ fontSize: '14px', color: '#5a67d8' }}>{message}</span>}
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
