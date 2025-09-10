@@ -73,6 +73,7 @@ export interface CustomTask {
 export interface AIRequest {
   prompt: string;
   context: WebsiteContext;
+  pageContent?: PageContent; // Add page content for richer context
   taskType: TaskType;
   outputFormat: OutputFormat;
   constraints: SecurityConstraints;

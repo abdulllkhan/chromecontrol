@@ -119,6 +119,9 @@
   margin-bottom: 28px;
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.3);
+  /* Ensure proper stacking context for dropdowns */
+  position: relative;
+  z-index: var(--z-base, 0);
 }
 
 .control-group {
@@ -126,6 +129,9 @@
   flex-direction: column;
   gap: 6px;
   align-items: flex-start;
+  /* Ensure dropdown positioning works correctly */
+  position: relative;
+  z-index: 1;
 }
 
 .control-group label {
@@ -147,6 +153,34 @@
   backdrop-filter: blur(8px);
   transition: all 0.2s ease;
   min-width: 120px;
+  position: relative;
+}
+
+/* Fix for Chrome extension dropdown positioning */
+.control-group select {
+  -webkit-appearance: menulist;
+  appearance: menulist;
+  /* Ensure dropdown respects container boundaries */
+  transform: translate3d(0, 0, 0);
+  z-index: var(--z-dropdown, 100);
+}
+
+.control-group select::-webkit-scrollbar {
+  width: 8px;
+}
+
+.control-group select::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.control-group select::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.control-group select::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .control-group select:hover,
