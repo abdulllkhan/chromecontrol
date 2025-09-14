@@ -673,6 +673,52 @@ export const LowPriorityIcon: React.FC<IconProps> = ({
   </svg>
 );
 
+export const MinimizeIcon: React.FC<IconProps> = ({ 
+  size = 16, 
+  color = 'currentColor', 
+  className = '', 
+  onClick,
+  title = 'Minimize'
+}) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    className={`icon ${className}`}
+    onClick={onClick}
+    title={title}
+  >
+    <path 
+      d="M19 13H5v-2h14v2z" 
+      fill={color}
+    />
+  </svg>
+);
+
+export const ExpandIcon: React.FC<IconProps> = ({ 
+  size = 16, 
+  color = 'currentColor', 
+  className = '', 
+  onClick,
+  title = 'Expand'
+}) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    className={`icon ${className}`}
+    onClick={onClick}
+    title={title}
+  >
+    <path 
+      d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" 
+      fill={color}
+    />
+  </svg>
+);
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
