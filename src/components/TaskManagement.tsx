@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CustomTask, WebsiteCategory, OutputFormat, UsageMetrics, WebsiteContext } from '../types';
+import { CustomTask, WebsiteCategory, OutputFormat, WebsiteContext } from '../types';
 import { TaskManager } from '../services/taskManager';
 import { ChromeStorageService } from '../services/storage';
 import {
   EditIcon,
   DeleteIcon,
   DuplicateIcon,
-  StatsIcon,
   CloseIcon,
   CheckIcon,
   ErrorIcon
@@ -19,26 +18,18 @@ import {
 interface TaskManagementProps {
   taskManager: TaskManager;
   storageService: ChromeStorageService;
-  onClose: () => void;
   websiteContext: WebsiteContext | null;
 }
 
 interface TaskLibraryViewProps {
   tasks: CustomTask[];
-  usageStats: Record<string, UsageMetrics>;
   onEdit: (task: CustomTask) => void;
   onDuplicate: (task: CustomTask) => void;
   onDelete: (taskId: string) => void;
   onToggle: (taskId: string, enabled: boolean) => void;
   onExport: (taskIds: string[]) => void;
-  onViewStats: (task: CustomTask) => void;
 }
 
-interface TaskStatsModalProps {
-  task: CustomTask;
-  stats: UsageMetrics | null;
-  onClose: () => void;
-}
 
 interface TaskExportModalProps {
   tasks: CustomTask[];
@@ -53,13 +44,19 @@ interface TaskImportModalProps {
 }
 
 interface TaskCreateModalProps {
-  onSave: (task: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => void;
+  onSave: (task: Omit<CustomTask, 'id' | 'usageCount'>) => void;
   onCancel: () => void;
   websiteContext: WebsiteContext | null;
 }
 
+interface TaskEditModalProps {
+  task: CustomTask;
+  onSave: (taskId: string, task: Partial<Omit<CustomTask, 'id' | 'usageCount'>>) => void;
+  onCancel: () => void;
+}
+
 interface TaskOrganizationOptions {
-  sortBy: 'name' | 'created' | 'usage' | 'category';
+  sortBy: 'name' | 'created' | 'category';
   sortOrder: 'asc' | 'desc';
   groupBy: 'none' | 'category' | 'website' | 'tags';
   filterBy: {
@@ -74,38 +71,18 @@ interface TaskOrganizationOptions {
 // MAIN COMPONENT
 // ============================================================================
 
-/**
- * Ensures a value is a Date object, converting from string if necessary
- */
-function ensureDate(value: Date | string | undefined): Date {
-  if (!value) return new Date();
-  if (value instanceof Date) return value;
-  if (typeof value === 'string') {
-    const date = new Date(value);
-    return isNaN(date.getTime()) ? new Date() : date;
-  }
-  return new Date();
-}
 
 export const FullTaskManagement: React.FC<TaskManagementProps> = ({
   taskManager,
   storageService,
-  onClose,
   websiteContext
 }) => {
   const [tasks, setTasks] = useState<CustomTask[]>([]);
-  const [usageStats, setUsageStats] = useState<Record<string, UsageMetrics>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'library' | 'create' | 'stats' | 'export'>('library');
-  const [selectedTask, setSelectedTask] = useState<CustomTask | null>(null);
+  const [activeView, setActiveView] = useState<'library' | 'create' | 'export' | 'edit'>('library');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
-  const [organizationOptions, setOrganizationOptions] = useState<TaskOrganizationOptions>({
-    sortBy: 'name',
-    sortOrder: 'asc',
-    groupBy: 'none',
-    filterBy: {}
-  });
+  const [editingTask, setEditingTask] = useState<CustomTask | null>(null);
 
   // Load tasks and usage statistics
   const loadData = useCallback(async () => {
@@ -113,13 +90,8 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
       setLoading(true);
       setError(null);
 
-      const [tasksData, statsData] = await Promise.all([
-        taskManager.getAllTasks(),
-        storageService.getAllUsageStats()
-      ]);
-
+      const tasksData = await taskManager.getAllTasks();
       setTasks(Object.values(tasksData));
-      setUsageStats(statsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load tasks');
     } finally {
@@ -133,8 +105,8 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
 
   // Handle task operations
   const handleEdit = (task: CustomTask) => {
-    setSelectedTask(task);
-    setActiveView('library'); // Stay in library view but show edit form
+    setEditingTask(task);
+    setActiveView('edit');
   };
 
   const handleDuplicate = async (task: CustomTask) => {
@@ -173,18 +145,25 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
     setActiveView('export');
   };
 
-  const handleViewStats = (task: CustomTask) => {
-    setSelectedTask(task);
-    setActiveView('stats');
-  };
 
-  const handleCreateTask = async (taskData: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => {
+  const handleCreateTask = async (taskData: Omit<CustomTask, 'id' | 'usageCount'>) => {
     try {
       await taskManager.createTask(taskData);
       await loadData(); // Refresh data
       setActiveView('library');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create task');
+    }
+  };
+
+  const handleUpdateTask = async (taskId: string, taskData: Partial<Omit<CustomTask, 'id' | 'usageCount'>>) => {
+    try {
+      await taskManager.updateTask(taskId, taskData);
+      await loadData(); // Refresh data
+      setActiveView('library');
+      setEditingTask(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update task');
     }
   };
 
@@ -232,13 +211,6 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
 
   return (
     <div className="task-management">
-      <div className="task-management-header">
-        <h2>Task Management</h2>
-        <button className="btn btn-secondary close-button" onClick={onClose}>
-          <CloseIcon size={16} />
-        </button>
-      </div>
-      
       <div className="task-actions">
         <button
           className="btn btn-primary"
@@ -264,13 +236,11 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
       {activeView === 'library' && (
         <TaskLibraryView
           tasks={tasks}
-          usageStats={usageStats}
           onEdit={handleEdit}
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}
           onToggle={handleToggle}
           onExport={handleExport}
-          onViewStats={handleViewStats}
         />
       )}
 
@@ -282,13 +252,6 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
         />
       )}
 
-      {activeView === 'stats' && selectedTask && (
-        <TaskStatsModal
-          task={selectedTask}
-          stats={usageStats[selectedTask.id] || null}
-          onClose={() => setActiveView('library')}
-        />
-      )}
 
       {activeView === 'export' && (
         <TaskExportModal
@@ -296,6 +259,17 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
           selectedTaskIds={selectedTaskIds}
           onExport={handleExportTasks}
           onClose={() => setActiveView('library')}
+        />
+      )}
+
+      {activeView === 'edit' && editingTask && (
+        <TaskEditModal
+          task={editingTask}
+          onSave={handleUpdateTask}
+          onCancel={() => {
+            setActiveView('library');
+            setEditingTask(null);
+          }}
         />
       )}
 
@@ -309,13 +283,11 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
 
 const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
   tasks,
-  usageStats,
   onEdit,
   onDuplicate,
   onDelete,
   onToggle,
-  onExport,
-  onViewStats
+  onExport
 }) => {
   const [organizationOptions, setOrganizationOptions] = useState<TaskOrganizationOptions>({
     sortBy: 'name',
@@ -368,14 +340,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
         case 'name':
           comparison = a.name.localeCompare(b.name);
           break;
-        case 'created':
-          comparison = ensureDate(a.createdAt).getTime() - ensureDate(b.createdAt).getTime();
-          break;
-        case 'usage':
-          const aUsage = usageStats[a.id]?.usageCount || 0;
-          const bUsage = usageStats[b.id]?.usageCount || 0;
-          comparison = aUsage - bUsage;
-          break;
         case 'category':
           // Sort by first website pattern as category proxy
           const aCategory = a.websitePatterns[0] || '';
@@ -388,7 +352,7 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
     });
 
     return filteredTasks;
-  }, [tasks, organizationOptions, usageStats]);
+  }, [tasks, organizationOptions]);
 
   // Group tasks if grouping is enabled
   const groupedTasks = React.useMemo(() => {
@@ -479,8 +443,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
               }))}
             >
               <option value="name">Name</option>
-              <option value="created">Created Date</option>
-              <option value="usage">Usage Count</option>
               <option value="category">Category</option>
             </select>
             
@@ -578,7 +540,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
                 <TaskCard
                   key={task.id}
                   task={task}
-                  stats={usageStats[task.id]}
                   selected={selectedTaskIds.includes(task.id)}
                   showBulkActions={showBulkActions}
                   onSelect={(selected) => handleSelectTask(task.id, selected)}
@@ -586,7 +547,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
                   onDuplicate={() => onDuplicate(task)}
                   onDelete={() => onDelete(task.id)}
                   onToggle={(enabled) => onToggle(task.id, enabled)}
-                  onViewStats={() => onViewStats(task)}
                 />
               ))}
             </div>
@@ -609,7 +569,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
 
 interface TaskCardProps {
   task: CustomTask;
-  stats?: UsageMetrics;
   selected: boolean;
   showBulkActions: boolean;
   onSelect: (selected: boolean) => void;
@@ -617,20 +576,17 @@ interface TaskCardProps {
   onDuplicate: () => void;
   onDelete: () => void;
   onToggle: (enabled: boolean) => void;
-  onViewStats: () => void;
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({
   task,
-  stats,
   selected,
   showBulkActions,
   onSelect,
   onEdit,
   onDuplicate,
   onDelete,
-  onToggle,
-  onViewStats
+  onToggle
 }) => {
   return (
     <div className={`task-card ${!task.isEnabled ? 'disabled' : ''} ${selected ? 'selected' : ''}`}>
@@ -673,18 +629,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
             {task.tags.length > 3 && <span className="tag">+{task.tags.length - 3}</span>}
           </div>
         )}
-        
-        <div className="task-stats">
-          <span>Used: {stats?.usageCount || 0} times</span>
-          {stats && (
-            <span>Success: {Math.round(stats.successRate * 100)}%</span>
-          )}
-        </div>
-        
-        <div className="task-dates">
-          <small>Created: {ensureDate(task.createdAt).toLocaleDateString()}</small>
-          <small>Updated: {ensureDate(task.updatedAt).toLocaleDateString()}</small>
-        </div>
       </div>
       
       <div className="task-actions">
@@ -693,9 +637,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
         </button>
         <button className="btn btn-small btn-secondary" onClick={onDuplicate}>
           <DuplicateIcon size={14} /> Duplicate
-        </button>
-        <button className="btn btn-small btn-secondary" onClick={onViewStats}>
-          <StatsIcon size={14} /> Stats
         </button>
         <button className="btn btn-small btn-danger" onClick={onDelete}>
           <DeleteIcon size={14} /> Delete
@@ -716,20 +657,16 @@ const convertTasksToCSV = (tasks: CustomTask[]): string => {
     'Website Patterns',
     'Output Format',
     'Tags',
-    'Created Date',
-    'Updated Date',
     'Usage Count',
     'Enabled'
   ];
-  
+
   const rows = tasks.map(task => [
     task.name,
     task.description,
     task.websitePatterns.join('; '),
     task.outputFormat,
     task.tags.join('; '),
-    ensureDate(task.createdAt).toISOString(),
-    ensureDate(task.updatedAt).toISOString(),
     task.usageCount.toString(),
     task.isEnabled.toString()
   ]);
@@ -859,7 +796,7 @@ Please:
       return;
     }
 
-    const taskData: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
+    const taskData: Omit<CustomTask, 'id' | 'usageCount'> = {
       name: formData.name.trim(),
       description: formData.description.trim(),
       promptTemplate: formData.promptTemplate.trim(),
@@ -887,17 +824,16 @@ Please:
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal create-task-modal">
-        <div className="modal-header">
-          <h3>Create New Task</h3>
-          <button className="btn btn-secondary" onClick={onCancel}>
-            <CloseIcon size={16} />
-          </button>
-        </div>
+    <div className="fullscreen-modal-container">
+      <div className="fullscreen-modal-header">
+        <h3>Create New Task</h3>
+        <button className="modal-close-btn" onClick={onCancel}>
+          <CloseIcon size={20} />
+        </button>
+      </div>
 
-        <div className="modal-content">
-          <form onSubmit={handleSubmit}>
+      <div className="fullscreen-modal-body">
+        <form onSubmit={handleSubmit} className="task-form">
             {/* Template Selection */}
             <div className="form-group">
               <label>Template:</label>
@@ -1003,132 +939,226 @@ Please:
               <small>Separate multiple tags with commas</small>
             </div>
 
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={onCancel}>
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">
-                Create Task
-              </button>
-            </div>
-          </form>
-        </div>
+        </form>
+      </div>
+
+      <div className="fullscreen-modal-footer">
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          Cancel
+        </button>
+        <button className="btn btn-primary" onClick={handleSubmit}>
+          Create Task
+        </button>
       </div>
     </div>
   );
 };
 
 // ============================================================================
-// TASK STATISTICS MODAL
+// TASK EDIT MODAL
 // ============================================================================
 
-const TaskStatsModal: React.FC<TaskStatsModalProps> = ({ task, stats, onClose }) => {
+const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, onSave, onCancel }) => {
+  const [formData, setFormData] = useState({
+    name: task.name,
+    description: task.description,
+    promptTemplate: task.promptTemplate,
+    websitePatterns: task.websitePatterns.join(', '),
+    outputFormat: task.outputFormat,
+    tags: task.tags.join(', '),
+    isEnabled: task.isEnabled
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Task name is required';
+    } else if (formData.name.trim().length < 3) {
+      newErrors.name = 'Task name must be at least 3 characters';
+    }
+
+    if (!formData.description.trim()) {
+      newErrors.description = 'Description is required';
+    } else if (formData.description.trim().length < 10) {
+      newErrors.description = 'Description must be at least 10 characters';
+    }
+
+    if (!formData.promptTemplate.trim()) {
+      newErrors.promptTemplate = 'Prompt template is required';
+    } else if (formData.promptTemplate.trim().length < 10) {
+      newErrors.promptTemplate = 'Prompt template must be at least 10 characters';
+    }
+
+    if (!formData.websitePatterns.trim()) {
+      newErrors.websitePatterns = 'At least one website pattern is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
+    const updatedData: Partial<Omit<CustomTask, 'id' | 'usageCount'>> = {
+      name: formData.name.trim(),
+      description: formData.description.trim(),
+      promptTemplate: formData.promptTemplate.trim(),
+      websitePatterns: formData.websitePatterns.split(',').map(p => p.trim()).filter(p => p),
+      outputFormat: formData.outputFormat,
+      tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
+      isEnabled: formData.isEnabled
+    };
+
+    onSave(task.id, updatedData);
+  };
+
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    // Clear error for this field when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
+  };
+
   return (
-    <div className="modal-overlay">
-      <div className="modal task-stats-modal">
-        <div className="modal-header">
-          <h3><StatsIcon size={18} /> Task Statistics: {task.name}</h3>
-          <button className="btn btn-secondary" onClick={onClose}><CloseIcon size={16} /></button>
-        </div>
-        
-        <div className="modal-content">
-          {stats ? (
-            <div className="stats-grid">
-              <div className="stat-card">
-                <h4>Usage Count</h4>
-                <div className="stat-value">{stats.usageCount}</div>
-                <small>Total executions</small>
-              </div>
-              
-              <div className="stat-card">
-                <h4>Success Rate</h4>
-                <div className="stat-value">{Math.round(stats.successRate * 100)}%</div>
-                <small>Successful executions</small>
-              </div>
-              
-              <div className="stat-card">
-                <h4>Avg Execution Time</h4>
-                <div className="stat-value">{Math.round(stats.averageExecutionTime)}ms</div>
-                <small>Average response time</small>
-              </div>
-              
-              <div className="stat-card">
-                <h4>Error Count</h4>
-                <div className="stat-value">{stats.errorCount}</div>
-                <small>Failed executions</small>
-              </div>
-              
-              <div className="stat-card">
-                <h4>Last Used</h4>
-                <div className="stat-value">
-                  {stats.lastUsed ? ensureDate(stats.lastUsed).toLocaleDateString() : 'Never'}
-                </div>
-                <small>Most recent execution</small>
-              </div>
-              
-              <div className="stat-card">
-                <h4>Reliability Score</h4>
-                <div className="stat-value">
-                  {stats.usageCount > 0 ? Math.round((stats.successRate * 0.7 + (1 - stats.errorCount / stats.usageCount) * 0.3) * 100) : 0}%
-                </div>
-                <small>Overall performance</small>
-              </div>
+    <div className="fullscreen-modal-container">
+      <div className="fullscreen-modal-header">
+        <h3>Edit Task</h3>
+        <button className="modal-close-btn" onClick={onCancel}>
+          <CloseIcon size={20} />
+        </button>
+      </div>
+
+      <div className="fullscreen-modal-body">
+        <form onSubmit={handleSubmit} className="task-form">
+            {/* Task Name */}
+            <div className="form-group">
+              <label htmlFor="edit-task-name">Task Name *</label>
+              <input
+                id="edit-task-name"
+                type="text"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                className={errors.name ? 'error' : ''}
+                placeholder="Enter task name"
+              />
+              {errors.name && <span className="error-text">{errors.name}</span>}
             </div>
-          ) : (
-            <div className="no-stats">
-              <p>No usage statistics available for this task.</p>
-              <small>Statistics will appear after the task has been executed.</small>
+
+            {/* Description */}
+            <div className="form-group">
+              <label htmlFor="edit-task-description">Description *</label>
+              <textarea
+                id="edit-task-description"
+                value={formData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                className={errors.description ? 'error' : ''}
+                placeholder="Describe what this task does"
+                rows={3}
+              />
+              {errors.description && <span className="error-text">{errors.description}</span>}
             </div>
-          )}
-          
-          <div className="task-details">
-            <h4>Task Details</h4>
-            <div className="detail-grid">
-              <div className="detail-item">
-                <label>Created:</label>
-                <span>{ensureDate(task.createdAt).toLocaleString()}</span>
-              </div>
-              <div className="detail-item">
-                <label>Last Updated:</label>
-                <span>{ensureDate(task.updatedAt).toLocaleString()}</span>
-              </div>
-              <div className="detail-item">
-                <label>Output Format:</label>
-                <span>{task.outputFormat}</span>
-              </div>
-              <div className="detail-item">
-                <label>Website Patterns:</label>
-                <span>{task.websitePatterns.length} patterns</span>
-              </div>
-              <div className="detail-item">
-                <label>Tags:</label>
-                <span>{task.tags.length > 0 ? task.tags.join(', ') : 'None'}</span>
-              </div>
-              <div className="detail-item">
-                <label>Status:</label>
-                <span className={task.isEnabled ? 'enabled' : 'disabled'}>
-                  {task.isEnabled ? (
-                    <>
-                      <CheckIcon size={12} /> Enabled
-                    </>
-                  ) : (
-                    <>
-                      <ErrorIcon size={12} /> Disabled
-                    </>
-                  )}
-                </span>
-              </div>
+
+            {/* Website Patterns */}
+            <div className="form-group">
+              <label htmlFor="edit-website-patterns">Website Patterns *</label>
+              <input
+                id="edit-website-patterns"
+                type="text"
+                value={formData.websitePatterns}
+                onChange={(e) => handleInputChange('websitePatterns', e.target.value)}
+                className={errors.websitePatterns ? 'error' : ''}
+                placeholder="example.com, *.example.com/page/*"
+              />
+              {errors.websitePatterns && <span className="error-text">{errors.websitePatterns}</span>}
+              <small>Separate multiple patterns with commas. Use * as wildcard.</small>
             </div>
-          </div>
-        </div>
-        
-        <div className="modal-footer">
-          <button className="btn btn-primary" onClick={onClose}>Close</button>
-        </div>
+
+            {/* Prompt Template */}
+            <div className="form-group">
+              <label htmlFor="edit-prompt-template">Prompt Template *</label>
+              <textarea
+                id="edit-prompt-template"
+                value={formData.promptTemplate}
+                onChange={(e) => handleInputChange('promptTemplate', e.target.value)}
+                className={errors.promptTemplate ? 'error' : ''}
+                placeholder="Enter the AI prompt template..."
+                rows={6}
+              />
+              {errors.promptTemplate && <span className="error-text">{errors.promptTemplate}</span>}
+              <small>Use {`{{variable}}`} syntax for dynamic content like {`{{title}}`}, {`{{textContent}}`}</small>
+            </div>
+
+            {/* Output Format */}
+            <div className="form-group">
+              <label htmlFor="edit-output-format">Output Format</label>
+              <select
+                id="edit-output-format"
+                value={formData.outputFormat}
+                onChange={(e) => handleInputChange('outputFormat', e.target.value)}
+              >
+                <option value={OutputFormat.PLAIN_TEXT}>Plain Text</option>
+                <option value={OutputFormat.MARKDOWN}>Markdown</option>
+                <option value={OutputFormat.HTML}>HTML</option>
+                <option value={OutputFormat.JSON}>JSON</option>
+              </select>
+            </div>
+
+            {/* Tags */}
+            <div className="form-group">
+              <label htmlFor="edit-tags">Tags</label>
+              <input
+                id="edit-tags"
+                type="text"
+                value={formData.tags}
+                onChange={(e) => handleInputChange('tags', e.target.value)}
+                placeholder="tag1, tag2, tag3"
+              />
+              <small>Separate multiple tags with commas</small>
+            </div>
+
+            {/* Enable/Disable Toggle */}
+            <div className="form-group">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={formData.isEnabled}
+                  onChange={(e) => handleInputChange('isEnabled', e.target.checked)}
+                />
+                Task Enabled
+              </label>
+              <small>Disabled tasks won't appear in suggestions</small>
+            </div>
+
+        </form>
+      </div>
+
+      <div className="fullscreen-modal-footer">
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          Cancel
+        </button>
+        <button className="btn btn-primary" onClick={handleSubmit}>
+          Save Changes
+        </button>
       </div>
     </div>
   );
 };
+
 
 // ============================================================================
 // TASK EXPORT MODAL
@@ -1337,10 +1367,6 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
           throw new Error(`Task ${index + 1} is missing required fields (name, description, or promptTemplate)`);
         }
 
-        // Convert dates if they're strings
-        const createdAt = task.createdAt ? new Date(task.createdAt) : new Date();
-        const updatedAt = task.updatedAt ? new Date(task.updatedAt) : new Date();
-
         return {
           id: task.id || `imported_${Date.now()}_${index}`,
           name: task.name,
@@ -1349,8 +1375,6 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
           promptTemplate: task.promptTemplate,
           outputFormat: task.outputFormat || OutputFormat.PLAIN_TEXT,
           automationSteps: task.automationSteps || [],
-          createdAt,
-          updatedAt,
           usageCount: task.usageCount || 0,
           isEnabled: task.isEnabled !== false, // Default to true
           tags: Array.isArray(task.tags) ? task.tags : []
@@ -1395,12 +1419,6 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
             break;
           case 'tags':
             task.tags = value ? value.split(';').map(t => t.trim()) : [];
-            break;
-          case 'created date':
-            task.createdAt = value ? new Date(value) : new Date();
-            break;
-          case 'updated date':
-            task.updatedAt = value ? new Date(value) : new Date();
             break;
           case 'usage count':
             task.usageCount = parseInt(value) || 0;
