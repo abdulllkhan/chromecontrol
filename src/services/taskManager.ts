@@ -96,7 +96,7 @@ export class TaskManager {
   /**
    * Creates a new custom task with validation
    */
-  async createTask(taskData: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>): Promise<string> {
+  async createTask(taskData: Omit<CustomTask, 'id' | 'usageCount'>): Promise<string> {
     try {
       // Validate task data before creation
       if (this.config.enableValidation) {
@@ -146,7 +146,7 @@ export class TaskManager {
   /**
    * Updates an existing task
    */
-  async updateTask(taskId: string, updates: Partial<Omit<CustomTask, 'id' | 'createdAt'>>): Promise<boolean> {
+  async updateTask(taskId: string, updates: Partial<Omit<CustomTask, 'id' | 'usageCount'>>): Promise<boolean> {
     try {
       // Validate updates if validation is enabled
       if (this.config.enableValidation && Object.keys(updates).length > 0) {
@@ -217,8 +217,6 @@ export class TaskManager {
 
       // Remove fields that will be auto-generated
       delete (duplicatedTask as any).id;
-      delete (duplicatedTask as any).createdAt;
-      delete (duplicatedTask as any).updatedAt;
 
       return await this.createTask(duplicatedTask);
     } catch (error) {
@@ -767,9 +765,9 @@ export class TaskManager {
       if (a.usageCount !== b.usageCount) {
         return b.usageCount - a.usageCount;
       }
-      
-      // Tertiary sort by creation date (newer first)
-      return b.createdAt.getTime() - a.createdAt.getTime();
+
+      // Tertiary sort by name (alphabetical)
+      return a.name.localeCompare(b.name);
     });
   }
 
@@ -1047,7 +1045,7 @@ export function createTaskTemplate(
   promptTemplate: string,
   websitePatterns: string[] = [],
   outputFormat: OutputFormat = OutputFormat.PLAIN_TEXT
-): Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> {
+): Omit<CustomTask, 'id' | 'usageCount'> {
   return {
     name,
     description,

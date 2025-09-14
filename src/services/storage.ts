@@ -396,35 +396,6 @@ export class ChromeStorageService {
     return result;
   }
 
-  /**
-   * Ensures date fields are proper Date objects in tasks
-   */
-  private sanitizeTaskDates(tasks: Record<string, CustomTask>): Record<string, CustomTask> {
-    const sanitized = {} as Record<string, CustomTask>;
-    
-    for (const [taskId, task] of Object.entries(tasks)) {
-      sanitized[taskId] = {
-        ...task,
-        createdAt: this.ensureDateObject(task.createdAt),
-        updatedAt: this.ensureDateObject(task.updatedAt)
-      };
-    }
-    
-    return sanitized;
-  }
-
-  /**
-   * Ensures a value is a proper Date object
-   */
-  private ensureDateObject(value: any): Date {
-    if (!value) return new Date();
-    if (value instanceof Date) return value;
-    if (typeof value === 'string') {
-      const date = new Date(value);
-      return isNaN(date.getTime()) ? new Date() : date;
-    }
-    return new Date();
-  }
 
   /**
    * Sanitizes usage stats to ensure dates are proper Date objects
@@ -517,22 +488,16 @@ export class ChromeStorageService {
   /**
    * Creates a new custom task
    */
-  async createCustomTask(task: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>): Promise<string> {
+  async createCustomTask(task: Omit<CustomTask, 'id' | 'usageCount'>): Promise<string> {
     try {
       console.log('Storage: Creating custom task with data:', task);
 
       // Validate task data
       const taskId = crypto.randomUUID();
-      const now = new Date();
 
-      // Create task without dates first, then add system fields
-      const { createdAt: _, updatedAt: __, ...taskWithoutDates } = task as any;
-      
       const fullTask: CustomTask = {
-        ...taskWithoutDates,
+        ...task,
         id: taskId,
-        createdAt: now,
-        updatedAt: now,
         usageCount: 0
       };
 
@@ -583,16 +548,7 @@ export class ChromeStorageService {
   async getAllCustomTasks(): Promise<Record<string, CustomTask>> {
     try {
       const tasks = await this.retrieveData<Record<string, CustomTask>>(STORAGE_KEYS.CUSTOM_TASKS) || {};
-      // Sanitize date fields to ensure they are proper Date objects
-      const sanitizedTasks = this.sanitizeTaskDates(tasks);
-      
-      // If sanitization was needed, store the corrected data
-      if (JSON.stringify(tasks) !== JSON.stringify(sanitizedTasks)) {
-        console.log('Sanitizing task dates and storing corrected data');
-        await this.storeData(STORAGE_KEYS.CUSTOM_TASKS, sanitizedTasks);
-      }
-      
-      return sanitizedTasks;
+      return tasks;
     } catch (error) {
       console.error('Failed to get all custom tasks:', error);
       return {};
@@ -602,22 +558,20 @@ export class ChromeStorageService {
   /**
    * Updates an existing custom task
    */
-  async updateCustomTask(taskId: string, updates: Partial<Omit<CustomTask, 'id' | 'createdAt'>>): Promise<boolean> {
+  async updateCustomTask(taskId: string, updates: Partial<Omit<CustomTask, 'id' | 'usageCount'>>): Promise<boolean> {
     try {
-      const tasks = await this.getAllCustomTasks(); // Use getAllCustomTasks to get sanitized dates
+      const tasks = await this.getAllCustomTasks();
 
       if (!tasks[taskId]) {
         throw new Error(`Task with ID ${taskId} not found`);
       }
 
-      // Update the task with properly sanitized dates
       const existingTask = tasks[taskId];
       const updatedTask: CustomTask = {
         ...existingTask,
         ...updates,
         id: existingTask.id, // Ensure ID doesn't get overwritten
-        createdAt: existingTask.createdAt, // Ensure createdAt doesn't get overwritten
-        updatedAt: new Date()
+        usageCount: existingTask.usageCount // Preserve usage count
       };
 
       // Validate updated task

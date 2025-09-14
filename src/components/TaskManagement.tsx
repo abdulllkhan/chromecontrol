@@ -44,9 +44,15 @@ interface TaskImportModalProps {
 }
 
 interface TaskCreateModalProps {
-  onSave: (task: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => void;
+  onSave: (task: Omit<CustomTask, 'id' | 'usageCount'>) => void;
   onCancel: () => void;
   websiteContext: WebsiteContext | null;
+}
+
+interface TaskEditModalProps {
+  task: CustomTask;
+  onSave: (taskId: string, task: Partial<Omit<CustomTask, 'id' | 'usageCount'>>) => void;
+  onCancel: () => void;
 }
 
 interface TaskOrganizationOptions {
@@ -65,18 +71,6 @@ interface TaskOrganizationOptions {
 // MAIN COMPONENT
 // ============================================================================
 
-/**
- * Ensures a value is a Date object, converting from string if necessary
- */
-function ensureDate(value: Date | string | undefined): Date {
-  if (!value) return new Date();
-  if (value instanceof Date) return value;
-  if (typeof value === 'string') {
-    const date = new Date(value);
-    return isNaN(date.getTime()) ? new Date() : date;
-  }
-  return new Date();
-}
 
 export const FullTaskManagement: React.FC<TaskManagementProps> = ({
   taskManager,
@@ -86,8 +80,9 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
   const [tasks, setTasks] = useState<CustomTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'library' | 'create' | 'export'>('library');
+  const [activeView, setActiveView] = useState<'library' | 'create' | 'export' | 'edit'>('library');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [editingTask, setEditingTask] = useState<CustomTask | null>(null);
 
   // Load tasks and usage statistics
   const loadData = useCallback(async () => {
@@ -110,8 +105,8 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
 
   // Handle task operations
   const handleEdit = (task: CustomTask) => {
-    // TODO: Implement edit functionality
-    setActiveView('library'); // Stay in library view but show edit form
+    setEditingTask(task);
+    setActiveView('edit');
   };
 
   const handleDuplicate = async (task: CustomTask) => {
@@ -151,13 +146,24 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
   };
 
 
-  const handleCreateTask = async (taskData: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => {
+  const handleCreateTask = async (taskData: Omit<CustomTask, 'id' | 'usageCount'>) => {
     try {
       await taskManager.createTask(taskData);
       await loadData(); // Refresh data
       setActiveView('library');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create task');
+    }
+  };
+
+  const handleUpdateTask = async (taskId: string, taskData: Partial<Omit<CustomTask, 'id' | 'usageCount'>>) => {
+    try {
+      await taskManager.updateTask(taskId, taskData);
+      await loadData(); // Refresh data
+      setActiveView('library');
+      setEditingTask(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update task');
     }
   };
 
@@ -256,6 +262,17 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
         />
       )}
 
+      {activeView === 'edit' && editingTask && (
+        <TaskEditModal
+          task={editingTask}
+          onSave={handleUpdateTask}
+          onCancel={() => {
+            setActiveView('library');
+            setEditingTask(null);
+          }}
+        />
+      )}
+
     </div>
   );
 };
@@ -322,9 +339,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
       switch (organizationOptions.sortBy) {
         case 'name':
           comparison = a.name.localeCompare(b.name);
-          break;
-        case 'created':
-          comparison = ensureDate(a.createdAt).getTime() - ensureDate(b.createdAt).getTime();
           break;
         case 'category':
           // Sort by first website pattern as category proxy
@@ -429,7 +443,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
               }))}
             >
               <option value="name">Name</option>
-              <option value="created">Created Date</option>
               <option value="category">Category</option>
             </select>
             
@@ -644,20 +657,16 @@ const convertTasksToCSV = (tasks: CustomTask[]): string => {
     'Website Patterns',
     'Output Format',
     'Tags',
-    'Created Date',
-    'Updated Date',
     'Usage Count',
     'Enabled'
   ];
-  
+
   const rows = tasks.map(task => [
     task.name,
     task.description,
     task.websitePatterns.join('; '),
     task.outputFormat,
     task.tags.join('; '),
-    ensureDate(task.createdAt).toISOString(),
-    ensureDate(task.updatedAt).toISOString(),
     task.usageCount.toString(),
     task.isEnabled.toString()
   ]);
@@ -787,7 +796,7 @@ Please:
       return;
     }
 
-    const taskData: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
+    const taskData: Omit<CustomTask, 'id' | 'usageCount'> = {
       name: formData.name.trim(),
       description: formData.description.trim(),
       promptTemplate: formData.promptTemplate.trim(),
@@ -937,6 +946,212 @@ Please:
               </button>
               <button type="submit" className="btn btn-primary">
                 Create Task
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// TASK EDIT MODAL
+// ============================================================================
+
+const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, onSave, onCancel }) => {
+  const [formData, setFormData] = useState({
+    name: task.name,
+    description: task.description,
+    promptTemplate: task.promptTemplate,
+    websitePatterns: task.websitePatterns.join(', '),
+    outputFormat: task.outputFormat,
+    tags: task.tags.join(', '),
+    isEnabled: task.isEnabled
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Task name is required';
+    } else if (formData.name.trim().length < 3) {
+      newErrors.name = 'Task name must be at least 3 characters';
+    }
+
+    if (!formData.description.trim()) {
+      newErrors.description = 'Description is required';
+    } else if (formData.description.trim().length < 10) {
+      newErrors.description = 'Description must be at least 10 characters';
+    }
+
+    if (!formData.promptTemplate.trim()) {
+      newErrors.promptTemplate = 'Prompt template is required';
+    } else if (formData.promptTemplate.trim().length < 10) {
+      newErrors.promptTemplate = 'Prompt template must be at least 10 characters';
+    }
+
+    if (!formData.websitePatterns.trim()) {
+      newErrors.websitePatterns = 'At least one website pattern is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
+    const updatedData: Partial<Omit<CustomTask, 'id' | 'usageCount'>> = {
+      name: formData.name.trim(),
+      description: formData.description.trim(),
+      promptTemplate: formData.promptTemplate.trim(),
+      websitePatterns: formData.websitePatterns.split(',').map(p => p.trim()).filter(p => p),
+      outputFormat: formData.outputFormat,
+      tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
+      isEnabled: formData.isEnabled
+    };
+
+    onSave(task.id, updatedData);
+  };
+
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    // Clear error for this field when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal edit-task-modal">
+        <div className="modal-header">
+          <h3>Edit Task</h3>
+          <button className="btn btn-secondary" onClick={onCancel}>
+            <CloseIcon size={16} />
+          </button>
+        </div>
+
+        <div className="modal-content">
+          <form onSubmit={handleSubmit}>
+            {/* Task Name */}
+            <div className="form-group">
+              <label htmlFor="edit-task-name">Task Name *</label>
+              <input
+                id="edit-task-name"
+                type="text"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                className={errors.name ? 'error' : ''}
+                placeholder="Enter task name"
+              />
+              {errors.name && <span className="error-text">{errors.name}</span>}
+            </div>
+
+            {/* Description */}
+            <div className="form-group">
+              <label htmlFor="edit-task-description">Description *</label>
+              <textarea
+                id="edit-task-description"
+                value={formData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                className={errors.description ? 'error' : ''}
+                placeholder="Describe what this task does"
+                rows={3}
+              />
+              {errors.description && <span className="error-text">{errors.description}</span>}
+            </div>
+
+            {/* Website Patterns */}
+            <div className="form-group">
+              <label htmlFor="edit-website-patterns">Website Patterns *</label>
+              <input
+                id="edit-website-patterns"
+                type="text"
+                value={formData.websitePatterns}
+                onChange={(e) => handleInputChange('websitePatterns', e.target.value)}
+                className={errors.websitePatterns ? 'error' : ''}
+                placeholder="example.com, *.example.com/page/*"
+              />
+              {errors.websitePatterns && <span className="error-text">{errors.websitePatterns}</span>}
+              <small>Separate multiple patterns with commas. Use * as wildcard.</small>
+            </div>
+
+            {/* Prompt Template */}
+            <div className="form-group">
+              <label htmlFor="edit-prompt-template">Prompt Template *</label>
+              <textarea
+                id="edit-prompt-template"
+                value={formData.promptTemplate}
+                onChange={(e) => handleInputChange('promptTemplate', e.target.value)}
+                className={errors.promptTemplate ? 'error' : ''}
+                placeholder="Enter the AI prompt template..."
+                rows={6}
+              />
+              {errors.promptTemplate && <span className="error-text">{errors.promptTemplate}</span>}
+              <small>Use {`{{variable}}`} syntax for dynamic content like {`{{title}}`}, {`{{textContent}}`}</small>
+            </div>
+
+            {/* Output Format */}
+            <div className="form-group">
+              <label htmlFor="edit-output-format">Output Format</label>
+              <select
+                id="edit-output-format"
+                value={formData.outputFormat}
+                onChange={(e) => handleInputChange('outputFormat', e.target.value)}
+              >
+                <option value={OutputFormat.PLAIN_TEXT}>Plain Text</option>
+                <option value={OutputFormat.MARKDOWN}>Markdown</option>
+                <option value={OutputFormat.HTML}>HTML</option>
+                <option value={OutputFormat.JSON}>JSON</option>
+              </select>
+            </div>
+
+            {/* Tags */}
+            <div className="form-group">
+              <label htmlFor="edit-tags">Tags</label>
+              <input
+                id="edit-tags"
+                type="text"
+                value={formData.tags}
+                onChange={(e) => handleInputChange('tags', e.target.value)}
+                placeholder="tag1, tag2, tag3"
+              />
+              <small>Separate multiple tags with commas</small>
+            </div>
+
+            {/* Enable/Disable Toggle */}
+            <div className="form-group">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={formData.isEnabled}
+                  onChange={(e) => handleInputChange('isEnabled', e.target.checked)}
+                />
+                Task Enabled
+              </label>
+              <small>Disabled tasks won't appear in suggestions</small>
+            </div>
+
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={onCancel}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Save Changes
               </button>
             </div>
           </form>
@@ -1154,10 +1369,6 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
           throw new Error(`Task ${index + 1} is missing required fields (name, description, or promptTemplate)`);
         }
 
-        // Convert dates if they're strings
-        const createdAt = task.createdAt ? new Date(task.createdAt) : new Date();
-        const updatedAt = task.updatedAt ? new Date(task.updatedAt) : new Date();
-
         return {
           id: task.id || `imported_${Date.now()}_${index}`,
           name: task.name,
@@ -1166,8 +1377,6 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
           promptTemplate: task.promptTemplate,
           outputFormat: task.outputFormat || OutputFormat.PLAIN_TEXT,
           automationSteps: task.automationSteps || [],
-          createdAt,
-          updatedAt,
           usageCount: task.usageCount || 0,
           isEnabled: task.isEnabled !== false, // Default to true
           tags: Array.isArray(task.tags) ? task.tags : []
@@ -1212,12 +1421,6 @@ const TaskImportModal: React.FC<TaskImportModalProps> = ({ onImport, onClose }) 
             break;
           case 'tags':
             task.tags = value ? value.split(';').map(t => t.trim()) : [];
-            break;
-          case 'created date':
-            task.createdAt = value ? new Date(value) : new Date();
-            break;
-          case 'updated date':
-            task.updatedAt = value ? new Date(value) : new Date();
             break;
           case 'usage count':
             task.usageCount = parseInt(value) || 0;

@@ -63,8 +63,6 @@ export interface CustomTask {
   promptTemplate: string;
   outputFormat: OutputFormat;
   automationSteps?: AutomationStep[];
-  createdAt: Date;
-  updatedAt: Date;
   usageCount: number;
   isEnabled: boolean;
   tags: string[];
@@ -186,7 +184,6 @@ export interface WebsitePattern {
   category: WebsiteCategory;
   customSuggestions: string[];
   isEnabled: boolean;
-  createdAt: Date;
 }
 
 export interface UserPreferences {
@@ -353,37 +350,6 @@ export const ValidationUtils = {
       throw new ValidationError('automationSteps must be an array if provided', 'automationSteps');
     }
 
-    // Handle createdAt - allow Date, string, or convertible values
-    if (t.createdAt === null || t.createdAt === undefined) {
-      throw new ValidationError('createdAt cannot be null or undefined', 'createdAt');
-    }
-    if (!(t.createdAt instanceof Date) && typeof t.createdAt !== 'string') {
-      throw new ValidationError('createdAt must be a Date or ISO string', 'createdAt');
-    }
-    
-    // If it's a string, verify it can be converted to a valid date
-    if (typeof t.createdAt === 'string') {
-      const testDate = new Date(t.createdAt);
-      if (isNaN(testDate.getTime())) {
-        throw new ValidationError('createdAt string must be a valid date', 'createdAt');
-      }
-    }
-
-    // Handle updatedAt - allow Date, string, or convertible values
-    if (t.updatedAt === null || t.updatedAt === undefined) {
-      throw new ValidationError('updatedAt cannot be null or undefined', 'updatedAt');
-    }
-    if (!(t.updatedAt instanceof Date) && typeof t.updatedAt !== 'string') {
-      throw new ValidationError('updatedAt must be a Date or ISO string', 'updatedAt');
-    }
-    
-    // If it's a string, verify it can be converted to a valid date
-    if (typeof t.updatedAt === 'string') {
-      const testDate = new Date(t.updatedAt);
-      if (isNaN(testDate.getTime())) {
-        throw new ValidationError('updatedAt string must be a valid date', 'updatedAt');
-      }
-    }
 
     if (typeof t.usageCount !== 'number' || t.usageCount < 0) {
       throw new ValidationError('usageCount must be a non-negative number', 'usageCount');
