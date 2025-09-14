@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CustomTask, WebsiteCategory, OutputFormat, UsageMetrics, WebsiteContext } from '../types';
+import { CustomTask, WebsiteCategory, OutputFormat, WebsiteContext } from '../types';
 import { TaskManager } from '../services/taskManager';
 import { ChromeStorageService } from '../services/storage';
 import {
   EditIcon,
   DeleteIcon,
   DuplicateIcon,
-  StatsIcon,
   CloseIcon,
   CheckIcon,
   ErrorIcon
@@ -19,26 +18,18 @@ import {
 interface TaskManagementProps {
   taskManager: TaskManager;
   storageService: ChromeStorageService;
-  onClose: () => void;
   websiteContext: WebsiteContext | null;
 }
 
 interface TaskLibraryViewProps {
   tasks: CustomTask[];
-  usageStats: Record<string, UsageMetrics>;
   onEdit: (task: CustomTask) => void;
   onDuplicate: (task: CustomTask) => void;
   onDelete: (taskId: string) => void;
   onToggle: (taskId: string, enabled: boolean) => void;
   onExport: (taskIds: string[]) => void;
-  onViewStats: (task: CustomTask) => void;
 }
 
-interface TaskStatsModalProps {
-  task: CustomTask;
-  stats: UsageMetrics | null;
-  onClose: () => void;
-}
 
 interface TaskExportModalProps {
   tasks: CustomTask[];
@@ -59,7 +50,7 @@ interface TaskCreateModalProps {
 }
 
 interface TaskOrganizationOptions {
-  sortBy: 'name' | 'created' | 'usage' | 'category';
+  sortBy: 'name' | 'created' | 'category';
   sortOrder: 'asc' | 'desc';
   groupBy: 'none' | 'category' | 'website' | 'tags';
   filterBy: {
@@ -90,22 +81,13 @@ function ensureDate(value: Date | string | undefined): Date {
 export const FullTaskManagement: React.FC<TaskManagementProps> = ({
   taskManager,
   storageService,
-  onClose,
   websiteContext
 }) => {
   const [tasks, setTasks] = useState<CustomTask[]>([]);
-  const [usageStats, setUsageStats] = useState<Record<string, UsageMetrics>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'library' | 'create' | 'stats' | 'export'>('library');
-  const [selectedTask, setSelectedTask] = useState<CustomTask | null>(null);
+  const [activeView, setActiveView] = useState<'library' | 'create' | 'export'>('library');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
-  const [organizationOptions, setOrganizationOptions] = useState<TaskOrganizationOptions>({
-    sortBy: 'name',
-    sortOrder: 'asc',
-    groupBy: 'none',
-    filterBy: {}
-  });
 
   // Load tasks and usage statistics
   const loadData = useCallback(async () => {
@@ -113,13 +95,8 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
       setLoading(true);
       setError(null);
 
-      const [tasksData, statsData] = await Promise.all([
-        taskManager.getAllTasks(),
-        storageService.getAllUsageStats()
-      ]);
-
+      const tasksData = await taskManager.getAllTasks();
       setTasks(Object.values(tasksData));
-      setUsageStats(statsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load tasks');
     } finally {
@@ -133,7 +110,7 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
 
   // Handle task operations
   const handleEdit = (task: CustomTask) => {
-    setSelectedTask(task);
+    // TODO: Implement edit functionality
     setActiveView('library'); // Stay in library view but show edit form
   };
 
@@ -173,10 +150,6 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
     setActiveView('export');
   };
 
-  const handleViewStats = (task: CustomTask) => {
-    setSelectedTask(task);
-    setActiveView('stats');
-  };
 
   const handleCreateTask = async (taskData: Omit<CustomTask, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => {
     try {
@@ -232,13 +205,6 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
 
   return (
     <div className="task-management">
-      <div className="task-management-header">
-        <h2>Task Management</h2>
-        <button className="btn btn-secondary close-button" onClick={onClose}>
-          <CloseIcon size={16} />
-        </button>
-      </div>
-      
       <div className="task-actions">
         <button
           className="btn btn-primary"
@@ -264,13 +230,11 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
       {activeView === 'library' && (
         <TaskLibraryView
           tasks={tasks}
-          usageStats={usageStats}
           onEdit={handleEdit}
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}
           onToggle={handleToggle}
           onExport={handleExport}
-          onViewStats={handleViewStats}
         />
       )}
 
@@ -282,13 +246,6 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
         />
       )}
 
-      {activeView === 'stats' && selectedTask && (
-        <TaskStatsModal
-          task={selectedTask}
-          stats={usageStats[selectedTask.id] || null}
-          onClose={() => setActiveView('library')}
-        />
-      )}
 
       {activeView === 'export' && (
         <TaskExportModal
@@ -309,13 +266,11 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
 
 const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
   tasks,
-  usageStats,
   onEdit,
   onDuplicate,
   onDelete,
   onToggle,
-  onExport,
-  onViewStats
+  onExport
 }) => {
   const [organizationOptions, setOrganizationOptions] = useState<TaskOrganizationOptions>({
     sortBy: 'name',
@@ -371,11 +326,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
         case 'created':
           comparison = ensureDate(a.createdAt).getTime() - ensureDate(b.createdAt).getTime();
           break;
-        case 'usage':
-          const aUsage = usageStats[a.id]?.usageCount || 0;
-          const bUsage = usageStats[b.id]?.usageCount || 0;
-          comparison = aUsage - bUsage;
-          break;
         case 'category':
           // Sort by first website pattern as category proxy
           const aCategory = a.websitePatterns[0] || '';
@@ -388,7 +338,7 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
     });
 
     return filteredTasks;
-  }, [tasks, organizationOptions, usageStats]);
+  }, [tasks, organizationOptions]);
 
   // Group tasks if grouping is enabled
   const groupedTasks = React.useMemo(() => {
@@ -480,7 +430,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
             >
               <option value="name">Name</option>
               <option value="created">Created Date</option>
-              <option value="usage">Usage Count</option>
               <option value="category">Category</option>
             </select>
             
@@ -578,7 +527,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
                 <TaskCard
                   key={task.id}
                   task={task}
-                  stats={usageStats[task.id]}
                   selected={selectedTaskIds.includes(task.id)}
                   showBulkActions={showBulkActions}
                   onSelect={(selected) => handleSelectTask(task.id, selected)}
@@ -586,7 +534,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
                   onDuplicate={() => onDuplicate(task)}
                   onDelete={() => onDelete(task.id)}
                   onToggle={(enabled) => onToggle(task.id, enabled)}
-                  onViewStats={() => onViewStats(task)}
                 />
               ))}
             </div>
@@ -609,7 +556,6 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
 
 interface TaskCardProps {
   task: CustomTask;
-  stats?: UsageMetrics;
   selected: boolean;
   showBulkActions: boolean;
   onSelect: (selected: boolean) => void;
@@ -617,20 +563,17 @@ interface TaskCardProps {
   onDuplicate: () => void;
   onDelete: () => void;
   onToggle: (enabled: boolean) => void;
-  onViewStats: () => void;
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({
   task,
-  stats,
   selected,
   showBulkActions,
   onSelect,
   onEdit,
   onDuplicate,
   onDelete,
-  onToggle,
-  onViewStats
+  onToggle
 }) => {
   return (
     <div className={`task-card ${!task.isEnabled ? 'disabled' : ''} ${selected ? 'selected' : ''}`}>
@@ -673,18 +616,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
             {task.tags.length > 3 && <span className="tag">+{task.tags.length - 3}</span>}
           </div>
         )}
-        
-        <div className="task-stats">
-          <span>Used: {stats?.usageCount || 0} times</span>
-          {stats && (
-            <span>Success: {Math.round(stats.successRate * 100)}%</span>
-          )}
-        </div>
-        
-        <div className="task-dates">
-          <small>Created: {ensureDate(task.createdAt).toLocaleDateString()}</small>
-          <small>Updated: {ensureDate(task.updatedAt).toLocaleDateString()}</small>
-        </div>
       </div>
       
       <div className="task-actions">
@@ -693,9 +624,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
         </button>
         <button className="btn btn-small btn-secondary" onClick={onDuplicate}>
           <DuplicateIcon size={14} /> Duplicate
-        </button>
-        <button className="btn btn-small btn-secondary" onClick={onViewStats}>
-          <StatsIcon size={14} /> Stats
         </button>
         <button className="btn btn-small btn-danger" onClick={onDelete}>
           <DeleteIcon size={14} /> Delete
@@ -1018,117 +946,6 @@ Please:
   );
 };
 
-// ============================================================================
-// TASK STATISTICS MODAL
-// ============================================================================
-
-const TaskStatsModal: React.FC<TaskStatsModalProps> = ({ task, stats, onClose }) => {
-  return (
-    <div className="modal-overlay">
-      <div className="modal task-stats-modal">
-        <div className="modal-header">
-          <h3><StatsIcon size={18} /> Task Statistics: {task.name}</h3>
-          <button className="btn btn-secondary" onClick={onClose}><CloseIcon size={16} /></button>
-        </div>
-        
-        <div className="modal-content">
-          {stats ? (
-            <div className="stats-grid">
-              <div className="stat-card">
-                <h4>Usage Count</h4>
-                <div className="stat-value">{stats.usageCount}</div>
-                <small>Total executions</small>
-              </div>
-              
-              <div className="stat-card">
-                <h4>Success Rate</h4>
-                <div className="stat-value">{Math.round(stats.successRate * 100)}%</div>
-                <small>Successful executions</small>
-              </div>
-              
-              <div className="stat-card">
-                <h4>Avg Execution Time</h4>
-                <div className="stat-value">{Math.round(stats.averageExecutionTime)}ms</div>
-                <small>Average response time</small>
-              </div>
-              
-              <div className="stat-card">
-                <h4>Error Count</h4>
-                <div className="stat-value">{stats.errorCount}</div>
-                <small>Failed executions</small>
-              </div>
-              
-              <div className="stat-card">
-                <h4>Last Used</h4>
-                <div className="stat-value">
-                  {stats.lastUsed ? ensureDate(stats.lastUsed).toLocaleDateString() : 'Never'}
-                </div>
-                <small>Most recent execution</small>
-              </div>
-              
-              <div className="stat-card">
-                <h4>Reliability Score</h4>
-                <div className="stat-value">
-                  {stats.usageCount > 0 ? Math.round((stats.successRate * 0.7 + (1 - stats.errorCount / stats.usageCount) * 0.3) * 100) : 0}%
-                </div>
-                <small>Overall performance</small>
-              </div>
-            </div>
-          ) : (
-            <div className="no-stats">
-              <p>No usage statistics available for this task.</p>
-              <small>Statistics will appear after the task has been executed.</small>
-            </div>
-          )}
-          
-          <div className="task-details">
-            <h4>Task Details</h4>
-            <div className="detail-grid">
-              <div className="detail-item">
-                <label>Created:</label>
-                <span>{ensureDate(task.createdAt).toLocaleString()}</span>
-              </div>
-              <div className="detail-item">
-                <label>Last Updated:</label>
-                <span>{ensureDate(task.updatedAt).toLocaleString()}</span>
-              </div>
-              <div className="detail-item">
-                <label>Output Format:</label>
-                <span>{task.outputFormat}</span>
-              </div>
-              <div className="detail-item">
-                <label>Website Patterns:</label>
-                <span>{task.websitePatterns.length} patterns</span>
-              </div>
-              <div className="detail-item">
-                <label>Tags:</label>
-                <span>{task.tags.length > 0 ? task.tags.join(', ') : 'None'}</span>
-              </div>
-              <div className="detail-item">
-                <label>Status:</label>
-                <span className={task.isEnabled ? 'enabled' : 'disabled'}>
-                  {task.isEnabled ? (
-                    <>
-                      <CheckIcon size={12} /> Enabled
-                    </>
-                  ) : (
-                    <>
-                      <ErrorIcon size={12} /> Disabled
-                    </>
-                  )}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="modal-footer">
-          <button className="btn btn-primary" onClick={onClose}>Close</button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ============================================================================
 // TASK EXPORT MODAL
