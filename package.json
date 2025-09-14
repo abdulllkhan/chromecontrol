@@ -35,6 +35,8 @@
     "validate": "npm run type-check && npm run lint && npm run test:run"
   },
   "dependencies": {
+    "dotenv": "^17.2.2",
+    "node-fetch": "^2.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

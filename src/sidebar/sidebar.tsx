@@ -753,10 +753,10 @@ User's follow-up question: ${userMessage}`;
                         <h4>Max Tokens</h4>
                         <div className="config-value">{aiConfig.maxTokens?.toLocaleString()}</div>
                       </div>
-                      
+
                       <div className="config-section">
-                        <h4>Temperature</h4>
-                        <div className="config-value">{aiConfig.temperature}</div>
+                        <h4>API Endpoint</h4>
+                        <div className="config-value" style={{ fontSize: '12px' }}>{aiConfig.baseUrl || 'Default'}</div>
                       </div>
                     </div>
                     
@@ -905,7 +905,6 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     apiKey: config?.apiKey || '',
     model: config?.model || (provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
     maxTokens: config?.maxTokens || 8000,
-    temperature: config?.temperature || 0.7,
     baseUrl: config?.baseUrl || (provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
   });
 
@@ -931,7 +930,6 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
           apiKey: config.apiKey || '',
           model: config.model || (newProvider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
           maxTokens: config.maxTokens || 8000,
-          temperature: config.temperature || 0.7,
           baseUrl: config.baseUrl || (newProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
         };
         
@@ -1026,9 +1024,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
       newErrors.maxTokens = 'Max tokens must be between 1 and 200000';
     }
 
-    if (formData.temperature < 0 || formData.temperature > 2) {
-      newErrors.temperature = 'Temperature must be between 0 and 2';
-    }
+    // Temperature validation removed - newer models don't support it
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -1089,34 +1085,40 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
   };
 
   return (
-    <div className="ai-config-modal">
-      <div className="modal-header">
+    <div className="fullscreen-ai-modal-container">
+      <div className="fullscreen-ai-modal-header">
         <h3>AI Configuration</h3>
-        <button onClick={onCancel} className="btn-close">
+        <button onClick={onCancel} className="modal-close-btn">
           <CloseIcon size={20} />
         </button>
       </div>
 
-      <div className="ai-config-info">
-        <p>Configure your AI service to enable intelligent suggestions and automation.</p>
-        <div className="info-box">
-          <strong>
-            {provider === 'openai' ? 'OpenAI' : 'Claude'} API Key Required
-          </strong>
-          <p>Get your API key from <a 
-            href={provider === 'openai' 
-              ? 'https://platform.openai.com/api-keys' 
-              : 'https://console.anthropic.com/'
-            } 
-            target="_blank" 
-            rel="noopener noreferrer"
-          >
-            {provider === 'openai' ? 'OpenAI Platform' : 'Anthropic Console'}
-          </a></p>
-        </div>
-      </div>
+      <div className="fullscreen-ai-modal-body">
+        <div className="ai-config-wrapper">
+          <div className="ai-config-info">
+            <p>Configure your AI service to enable intelligent suggestions and automation.</p>
+            <div className="info-alert">
+              <span className="alert-icon">i</span>
+              <div>
+                <strong>{provider === 'openai' ? 'OpenAI' : 'Claude'} API Key Required</strong>
+                <p>Get your API key from{' '}
+                  <a
+                    href={provider === 'openai'
+                      ? 'https://platform.openai.com/api-keys'
+                      : 'https://console.anthropic.com/'
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="api-link"
+                  >
+                    {provider === 'openai' ? 'OpenAI Platform' : 'Anthropic Console'}
+                  </a>
+                </p>
+              </div>
+            </div>
+          </div>
 
-      <form onSubmit={handleSubmit} className="ai-config-form">
+          <form onSubmit={handleSubmit} className="ai-config-form">
         <div className="form-section">
           <div className="form-section-title">
             Provider Selection
@@ -1129,7 +1131,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
             >
               <div className="provider-logo">OpenAI</div>
               <div className="provider-name">OpenAI</div>
-              <div className="provider-description">GPT-5, GPT-4.1, o4-mini</div>
+              <div className="provider-description">GPT-5, GPT-5 Mini, GPT-4o</div>
             </div>
             
             <div 
@@ -1159,14 +1161,18 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
                 className={errors.apiKey ? 'error' : ''}
                 placeholder={provider === 'openai' ? 'sk-...' : 'sk-ant-...'}
               />
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="password-toggle"
                 onClick={(e) => {
-                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                  input.type = input.type === 'password' ? 'text' : 'password';
-                  e.currentTarget.textContent = input.type === 'password' ? 'Show' : 'Hide';
+                  const input = document.getElementById('api-key') as HTMLInputElement;
+                  if (input) {
+                    const isPassword = input.type === 'password';
+                    input.type = isPassword ? 'text' : 'password';
+                    e.currentTarget.textContent = isPassword ? 'Hide' : 'Show';
+                  }
                 }}
+                title="Toggle visibility"
               >
                 Show
               </button>
@@ -1185,13 +1191,9 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
               {provider === 'openai' ? (
                 <>
                   <option value="gpt-5">GPT-5 (Latest)</option>
-                  <option value="gpt-4.1">GPT-4.1 (Enhanced)</option>
-                  <option value="o4-mini">o4 Mini (Fast & Efficient)</option>
-                  <option value="gpt-4o">GPT-4o (Legacy)</option>
-                  <option value="gpt-4o-mini">GPT-4o Mini (Legacy)</option>
-                  <option value="gpt-4">GPT-4 (Legacy)</option>
-                  <option value="gpt-4-turbo">GPT-4 Turbo (Legacy)</option>
-                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
+                  <option value="gpt-5-mini">GPT-5 Mini (Fast)</option>
+                  <option value="gpt-4o">GPT-4o (Optimized)</option>
+                  <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
                 </>
               ) : (
                 <>
@@ -1221,53 +1223,48 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         </div>
 
         <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="temperature">Temperature</label>
-            <input
-              id="temperature"
-              type="number"
-              step="0.1"
-              value={formData.temperature}
-              onChange={(e) => setFormData({ ...formData, temperature: parseFloat(e.target.value) })}
-              min="0"
-              max="2"
-              className={errors.temperature ? 'error' : ''}
-            />
-            {errors.temperature && <span className="error-text">{errors.temperature}</span>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="base-url">Base URL</label>
+          <div className="form-group" style={{ width: '100%' }}>
+            <label htmlFor="base-url">API Endpoint</label>
             <input
               id="base-url"
               type="url"
               value={formData.baseUrl}
               onChange={(e) => setFormData({ ...formData, baseUrl: e.target.value })}
               placeholder="https://api.example.com/v1"
+              style={{ width: '100%' }}
             />
+            <small style={{ color: '#999', fontSize: '12px' }}>
+              {provider === 'openai' ? 'Default: https://api.openai.com/v1' : 'Default: https://api.anthropic.com/v1'}
+            </small>
           </div>
         </div>
         </div>
 
-        <div className="form-actions">
-          <button type="button" onClick={onCancel} className="btn-cancel">Cancel</button>
-          <button
-            type="button"
-            onClick={handleTestConnection}
-            disabled={isTestingConnection}
-            className="btn-test"
-          >
-            {isTestingConnection ? 'Testing...' : 'Test Connection'}
-          </button>
-          <button type="submit" className="btn-save">Save Configuration</button>
+            {testResult && (
+              <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
+                {testResult.message}
+              </div>
+            )}
+          </form>
         </div>
+      </div>
 
-        {testResult && (
-          <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
-            {testResult.message}
-          </div>
-        )}
-      </form>
+      <div className="fullscreen-ai-modal-footer">
+        <button type="button" onClick={onCancel} className="btn btn-secondary">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleTestConnection}
+          disabled={isTestingConnection}
+          className="btn btn-warning"
+        >
+          {isTestingConnection ? 'Testing...' : 'Test Connection'}
+        </button>
+        <button onClick={handleSubmit} className="btn btn-primary">
+          Save Configuration
+        </button>
+      </div>
     </div>
   );
 };
