@@ -15,7 +15,8 @@ import {
   SecurityLevel,
   PageType,
   TaskType,
-  SecurityConstraints
+  SecurityConstraints,
+  AIConfiguration
 } from '../types';
 import type { TaskResult } from '../types';
 import {
@@ -65,6 +66,8 @@ interface SidebarState {
   error: string | null;
   hasAIConfig: boolean;
   activeTab: 'suggestions' | 'tasks' | 'ai' | 'settings';
+  aiConfigurations: AIConfiguration[];
+  activeAIConfigId: string | null;
 }
 
 interface AIConfigProps {
@@ -84,7 +87,9 @@ const SidebarApp: React.FC = () => {
     isLoading: true,
     error: null,
     hasAIConfig: false,
-    activeTab: 'suggestions'
+    activeTab: 'suggestions',
+    aiConfigurations: [],
+    activeAIConfigId: null
   });
 
   // Service instances
@@ -103,6 +108,7 @@ const SidebarApp: React.FC = () => {
   const [aiService, setAIService] = useState<AIService | null>(null);
   const [aiConfig, setAIConfig] = useState<AIServiceConfig | null>(null);
   const [provider, setProvider] = useState<'openai' | 'claude'>('openai');
+  const [editingConfigId, setEditingConfigId] = useState<string | null>(null);
 
   // Enhanced error handling
   const { error: globalError, retry, clearError, executeWithErrorHandling } = useErrorHandler({
@@ -166,9 +172,30 @@ const SidebarApp: React.FC = () => {
       console.log('🔍 SIDEBAR: Loading AI configuration from storage...');
       const preferences = await storageService.getUserPreferences();
       console.log('📋 SIDEBAR: Loaded preferences:', preferences);
-      const loadedAiConfig = preferences?.aiConfig || null;
+
+      // Load multiple configurations
+      const aiConfigurations = preferences?.aiConfigurations || [];
+      const activeAIConfigId = preferences?.activeAIConfigId || null;
+
+      // Find the active configuration
+      const activeConfig = aiConfigurations.find(c => c.id === activeAIConfigId);
+      let loadedAiConfig = null;
+
+      if (activeConfig) {
+        loadedAiConfig = {
+          apiKey: activeConfig.apiKey,
+          model: activeConfig.model,
+          maxTokens: activeConfig.maxTokens,
+          temperature: activeConfig.temperature,
+          baseUrl: activeConfig.baseUrl
+        } as AIServiceConfig;
+      } else {
+        // Fallback to old single config if exists
+        loadedAiConfig = preferences?.aiConfig || null;
+      }
+
       console.log('🔧 SIDEBAR: AI Config from storage:', loadedAiConfig);
-      const hasAIConfig = !!(loadedAiConfig?.apiKey);
+      const hasAIConfig = !!(loadedAiConfig?.apiKey) || aiConfigurations.length > 0;
       console.log('✅ SIDEBAR: AI Configured:', hasAIConfig);
       
       // Store the config in state for the AI config component
@@ -335,6 +362,8 @@ const SidebarApp: React.FC = () => {
         suggestions,
         tasks,
         hasAIConfig,
+        aiConfigurations,
+        activeAIConfigId,
         isLoading: false,
         error: null
       }));
@@ -486,7 +515,7 @@ User's follow-up question: ${userMessage}`;
   // Handle AI configuration
   const handleAISave = useCallback(async (config: AIServiceConfig) => {
     console.log('🎯 SIDEBAR: handleAISave called with config:', config);
-    
+
     if (!storageService) {
       console.error('❌ SIDEBAR: Storage service not available');
       setState(prev => ({ ...prev, error: 'Storage service not available' }));
@@ -497,23 +526,62 @@ User's follow-up question: ${userMessage}`;
     try {
       console.log('💾 SIDEBAR: Starting save process...');
       console.log('💾 SIDEBAR: Config to save:', JSON.stringify(config, null, 2));
-      
-      // Save AI config to user preferences
+
+      // Save AI config to user preferences in new format
       const preferences = await storageService.getUserPreferences();
       console.log('📋 SIDEBAR: Current preferences:', JSON.stringify(preferences, null, 2));
-      
+
+      // Create a new AI configuration
+      const newAIConfig: AIConfiguration = {
+        id: editingConfigId || `config_${Date.now()}`,
+        name: editingConfigId
+          ? state.aiConfigurations.find(c => c.id === editingConfigId)?.name || 'Updated Configuration'
+          : `Configuration ${(state.aiConfigurations?.length || 0) + 1}`,
+        provider: config.baseUrl?.includes('anthropic') ? 'claude' : 'openai',
+        apiKey: config.apiKey,
+        model: config.model,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature || 0.7,
+        baseUrl: config.baseUrl,
+        isActive: false,
+        createdAt: editingConfigId
+          ? state.aiConfigurations.find(c => c.id === editingConfigId)?.createdAt || new Date()
+          : new Date(),
+        updatedAt: new Date()
+      };
+
+      // Update or add the configuration
+      let updatedConfigs = [...(preferences.aiConfigurations || [])];
+      if (editingConfigId) {
+        const index = updatedConfigs.findIndex(c => c.id === editingConfigId);
+        if (index >= 0) {
+          updatedConfigs[index] = newAIConfig;
+        } else {
+          updatedConfigs.push(newAIConfig);
+        }
+      } else {
+        updatedConfigs.push(newAIConfig);
+      }
+
+      // If this is the first config or we're editing the active one, make it active
+      const activeConfigId = (!preferences.activeAIConfigId || editingConfigId === preferences.activeAIConfigId)
+        ? newAIConfig.id
+        : preferences.activeAIConfigId;
+
       const updatedPreferences = {
         ...preferences,
-        aiConfig: config
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: activeConfigId,
+        aiConfig: config // Keep backward compatibility
       };
       console.log('💾 SIDEBAR: Updated preferences to save:', JSON.stringify(updatedPreferences, null, 2));
-      
+
       await storageService.updateUserPreferences(updatedPreferences);
       console.log('✅ SIDEBAR: Preferences saved to storage');
-      
+
       // Verify the save
       const verifyPrefs = await storageService.getUserPreferences();
-      console.log('🔍 SIDEBAR: Verification - saved config:', verifyPrefs?.aiConfig);
+      console.log('🔍 SIDEBAR: Verification - saved configs:', verifyPrefs?.aiConfigurations);
       
       // Update local state
       console.log('🔧 SIDEBAR: Updating React state...');
@@ -523,11 +591,18 @@ User's follow-up question: ${userMessage}`;
       const newAIService = new AIService(config);
       setAIService(newAIService);
       
-      setState(prev => ({ ...prev, hasAIConfig: true, error: null }));
+      setState(prev => ({
+        ...prev,
+        hasAIConfig: true,
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: activeConfigId,
+        error: null
+      }));
       setShowAIConfig(false);
-      
+      setEditingConfigId(null);
+
       console.log('✅ SIDEBAR: AI configuration saved successfully!');
-      alert('AI Configuration saved successfully! Close and reopen sidebar to verify persistence.');
+      alert('AI Configuration saved successfully! The new configuration has been added.');
       
       // Reinitialize with new AI service
       await initializeSidebar();
@@ -549,6 +624,90 @@ User's follow-up question: ${userMessage}`;
       return false;
     }
   }, []);
+
+  const handleSetActiveConfig = useCallback(async (configId: string) => {
+    if (!storageService) return;
+
+    try {
+      const preferences = await storageService.getUserPreferences();
+      if (!preferences) return;
+
+      await storageService.updateUserPreferences({
+        ...preferences,
+        activeAIConfigId: configId
+      });
+
+      const activeConfig = state.aiConfigurations.find(c => c.id === configId);
+      if (activeConfig) {
+        const aiServiceConfig: AIServiceConfig = {
+          apiKey: activeConfig.apiKey,
+          model: activeConfig.model,
+          maxTokens: activeConfig.maxTokens,
+          temperature: activeConfig.temperature,
+          baseUrl: activeConfig.baseUrl
+        };
+        setAIConfig(aiServiceConfig);
+        setAIService(new AIService(aiServiceConfig));
+      }
+
+      setState(prev => ({
+        ...prev,
+        activeAIConfigId: configId,
+        hasAIConfig: true
+      }));
+    } catch (error) {
+      console.error('Failed to set active config:', error);
+    }
+  }, [storageService, state.aiConfigurations]);
+
+  const handleDeleteConfig = useCallback(async (configId: string) => {
+    if (!storageService) return;
+
+    try {
+      const preferences = await storageService.getUserPreferences();
+      if (!preferences) return;
+
+      const updatedConfigs = (preferences.aiConfigurations || []).filter(c => c.id !== configId);
+      let newActiveId = preferences.activeAIConfigId;
+
+      if (newActiveId === configId) {
+        newActiveId = updatedConfigs.length > 0 ? updatedConfigs[0].id : null;
+      }
+
+      await storageService.updateUserPreferences({
+        ...preferences,
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: newActiveId
+      });
+
+      setState(prev => ({
+        ...prev,
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: newActiveId,
+        hasAIConfig: updatedConfigs.length > 0
+      }));
+
+      if (newActiveId && updatedConfigs.length > 0) {
+        const activeConfig = updatedConfigs.find(c => c.id === newActiveId);
+        if (activeConfig) {
+          const aiServiceConfig: AIServiceConfig = {
+            apiKey: activeConfig.apiKey,
+            model: activeConfig.model,
+            maxTokens: activeConfig.maxTokens,
+            temperature: activeConfig.temperature,
+            baseUrl: activeConfig.baseUrl
+          };
+          setAIConfig(aiServiceConfig);
+          setAIService(new AIService(aiServiceConfig));
+        }
+      } else {
+        setAIConfig(null);
+        setAIService(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete config:', error);
+    }
+  }, [storageService]);
 
   // Render loading state
   if (state.isLoading) {
@@ -716,79 +875,114 @@ User's follow-up question: ${userMessage}`;
 
         {state.activeTab === 'ai' && (
           <div className="ai-panel">
-            {!state.hasAIConfig ? (
-              <div className="ai-setup">
-                <h3>AI Configuration Required</h3>
-                <p>Configure your AI service to enable intelligent suggestions and automation.</p>
+            <div className="ai-configurations-header">
+              <h3>AI Configurations</h3>
+              <button
+                className="add-config-button"
+                onClick={() => {
+                  setEditingConfigId(null);
+                  setShowAIConfig(true);
+                }}
+              >
+                + Add Configuration
+              </button>
+            </div>
+
+            {state.aiConfigurations.length === 0 ? (
+              <div className="ai-empty-state">
+                <p>No AI configurations yet.</p>
                 <button
                   className="setup-ai-button"
-                  onClick={() => setShowAIConfig(true)}
+                  onClick={() => {
+                    setEditingConfigId(null);
+                    setShowAIConfig(true);
+                  }}
                 >
-                  Configure AI Service
+                  Add Your First Configuration
                 </button>
               </div>
             ) : (
-              <div className="ai-status">
-                <div className="ai-status-header">
-                  <h3>AI Service Connected</h3>
-                  <span className="ai-status-badge">Active</span>
-                </div>
-                
-                {aiConfig && (
-                  <div className="ai-config-details">
-                    <div className="config-section">
-                      <h4>Provider</h4>
-                      <div className="config-value">
-                        {aiConfig.baseUrl?.includes('anthropic') || aiConfig.model?.includes('claude') ? 'Claude' : 'OpenAI'}
-                      </div>
-                    </div>
-                    
-                    <div className="config-section">
-                      <h4>Model</h4>
-                      <div className="config-value">{aiConfig.model}</div>
-                    </div>
-                    
-                    <div className="config-row">
-                      <div className="config-section">
-                        <h4>Max Tokens</h4>
-                        <div className="config-value">{aiConfig.maxTokens?.toLocaleString()}</div>
+              <div className="ai-configs-list">
+                {state.aiConfigurations.map((config) => {
+                  const isActive = config.id === state.activeAIConfigId;
+                  return (
+                    <div key={config.id} className={`ai-config-card ${isActive ? 'active' : ''}`}>
+                      <div className="config-header">
+                        <h4>{config.name}</h4>
+                        {isActive && <span className="active-badge">Active</span>}
                       </div>
 
-                      <div className="config-section">
-                        <h4>API Endpoint</h4>
-                        <div className="config-value" style={{ fontSize: '12px' }}>{aiConfig.baseUrl || 'Default'}</div>
+                      <div className="config-details">
+                        <div className="config-row">
+                          <div className="config-item">
+                            <span className="config-label">Provider</span>
+                            <span className="config-value">{config.provider}</span>
+                          </div>
+                          <div className="config-item">
+                            <span className="config-label">Model</span>
+                            <span className="config-value">{config.model}</span>
+                          </div>
+                        </div>
+                        <div className="config-row">
+                          <div className="config-item">
+                            <span className="config-label">Max Tokens</span>
+                            <span className="config-value">{config.maxTokens?.toLocaleString()}</span>
+                          </div>
+                          <div className="config-item">
+                            <span className="config-label">Temperature</span>
+                            <span className="config-value">{config.temperature}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="config-actions">
+                        {!isActive && (
+                          <button
+                            className="activate-button"
+                            onClick={() => handleSetActiveConfig(config.id)}
+                          >
+                            Activate
+                          </button>
+                        )}
+                        <button
+                          className="edit-button"
+                          onClick={() => {
+                            setEditingConfigId(config.id);
+                            setShowAIConfig(true);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="delete-button"
+                          onClick={() => {
+                            if (confirm(`Delete configuration "${config.name}"?`)) {
+                              handleDeleteConfig(config.id);
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
+                        <button
+                          className="test-button"
+                          onClick={async () => {
+                            const testConfig: AIServiceConfig = {
+                              apiKey: config.apiKey,
+                              model: config.model,
+                              maxTokens: config.maxTokens,
+                              temperature: config.temperature,
+                              baseUrl: config.baseUrl
+                            };
+                            const success = await handleAITest(testConfig);
+                            alert(success ? 'Connection test successful!' : 'Connection test failed!');
+                          }}
+                        >
+                          Test
+                        </button>
                       </div>
                     </div>
-                    
-                    <div className="config-section">
-                      <h4>Status</h4>
-                      <div className="config-value">
-                        {aiConfig.apiKey ? 'API Key Configured' : 'No API Key'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="ai-actions">
-                  <button
-                    className="reconfigure-ai-button"
-                    onClick={() => setShowAIConfig(true)}
-                  >
-                    Update Configuration
-                  </button>
-                  
-                  <button
-                    className="test-ai-button"
-                    onClick={async () => {
-                      if (aiConfig) {
-                        const success = await handleAITest(aiConfig);
-                        alert(success ? 'Connection test successful!' : 'Connection test failed!');
-                      }
-                    }}
-                  >
-                    Test Connection
-                  </button>
-                </div>
+                  );
+                })}
               </div>
             )}
           </div>

@@ -775,7 +775,7 @@
     background: rgba(255, 255, 255, 0.95) !important;
     color: #2d3748 !important;
   }
-  
+
   .pattern-form .form-group input,
   .pattern-form .form-group textarea,
   .pattern-form .form-group select {
@@ -783,4 +783,196 @@
     color: #2d3748 !important;
     border: 1px solid #e1e5e9 !important;
   }
+}
+
+/* ============================================================================
+   AI CONFIGURATIONS STYLES
+   ============================================================================ */
+
+.ai-configurations {
+  padding: 16px;
+}
+
+.ai-configurations h4 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.config-add-section {
+  margin-bottom: 20px;
+}
+
+.config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.config-item {
+  background: white;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.config-item:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1);
+}
+
+.config-item.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.config-info {
+  margin-bottom: 12px;
+}
+
+.config-info h5 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #1a202c;
+}
+
+.config-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.config-badge.provider {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.config-badge.model {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.config-badge.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.config-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+  border: none;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+/* AI Config Form Styles */
+.ai-config-form {
+  background: white;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.ai-config-form .form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.ai-config-form .form-header h4 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.ai-config-form .form-content {
+  padding: 20px;
+}
+
+.ai-config-form .form-group {
+  margin-bottom: 16px;
+}
+
+.ai-config-form .form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.ai-config-form .form-group input[type="text"],
+.ai-config-form .form-group input[type="password"],
+.ai-config-form .form-group input[type="url"],
+.ai-config-form .form-group select {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #1a202c;
+  transition: border-color 0.2s;
+}
+
+.ai-config-form .form-group input[type="range"] {
+  width: 100%;
+}
+
+.ai-config-form .form-group input:focus,
+.ai-config-form .form-group select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.ai-config-form .form-group small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.ai-config-form .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 14px;
 }

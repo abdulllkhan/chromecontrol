@@ -4,7 +4,8 @@ import {
   WebsiteCategory,
   SecurityLevel,
   CustomPattern,
-  PrivacySettings
+  PrivacySettings,
+  AIConfiguration
 } from '../types';
 import { ChromeStorageService } from '../services/storage';
 
@@ -515,6 +516,309 @@ const CategoryPreferencesComponent: React.FC<CategoryPreferencesProps> = ({
 };
 
 // ============================================================================
+// COMPONENT: AI Configuration Management
+// ============================================================================
+
+interface AIConfigurationManagerProps {
+  configurations: AIConfiguration[];
+  activeConfigId: string | null;
+  onSave: (config: AIConfiguration) => void;
+  onDelete: (configId: string) => void;
+  onSetActive: (configId: string) => void;
+}
+
+const AIConfigurationManager: React.FC<AIConfigurationManagerProps> = ({
+  configurations,
+  activeConfigId,
+  onSave,
+  onDelete,
+  onSetActive
+}) => {
+  const [showForm, setShowForm] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<AIConfiguration | null>(null);
+  const [formData, setFormData] = useState({
+    id: '',
+    name: '',
+    provider: 'openai' as 'openai' | 'claude' | 'local',
+    apiKey: '',
+    model: 'gpt-5',
+    maxTokens: 8000,
+    temperature: 0.7,
+    baseUrl: 'https://api.openai.com/v1',
+    isActive: false,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  });
+
+  const handleAdd = () => {
+    setEditingConfig(null);
+    setFormData({
+      id: `config_${Date.now()}`,
+      name: '',
+      provider: 'openai',
+      apiKey: '',
+      model: 'gpt-5',
+      maxTokens: 8000,
+      temperature: 0.7,
+      baseUrl: 'https://api.openai.com/v1',
+      isActive: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    setShowForm(true);
+  };
+
+  const handleEdit = (config: AIConfiguration) => {
+    setEditingConfig(config);
+    setFormData({
+      id: config.id,
+      name: config.name,
+      provider: config.provider,
+      apiKey: config.apiKey,
+      model: config.model || 'gpt-5',
+      maxTokens: config.maxTokens || 8000,
+      temperature: config.temperature || 0.7,
+      baseUrl: config.baseUrl || 'https://api.openai.com/v1',
+      isActive: config.isActive,
+      createdAt: config.createdAt,
+      updatedAt: new Date()
+    });
+    setShowForm(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.apiKey) return;
+
+    onSave(formData as AIConfiguration);
+    setShowForm(false);
+    setEditingConfig(null);
+  };
+
+  const handleCancel = () => {
+    setShowForm(false);
+    setEditingConfig(null);
+  };
+
+  const getModelOptions = (provider: string) => {
+    switch (provider) {
+      case 'openai':
+        return (
+          <>
+            <option value="gpt-5">GPT-5 (Latest)</option>
+            <option value="gpt-5-mini">GPT-5 Mini (Fast)</option>
+            <option value="gpt-4o">GPT-4o (Optimized)</option>
+            <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
+          </>
+        );
+      case 'claude':
+        return (
+          <>
+            <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Latest)</option>
+            <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
+            <option value="claude-3-opus-20240229">Claude 3 Opus (Most Capable)</option>
+            <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (Balanced)</option>
+            <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast)</option>
+          </>
+        );
+      default:
+        return <option value="">Enter custom model</option>;
+    }
+  };
+
+  if (showForm) {
+    return (
+      <div className="ai-config-form">
+        <div className="form-header">
+          <h4>{editingConfig ? 'Edit Configuration' : 'Add AI Configuration'}</h4>
+          <button className="btn btn-secondary btn-small" onClick={handleCancel}>
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="form-content">
+          <div className="form-group">
+            <label htmlFor="config-name">Configuration Name *</label>
+            <input
+              id="config-name"
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g., Production OpenAI"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="config-provider">Provider</label>
+            <select
+              id="config-provider"
+              value={formData.provider}
+              onChange={(e) => setFormData({
+                ...formData,
+                provider: e.target.value as 'openai' | 'claude' | 'local',
+                model: e.target.value === 'openai' ? 'gpt-5' :
+                       e.target.value === 'claude' ? 'claude-3-5-sonnet-20241022' : ''
+              })}
+            >
+              <option value="openai">OpenAI</option>
+              <option value="claude">Claude</option>
+              <option value="local">Local Model</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="config-apikey">API Key *</label>
+            <input
+              id="config-apikey"
+              type="password"
+              value={formData.apiKey}
+              onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+              placeholder="sk-..."
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="config-model">Model</label>
+            {formData.provider === 'local' ? (
+              <input
+                id="config-model"
+                type="text"
+                value={formData.model}
+                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                placeholder="Local model path or identifier"
+              />
+            ) : (
+              <select
+                id="config-model"
+                value={formData.model}
+                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+              >
+                {getModelOptions(formData.provider)}
+              </select>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="config-maxtokens">
+              Max Tokens: {formData.maxTokens}
+            </label>
+            <input
+              id="config-maxtokens"
+              type="range"
+              min="100"
+              max="16000"
+              step="100"
+              value={formData.maxTokens}
+              onChange={(e) => setFormData({ ...formData, maxTokens: parseInt(e.target.value) })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="config-temperature">
+              Temperature: {formData.temperature}
+            </label>
+            <input
+              id="config-temperature"
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              value={formData.temperature}
+              onChange={(e) => setFormData({ ...formData, temperature: parseFloat(e.target.value) })}
+            />
+            <small>Higher values make output more creative but less focused</small>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="config-baseurl">API Endpoint</label>
+            <input
+              id="config-baseurl"
+              type="url"
+              value={formData.baseUrl}
+              onChange={(e) => setFormData({ ...formData, baseUrl: e.target.value })}
+              placeholder="https://api.openai.com/v1"
+            />
+          </div>
+
+          <div className="form-actions">
+            <button type="button" className="btn btn-secondary" onClick={handleCancel}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary">
+              {editingConfig ? 'Update Configuration' : 'Add Configuration'}
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ai-configurations">
+      <h4>AI Configurations</h4>
+
+      <div className="config-add-section">
+        <button className="btn btn-primary" onClick={handleAdd}>
+          + Add Configuration
+        </button>
+      </div>
+
+      {configurations.length === 0 ? (
+        <div className="empty-state">
+          <p>No AI configurations yet. Add one to get started!</p>
+        </div>
+      ) : (
+        <div className="config-list">
+          {configurations.map(config => (
+            <div key={config.id} className={`config-item ${config.id === activeConfigId ? 'active' : ''}`}>
+              <div className="config-info">
+                <h5>{config.name}</h5>
+                <div className="config-meta">
+                  <span className="config-badge provider">{config.provider}</span>
+                  <span className="config-badge model">{config.model}</span>
+                  {config.id === activeConfigId && (
+                    <span className="config-badge active">✓ Active</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="config-actions">
+                {config.id !== activeConfigId && (
+                  <button
+                    className="btn btn-primary btn-small"
+                    onClick={() => onSetActive(config.id)}
+                  >
+                    Activate
+                  </button>
+                )}
+                <button
+                  className="btn btn-secondary btn-small"
+                  onClick={() => handleEdit(config)}
+                >
+                  Edit
+                </button>
+                <button
+                  className="btn btn-danger btn-small"
+                  onClick={() => {
+                    if (confirm(`Delete configuration "${config.name}"?`)) {
+                      onDelete(config.id);
+                    }
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -523,7 +827,7 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'categories' | 'patterns' | 'privacy' | 'automation' | 'general'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'patterns' | 'privacy' | 'automation' | 'ai' | 'general'>('categories');
   const [showPatternForm, setShowPatternForm] = useState(false);
   const [editingPattern, setEditingPattern] = useState<CustomPattern | undefined>();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -586,9 +890,60 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
 
   const updatePreferences = (updates: Partial<UserPreferences>) => {
     if (!preferences) return;
-    
+
     setPreferences({ ...preferences, ...updates });
     setHasUnsavedChanges(true);
+  };
+
+  const handleAIConfigSave = (config: AIConfiguration) => {
+    if (!preferences) return;
+
+    const existingConfigs = preferences.aiConfigurations || [];
+    const existingIndex = existingConfigs.findIndex(c => c.id === config.id);
+
+    let updatedConfigs: AIConfiguration[];
+    if (existingIndex >= 0) {
+      updatedConfigs = [...existingConfigs];
+      updatedConfigs[existingIndex] = config;
+    } else {
+      updatedConfigs = [...existingConfigs, config];
+    }
+
+    // If this is the first config or it's set as active, make it the active one
+    const activeConfigId = config.isActive || !preferences.activeAIConfigId
+      ? config.id
+      : preferences.activeAIConfigId;
+
+    updatePreferences({
+      aiConfigurations: updatedConfigs,
+      activeAIConfigId: activeConfigId
+    });
+  };
+
+  const handleAIConfigDelete = (configId: string) => {
+    if (!preferences) return;
+
+    const existingConfigs = preferences.aiConfigurations || [];
+    const updatedConfigs = existingConfigs.filter(c => c.id !== configId);
+
+    // If deleting the active config, activate another one
+    let newActiveId = preferences.activeAIConfigId;
+    if (newActiveId === configId) {
+      newActiveId = updatedConfigs.length > 0 ? updatedConfigs[0].id : null;
+    }
+
+    updatePreferences({
+      aiConfigurations: updatedConfigs,
+      activeAIConfigId: newActiveId
+    });
+  };
+
+  const handleAIConfigSetActive = (configId: string) => {
+    if (!preferences) return;
+
+    updatePreferences({
+      activeAIConfigId: configId
+    });
   };
 
   const handlePatternSave = (patternData: Omit<CustomPattern, 'id'>) => {
@@ -699,6 +1054,12 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
             Automation
           </button>
           <button
+            className={`tab ${activeTab === 'ai' ? 'active' : ''}`}
+            onClick={() => setActiveTab('ai')}
+          >
+            AI
+          </button>
+          <button
             className={`tab ${activeTab === 'general' ? 'active' : ''}`}
             onClick={() => setActiveTab('general')}
           >
@@ -793,54 +1154,20 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
             />
           )}
 
+          {activeTab === 'ai' && (
+            <AIConfigurationManager
+              configurations={preferences.aiConfigurations || []}
+              activeConfigId={preferences.activeAIConfigId || null}
+              onSave={handleAIConfigSave}
+              onDelete={handleAIConfigDelete}
+              onSetActive={handleAIConfigSetActive}
+            />
+          )}
+
           {activeTab === 'general' && (
             <div className="general-settings">
               <h4>General Settings</h4>
 
-              <div className="settings-group">
-                <h5>AI Provider</h5>
-                <select
-                  value={preferences.aiProvider}
-                  onChange={(e) => updatePreferences({ aiProvider: e.target.value })}
-                  className="setting-select"
-                >
-                  <option value="openai">OpenAI</option>
-                  <option value="claude">Claude</option>
-                  <option value="local">Local Model</option>
-                </select>
-                {/* <small>Choose your preferred AI service provider</small> */}
-              </div>
-
-              <div className="settings-group">
-                <h5>AI Model</h5>
-                {preferences.aiProvider === 'openai' ? (
-                  <select
-                    className="setting-select"
-                    defaultValue="gpt-5"
-                  >
-                    <option value="gpt-5">GPT-5 (Latest)</option>
-                    <option value="gpt-5-mini">GPT-5 Mini (Fast)</option>
-                    <option value="gpt-4o">GPT-4o (Optimized)</option>
-                    <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
-                  </select>
-                ) : preferences.aiProvider === 'claude' ? (
-                  <select
-                    className="setting-select"
-                    defaultValue="claude-3-5-sonnet-20241022"
-                  >
-                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Latest)</option>
-                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
-                    <option value="claude-3-opus-20240229">Claude 3 Opus (Most Capable)</option>
-                    <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (Balanced)</option>
-                    <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast)</option>
-                  </select>
-                ) : (
-                  <select className="setting-select" disabled>
-                    <option>Select AI Provider First</option>
-                  </select>
-                )}
-                {/* <small>Select the AI model to use for suggestions and analysis</small> */}
-              </div>
 
               <div className="settings-group">
                 <h5>Theme</h5>

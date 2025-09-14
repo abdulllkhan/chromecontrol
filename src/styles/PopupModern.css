@@ -13,12 +13,14 @@
   --color-secondary: #8b5cf6;
   --color-secondary-dark: #7c3aed;
   --color-secondary-light: #a78bfa;
-  
+  --color-secondary-bg: #f3e8ff;
+
   --color-success: #10b981;
   --color-success-bg: #d1fae5;
   --color-warning: #f59e0b;
   --color-warning-bg: #fef3c7;
   --color-error: #ef4444;
+  --color-error-dark: #dc2626;
   --color-error-bg: #fee2e2;
   
   --color-bg-primary: #ffffff;
@@ -1127,4 +1129,136 @@ input:checked + .toggle-slider:before {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ============================================================================
+   AI CONFIGURATION MANAGER STYLES
+   ============================================================================ */
+
+.ai-config-manager {
+  padding: var(--spacing-lg);
+}
+
+.config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-xl);
+}
+
+.config-header h2 {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.config-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.config-item {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  transition: all var(--transition-base);
+}
+
+.config-item:hover {
+  border-color: var(--color-primary-light);
+  box-shadow: var(--shadow-sm);
+}
+
+.config-item.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
+
+.config-info {
+  margin-bottom: var(--spacing-md);
+}
+
+.config-info h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.config-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.provider-badge,
+.model-badge,
+.active-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.provider-badge {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+.model-badge {
+  background: var(--color-secondary-bg);
+  color: var(--color-secondary);
+}
+
+.active-badge {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.config-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.config-footer {
+  margin-top: var(--spacing-xl);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-danger {
+  background: var(--color-error);
+  color: var(--color-text-inverse);
+}
+
+.btn-danger:hover {
+  background: var(--color-error-dark);
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--spacing-3xl) var(--spacing-xl);
+  color: var(--color-text-secondary);
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: var(--font-size-base);
+}
+
+/* Dark theme adjustments for AI Config Manager */
+[data-theme="dark"] .config-item {
+  background: var(--color-bg-secondary);
+}
+
+[data-theme="dark"] .config-item.active {
+  background: rgba(99, 102, 241, 0.1);
 }
