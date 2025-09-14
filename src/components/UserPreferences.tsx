@@ -816,11 +816,11 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
                 {preferences.aiProvider === 'openai' ? (
                   <select
                     className="setting-select"
-                    defaultValue="gpt-5"
+                    defaultValue="gpt-4o"
                   >
-                    <option value="gpt-5">GPT-5 (Latest)</option>
-                    <option value="gpt-4.1">GPT-4.1 (Enhanced)</option>
-                    <option value="o4-mini">o4 Mini (Fast & Efficient)</option>
+                    <option value="gpt-4o">GPT-4o (Optimized)</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
+                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
                     <option value="gpt-4o">GPT-4o (Legacy)</option>
                     <option value="gpt-4o-mini">GPT-4o Mini (Legacy)</option>
                     <option value="gpt-4">GPT-4 (Legacy)</option>

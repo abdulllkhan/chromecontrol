@@ -343,7 +343,7 @@ interface AIConfigViewProps {
 const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onTest }) => {
   const [formData, setFormData] = useState({
     apiKey: config?.apiKey || '',
-    model: config?.model || 'gpt-5',
+    model: config?.model || 'gpt-4o',
     maxTokens: config?.maxTokens || 8000,
     temperature: config?.temperature || 0.7,
     baseUrl: config?.baseUrl || 'https://api.openai.com/v1'
@@ -407,14 +407,11 @@ const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onTest }) =
               value={formData.model}
               onChange={(e) => setFormData({ ...formData, model: e.target.value })}
             >
-              <option value="gpt-5">GPT-5 (Latest)</option>
-              <option value="gpt-4.1">GPT-4.1 (Enhanced)</option>
-              <option value="o4-mini">o4 Mini (Fast & Efficient)</option>
-              <option value="gpt-4o">GPT-4o (Legacy)</option>
-              <option value="gpt-4o-mini">GPT-4o Mini (Legacy)</option>
-              <option value="gpt-4">GPT-4 (Legacy)</option>
-              <option value="gpt-4-turbo">GPT-4 Turbo (Legacy)</option>
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
+              <option value="gpt-4o">GPT-4o (Optimized)</option>
+              <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
+              <option value="gpt-4-turbo">GPT-4 Turbo</option>
+              <option value="gpt-4">GPT-4</option>
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
             </select>
           </div>
 

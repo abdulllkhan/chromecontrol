@@ -139,7 +139,7 @@ export class AIProviderService {
       case 'openai':
         return {
           provider: 'openai',
-          models: ['gpt-5', 'gpt-4.1', 'o4-mini', 'gpt-4o', 'gpt-4o-mini', 'gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+          models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'],
           maxTokens: 200000,
           supportedFeatures: ['text-generation', 'analysis', 'automation', 'streaming']
         };

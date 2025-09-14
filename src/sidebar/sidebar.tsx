@@ -903,7 +903,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
   });
   const [formData, setFormData] = useState({
     apiKey: config?.apiKey || '',
-    model: config?.model || (provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
+    model: config?.model || (provider === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20241022'),
     maxTokens: config?.maxTokens || 8000,
     temperature: config?.temperature || 0.7,
     baseUrl: config?.baseUrl || (provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
@@ -929,7 +929,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         
         const newFormData = {
           apiKey: config.apiKey || '',
-          model: config.model || (newProvider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
+          model: config.model || (newProvider === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20241022'),
           maxTokens: config.maxTokens || 8000,
           temperature: config.temperature || 0.7,
           baseUrl: config.baseUrl || (newProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
@@ -991,7 +991,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     setFormData(prev => {
       const newFormData = {
         ...prev,
-        model: provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022',
+        model: provider === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20241022',
         baseUrl: provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1',
         // Preserve API key from config if available, otherwise keep current
         apiKey: config?.apiKey || prev.apiKey
@@ -1135,7 +1135,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
             >
               <div className="provider-logo">OpenAI</div>
               <div className="provider-name">OpenAI</div>
-              <div className="provider-description">GPT-5, GPT-4.1, o4-mini</div>
+              <div className="provider-description">GPT-4o, GPT-4 Turbo, GPT-3.5</div>
             </div>
             
             <div 
@@ -1194,14 +1194,11 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
             >
               {provider === 'openai' ? (
                 <>
-                  <option value="gpt-5">GPT-5 (Latest)</option>
-                  <option value="gpt-4.1">GPT-4.1 (Enhanced)</option>
-                  <option value="o4-mini">o4 Mini (Fast & Efficient)</option>
-                  <option value="gpt-4o">GPT-4o (Legacy)</option>
-                  <option value="gpt-4o-mini">GPT-4o Mini (Legacy)</option>
-                  <option value="gpt-4">GPT-4 (Legacy)</option>
-                  <option value="gpt-4-turbo">GPT-4 Turbo (Legacy)</option>
-                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
+                  <option value="gpt-4o">GPT-4o (Optimized)</option>
+                  <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
+                  <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                  <option value="gpt-4">GPT-4</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
                 </>
               ) : (
                 <>
