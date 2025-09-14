@@ -294,7 +294,7 @@
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 12px;
-  padding: 16px;
+  padding: 12px;
   transition: all 0.2s ease;
   position: relative;
   backdrop-filter: blur(10px);
@@ -330,7 +330,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .task-name {
@@ -370,17 +370,17 @@
 
 .task-description {
   color: #6b7280;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.4;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 /* Task Meta */
 .task-meta {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 6px;
+  margin-bottom: 10px;
   font-size: 12px;
 }
 
@@ -420,11 +420,20 @@
   color: #9ca3af;
 }
 
-/* Task Actions */
-.task-actions {
+/* Task Card Actions */
+.task-card .task-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: row;
+  gap: 4px;
+  width: auto;
+  align-items: stretch;
+  margin-top: 8px;
+  justify-content: flex-start;
+}
+
+
+.task-card .task-actions .btn svg {
+  flex-shrink: 0;
 }
 
 .btn {
@@ -446,6 +455,23 @@
   font-size: 11px;
 }
 
+/* Override for task card buttons to ensure proper alignment */
+.task-card .task-actions .btn.btn-small {
+  flex: 0 0 auto !important;
+  min-width: auto !important;
+  max-width: none !important;
+  width: auto !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  height: 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+}
+
 .btn-primary {
   background: #3b82f6;
   color: white;
@@ -458,13 +484,13 @@
 }
 
 .btn-secondary {
-  background: #f3f4f6;
+  background: #ffffff;
   color: #374151;
   border-color: #d1d5db;
 }
 
 .btn-secondary:hover {
-  background: #e5e7eb;
+  background: #f9fafb;
   border-color: #9ca3af;
 }
 
@@ -477,6 +503,26 @@
 .btn-danger:hover {
   background: #dc2626;
   border-color: #dc2626;
+}
+
+/* Specific styles for task card buttons */
+.task-card .btn-secondary {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
+.task-card .btn-secondary:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.task-card .btn-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.task-card .btn-danger:hover {
+  background: #b91c1c;
 }
 
 .btn:disabled {
@@ -959,7 +1005,7 @@
 }
 
 @media (max-width: 480px) {
-  .task-actions {
+  .task-management > .task-actions {
     flex-direction: column;
   }
   
