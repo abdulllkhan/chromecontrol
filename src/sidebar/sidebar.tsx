@@ -1141,7 +1141,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         console.log('🔧 SIDEBAR: Detected provider:', newProvider);
         
         const newFormData = {
-          apiKey: config.apiKey || '',
+          apiKey: '', // Never display existing API key for security
           model: config.model || (newProvider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
           maxTokens: config.maxTokens || 8000,
           baseUrl: config.baseUrl || (newProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')

@@ -574,7 +574,7 @@ const AIConfigurationManager: React.FC<AIConfigurationManagerProps> = ({
       id: config.id,
       name: config.name,
       provider: config.provider,
-      apiKey: config.apiKey,
+      apiKey: '', // Never display existing API key for security
       model: config.model || 'gpt-5',
       maxTokens: config.maxTokens || 8000,
       temperature: config.temperature || 0.7,
@@ -588,9 +588,18 @@ const AIConfigurationManager: React.FC<AIConfigurationManagerProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.apiKey) return;
+    if (!formData.name) return;
 
-    onSave(formData as AIConfiguration);
+    // When editing, preserve existing API key if user left it empty (for security)
+    const configToSave = {
+      ...formData,
+      apiKey: formData.apiKey.trim() || (editingConfig?.apiKey || '')
+    };
+
+    // Only proceed if we have an API key (either new or existing)
+    if (!configToSave.apiKey) return;
+
+    onSave(configToSave as AIConfiguration);
     setShowForm(false);
     setEditingConfig(null);
   };
@@ -674,8 +683,8 @@ const AIConfigurationManager: React.FC<AIConfigurationManagerProps> = ({
               type="password"
               value={formData.apiKey}
               onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-              placeholder="sk-..."
-              required
+              placeholder={editingConfig ? "Leave empty to keep existing key" : "sk-..."}
+              required={!editingConfig}
             />
           </div>
 
@@ -929,7 +938,7 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
     // If deleting the active config, activate another one
     let newActiveId = preferences.activeAIConfigId;
     if (newActiveId === configId) {
-      newActiveId = updatedConfigs.length > 0 ? updatedConfigs[0].id : null;
+      newActiveId = updatedConfigs.length > 0 ? updatedConfigs[0].id : undefined;
     }
 
     updatePreferences({
