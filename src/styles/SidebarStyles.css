@@ -2193,3 +2193,185 @@
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(159, 122, 234, 0.3);
 }
+
+/* ============================================================================
+   IMPROVED FORM STYLES - COMPACT VERSION
+   ============================================================================ */
+
+.form-section {
+  padding: 4px !important;
+  margin-bottom: 4px !important;
+}
+
+.input-wrapper {
+  position: relative;
+  margin-top: 4px;
+}
+
+.styled-input {
+  width: calc(100% - 8px);
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  box-sizing: border-box;
+}
+
+.styled-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+  background: #fafbff;
+}
+
+.styled-input.error {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.styled-input::placeholder {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.input-hint {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.required-star {
+  color: #ef4444;
+  font-weight: normal;
+  margin-left: 2px;
+  font-size: 11px;
+}
+
+.select-wrapper {
+  position: relative;
+  margin-top: 4px;
+}
+
+.styled-select {
+  width: calc(100% - 8px);
+  padding: 6px 30px 6px 8px;
+  font-size: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+  appearance: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  box-sizing: border-box;
+}
+
+.styled-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+  background: #fafbff;
+}
+
+.styled-select:hover {
+  border-color: #d1d5db;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #6b7280;
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.select-wrapper:hover .select-arrow {
+  color: #4b5563;
+}
+
+.styled-select:focus ~ .select-arrow {
+  color: #667eea;
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.provider-info {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.info-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  color: #4b5563;
+}
+
+.info-badge.openai {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #15803d;
+}
+
+.info-badge.claude {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+}
+
+.badge-icon {
+  font-size: 8px;
+}
+
+.form-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+/* Fix AI config form specific styles */
+.ai-config-form .form-section {
+  background: #f9fafb;
+  border-radius: 6px;
+  padding: 4px !important;
+  margin-bottom: 4px !important;
+}
+
+.ai-config-wrapper {
+  padding: 4px !important;
+}
+
+.fullscreen-ai-modal-body {
+  padding: 4px !important;
+}
+
+.ai-config-info {
+  padding: 4px !important;
+  margin-bottom: 4px !important;
+}
+
+.ai-config-info p {
+  font-size: 11px;
+  margin: 2px 0;
+}
+
+.info-alert {
+  padding: 4px !important;
+  font-size: 10px;
+}

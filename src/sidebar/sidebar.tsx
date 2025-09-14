@@ -72,7 +72,8 @@ interface SidebarState {
 
 interface AIConfigProps {
   config?: AIServiceConfig;
-  onSave: (config: AIServiceConfig) => void;
+  configName?: string;
+  onSave: (config: AIServiceConfig, name: string) => void;
   onCancel: () => void;
   onTest: (config: AIServiceConfig) => Promise<boolean>;
 }
@@ -513,7 +514,7 @@ User's follow-up question: ${userMessage}`;
   }, [chatInput, aiService, isProcessingChat, currentExecutingSuggestion, testResult, chatMessages, state.websiteContext]);
 
   // Handle AI configuration
-  const handleAISave = useCallback(async (config: AIServiceConfig) => {
+  const handleAISave = useCallback(async (config: AIServiceConfig, configName?: string) => {
     console.log('🎯 SIDEBAR: handleAISave called with config:', config);
 
     if (!storageService) {
@@ -534,9 +535,9 @@ User's follow-up question: ${userMessage}`;
       // Create a new AI configuration
       const newAIConfig: AIConfiguration = {
         id: editingConfigId || `config_${Date.now()}`,
-        name: editingConfigId
+        name: configName || (editingConfigId
           ? state.aiConfigurations.find(c => c.id === editingConfigId)?.name || 'Updated Configuration'
-          : `Configuration ${(state.aiConfigurations?.length || 0) + 1}`,
+          : `Configuration ${(state.aiConfigurations?.length || 0) + 1}`),
         provider: config.baseUrl?.includes('anthropic') ? 'claude' : 'openai',
         apiKey: config.apiKey,
         model: config.model,
@@ -550,16 +551,20 @@ User's follow-up question: ${userMessage}`;
         updatedAt: new Date()
       };
 
-      // Update or add the configuration
-      let updatedConfigs = [...(preferences.aiConfigurations || [])];
+      // Update or add the configuration - use state.aiConfigurations as source of truth
+      let updatedConfigs = [...(state.aiConfigurations || [])];
       if (editingConfigId) {
         const index = updatedConfigs.findIndex(c => c.id === editingConfigId);
         if (index >= 0) {
+          // Update existing configuration
           updatedConfigs[index] = newAIConfig;
         } else {
+          // This shouldn't happen, but handle it gracefully
+          console.warn('Configuration to edit not found, adding as new');
           updatedConfigs.push(newAIConfig);
         }
       } else {
+        // Add new configuration
         updatedConfigs.push(newAIConfig);
       }
 
@@ -612,7 +617,7 @@ User's follow-up question: ${userMessage}`;
       setState(prev => ({ ...prev, error: errorMessage }));
       alert('Failed to save configuration: ' + errorMessage);
     }
-  }, [storageService, initializeSidebar]);
+  }, [storageService, initializeSidebar, state.aiConfigurations, editingConfigId]);
 
   const handleAITest = useCallback(async (config: AIServiceConfig): Promise<boolean> => {
     try {
@@ -1069,10 +1074,25 @@ User's follow-up question: ${userMessage}`;
       {showAIConfig && storageService && (
         <div className="modal-overlay">
           <AIConfigComponent
-            key={aiConfig?.apiKey ? `configured-${aiConfig.apiKey.substring(0, 8)}` : 'unconfigured'}
-            config={aiConfig || undefined}
+            key={editingConfigId || 'new'}
+            config={editingConfigId ? (() => {
+              const editConfig = state.aiConfigurations.find(c => c.id === editingConfigId);
+              return editConfig ? {
+                apiKey: editConfig.apiKey,
+                model: editConfig.model,
+                maxTokens: editConfig.maxTokens,
+                temperature: editConfig.temperature,
+                baseUrl: editConfig.baseUrl
+              } as AIServiceConfig : undefined;
+            })() : undefined}
+            configName={editingConfigId
+              ? state.aiConfigurations.find(c => c.id === editingConfigId)?.name
+              : ''}
             onSave={handleAISave}
-            onCancel={() => setShowAIConfig(false)}
+            onCancel={() => {
+              setShowAIConfig(false);
+              setEditingConfigId(null);
+            }}
             onTest={handleAITest}
           />
         </div>
@@ -1084,6 +1104,7 @@ User's follow-up question: ${userMessage}`;
 // AI Configuration Component (simplified version of popup component)
 const AIConfigComponent: React.FC<AIConfigProps> = ({
   config,
+  configName,
   onSave,
   onCancel,
   onTest
@@ -1095,6 +1116,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     }
     return 'openai';
   });
+  const [name, setName] = useState(configName || '');
   const [formData, setFormData] = useState({
     apiKey: config?.apiKey || '',
     model: config?.model || (provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
@@ -1228,14 +1250,20 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     e.preventDefault();
     console.log('🚀 SIDEBAR: Save button clicked!');
     console.log('📝 SIDEBAR: Form data to save:', formData);
-    
+    console.log('📝 SIDEBAR: Configuration name:', name);
+
+    if (!name.trim()) {
+      setErrors({ ...errors, name: 'Configuration name is required' });
+      return;
+    }
+
     if (validateForm()) {
       console.log('✅ SIDEBAR: Form validation passed');
       setTestResult({ success: true, message: 'Saving configuration...' });
-      
+
       try {
-        console.log('💾 SIDEBAR: Calling onSave with config:', formData);
-        await onSave(formData as AIServiceConfig);
+        console.log('💾 SIDEBAR: Calling onSave with config and name:', formData, name);
+        await onSave(formData as AIServiceConfig, name.trim());
         console.log('✅ SIDEBAR: onSave completed successfully');
         setTestResult({ success: true, message: 'Configuration saved successfully!' });
         
@@ -1315,27 +1343,67 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
           <form onSubmit={handleSubmit} className="ai-config-form">
         <div className="form-section">
           <div className="form-section-title">
-            Provider Selection
+            Configuration Name <span className="required-star">*</span>
           </div>
-          
-          <div className="provider-selection">
-            <div 
-              className={`provider-option ${provider === 'openai' ? 'selected' : ''}`}
-              onClick={() => setProvider('openai')}
-            >
-              <div className="provider-logo">OpenAI</div>
-              <div className="provider-name">OpenAI</div>
-              <div className="provider-description">GPT-5, GPT-5 Mini, GPT-4o</div>
+          <div className="input-wrapper">
+            <input
+              type="text"
+              className={`form-input styled-input ${errors.name ? 'error' : ''}`}
+              placeholder="Give your configuration a descriptive name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (errors.name) {
+                  setErrors({ ...errors, name: '' });
+                }
+              }}
+              autoFocus
+            />
+            <div className="input-hint">
+              {name ? `${name.length}/50 characters` : 'e.g., "Production API", "Development Testing"'}
             </div>
-            
-            <div 
-              className={`provider-option ${provider === 'claude' ? 'selected' : ''}`}
-              onClick={() => setProvider('claude')}
+          </div>
+          {errors.name && <div className="error-message">{errors.name}</div>}
+        </div>
+
+        <div className="form-section">
+          <div className="form-section-title">
+            AI Provider <span className="required-star">*</span>
+          </div>
+
+          <div className="select-wrapper">
+            <select
+              className="form-select styled-select"
+              value={provider}
+              onChange={(e) => {
+                const newProvider = e.target.value as 'openai' | 'claude';
+                setProvider(newProvider);
+                // Update default values based on provider
+                setFormData(prev => ({
+                  ...prev,
+                  model: newProvider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022',
+                  baseUrl: newProvider === 'openai'
+                    ? 'https://api.openai.com/v1'
+                    : 'https://api.anthropic.com/v1'
+                }));
+              }}
             >
-              <div className="provider-logo">Claude</div>
-              <div className="provider-name">Claude</div>
-              <div className="provider-description">Anthropic AI Assistant</div>
-            </div>
+              <option value="openai">OpenAI (GPT-5, GPT-4o, GPT-5 Mini)</option>
+              <option value="claude">Claude (Anthropic AI Assistant)</option>
+            </select>
+            <div className="select-arrow">▼</div>
+          </div>
+
+          <div className="provider-info">
+            {provider === 'openai' ? (
+              <span className="info-badge openai">
+                OpenAI API
+              </span>
+            ) : (
+              <span className="info-badge claude">
+                Anthropic API
+              </span>
+            )}
           </div>
         </div>
 
