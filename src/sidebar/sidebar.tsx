@@ -753,10 +753,10 @@ User's follow-up question: ${userMessage}`;
                         <h4>Max Tokens</h4>
                         <div className="config-value">{aiConfig.maxTokens?.toLocaleString()}</div>
                       </div>
-                      
+
                       <div className="config-section">
-                        <h4>Temperature</h4>
-                        <div className="config-value">{aiConfig.temperature}</div>
+                        <h4>API Endpoint</h4>
+                        <div className="config-value" style={{ fontSize: '12px' }}>{aiConfig.baseUrl || 'Default'}</div>
                       </div>
                     </div>
                     
