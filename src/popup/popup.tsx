@@ -905,9 +905,8 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
   const [provider, setProvider] = useState<'openai' | 'claude'>('openai');
   const [formData, setFormData] = useState({
     apiKey: config?.apiKey || '',
-    model: config?.model || (provider === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20241022'),
+    model: config?.model || (provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
     maxTokens: config?.maxTokens || 8000,
-    temperature: config?.temperature || 0.7,
     baseUrl: config?.baseUrl || (provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
   });
 
@@ -931,9 +930,8 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         
         const newFormData = {
           apiKey: config.apiKey || '',
-          model: config.model || (newProvider === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20241022'),
+          model: config.model || (newProvider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
           maxTokens: config.maxTokens || 8000,
-          temperature: config.temperature || 0.7,
           baseUrl: config.baseUrl || (newProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
         };
         
@@ -993,7 +991,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     setFormData(prev => {
       const newFormData = {
         ...prev,
-        model: provider === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20241022',
+        model: provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022',
         baseUrl: provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1',
         // Preserve API key from config if available, otherwise keep current
         apiKey: config?.apiKey || prev.apiKey
@@ -1018,9 +1016,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
       newErrors.maxTokens = 'Max tokens must be between 1 and 200000';
     }
 
-    if (formData.temperature < 0 || formData.temperature > 2) {
-      newErrors.temperature = 'Temperature must be between 0 and 2';
-    }
+    // Temperature validation removed - newer models don't support it
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -1037,7 +1033,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         apiKey: formData.apiKey.trim(),
         model: formData.model,
         maxTokens: formData.maxTokens,
-        temperature: formData.temperature,
+        // Temperature removed - not supported by newer models
         baseUrl: formData.baseUrl
       };
 
@@ -1134,11 +1130,10 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
             >
               {provider === 'openai' ? (
                 <>
+                  <option value="gpt-5">GPT-5 (Latest)</option>
+                  <option value="gpt-5-mini">GPT-5 Mini (Fast)</option>
                   <option value="gpt-4o">GPT-4o (Optimized)</option>
                   <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
-                  <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                  <option value="gpt-4">GPT-4</option>
-                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
                 </>
               ) : (
                 <>
@@ -1168,31 +1163,17 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         </div>
 
         <div className="form-group">
-          <label htmlFor="temperature">
-            Temperature ({formData.temperature})
-            <small>Controls randomness: 0 = focused, 2 = creative</small>
-          </label>
-          <input
-            id="temperature"
-            type="range"
-            min="0"
-            max="2"
-            step="0.1"
-            value={formData.temperature}
-            onChange={(e) => setFormData({ ...formData, temperature: parseFloat(e.target.value) })}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="base-url">Base URL (Advanced)</label>
+          <label htmlFor="base-url">API Endpoint</label>
           <input
             id="base-url"
             type="url"
             value={formData.baseUrl}
             onChange={(e) => setFormData({ ...formData, baseUrl: e.target.value })}
-            placeholder="https://api.openai.com/v1"
+            placeholder={provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1'}
           />
-          <small>Leave default unless using a custom endpoint</small>
+          <small style={{ color: '#999', fontSize: '12px' }}>
+            {provider === 'openai' ? 'Default: https://api.openai.com/v1' : 'Default: https://api.anthropic.com/v1'}
+          </small>
         </div>
 
         {testResult && (

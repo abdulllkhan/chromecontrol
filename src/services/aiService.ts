@@ -82,7 +82,7 @@ export class AIService {
   constructor(config: AIServiceConfig) {
     this.config = {
       baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini', // Use a valid, cost-effective model
+      model: 'gpt-5-mini', // Use the fast, cost-effective GPT-5 model
       maxTokens: 4000,
       temperature: 0.7,
       timeout: 30000,
@@ -289,7 +289,7 @@ export class AIService {
       }
 
       // Try with the configured model first, then fallback
-      const modelsToTry = [this.config.model, 'gpt-4o', 'gpt-4o-mini'];
+      const modelsToTry = [this.config.model, 'gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini'];
       
       for (const model of modelsToTry) {
         const result = await this.tryTestWithModel(model);
@@ -322,7 +322,7 @@ export class AIService {
       };
 
       // Newer models have different parameter requirements
-      if (model.includes('gpt-4o') || model.includes('o1')) {
+      if (model.includes('gpt-5') || model.includes('gpt-4o') || model.includes('o1')) {
         testRequest.max_completion_tokens = 5;
         // Newer models only support default temperature (1), so don't include it
       } else {
@@ -602,7 +602,8 @@ export class AIService {
    */
   private buildAPIRequest(prompt: string, request: AIRequest): any {
     // Use the correct token parameter based on the model
-    const isNewerModel = this.config.model.includes('gpt-4o') ||
+    const isNewerModel = this.config.model.includes('gpt-5') ||
+                        this.config.model.includes('gpt-4o') ||
                         this.config.model.includes('o1');
     
     const apiRequest: any = {
@@ -1086,7 +1087,7 @@ export function createAIService(config: AIServiceConfig): AIService {
  */
 export const DEFAULT_AI_CONFIG: Omit<AIServiceConfig, 'apiKey'> = {
   baseUrl: 'https://api.openai.com/v1',
-  model: 'gpt-4o-mini', // Use the same reliable, cost-effective model
+  model: 'gpt-5-mini', // Use the same reliable, cost-effective model
   maxTokens: 4000,
   temperature: 0.7,
   timeout: 30000,
@@ -1102,11 +1103,10 @@ export const DEFAULT_AI_CONFIG: Omit<AIServiceConfig, 'apiKey'> = {
  * Available OpenAI models with their configurations
  */
 export const AVAILABLE_MODELS = {
+  'gpt-5': { maxTokens: 200000, name: 'GPT-5 (Latest)' },
+  'gpt-5-mini': { maxTokens: 150000, name: 'GPT-5 Mini (Fast)' },
   'gpt-4o': { maxTokens: 128000, name: 'GPT-4o (Optimized)' },
-  'gpt-4o-mini': { maxTokens: 128000, name: 'GPT-4o Mini (Fast)' },
-  'gpt-4-turbo': { maxTokens: 128000, name: 'GPT-4 Turbo' },
-  'gpt-4': { maxTokens: 8192, name: 'GPT-4' },
-  'gpt-3.5-turbo': { maxTokens: 16384, name: 'GPT-3.5 Turbo' }
+  'gpt-4o-mini': { maxTokens: 128000, name: 'GPT-4o Mini (Fast)' }
 } as const;
 
 export function getModelMaxTokens(model: string): number {

@@ -343,9 +343,8 @@ interface AIConfigViewProps {
 const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onTest }) => {
   const [formData, setFormData] = useState({
     apiKey: config?.apiKey || '',
-    model: config?.model || 'gpt-4o',
+    model: config?.model || 'gpt-5',
     maxTokens: config?.maxTokens || 8000,
-    temperature: config?.temperature || 0.7,
     baseUrl: config?.baseUrl || 'https://api.openai.com/v1'
   });
   
@@ -407,11 +406,10 @@ const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onTest }) =
               value={formData.model}
               onChange={(e) => setFormData({ ...formData, model: e.target.value })}
             >
+              <option value="gpt-5">GPT-5 (Latest)</option>
+              <option value="gpt-5-mini">GPT-5 Mini (Fast)</option>
               <option value="gpt-4o">GPT-4o (Optimized)</option>
               <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
-              <option value="gpt-4-turbo">GPT-4 Turbo</option>
-              <option value="gpt-4">GPT-4</option>
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
             </select>
           </div>
 
@@ -431,20 +429,16 @@ const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onTest }) =
           </div>
 
           <div className="form-group">
-            <label className="form-label">
-              Temperature: {formData.temperature}
-            </label>
+            <label className="form-label">API Endpoint</label>
             <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.1"
-              value={formData.temperature}
-              onChange={(e) => setFormData({ ...formData, temperature: parseFloat(e.target.value) })}
+              type="url"
               className="form-input"
+              placeholder="https://api.openai.com/v1"
+              value={formData.baseUrl}
+              onChange={(e) => setFormData({ ...formData, baseUrl: e.target.value })}
             />
             <div className="form-helper">
-              0 = Focused, 2 = Creative
+              Default: https://api.openai.com/v1
             </div>
           </div>
 
