@@ -908,7 +908,15 @@ User's follow-up question: ${userMessage}`;
               </div>
             ) : (
               <div className="ai-configs-list">
-                {state.aiConfigurations.map((config) => {
+                {state.aiConfigurations
+                  .sort((a, b) => {
+                    // Active configuration first
+                    if (a.id === state.activeAIConfigId) return -1;
+                    if (b.id === state.activeAIConfigId) return 1;
+                    // Then sort by creation date (newest first)
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                  })
+                  .map((config) => {
                   const isActive = config.id === state.activeAIConfigId;
                   return (
                     <div key={config.id} className={`ai-config-card ${isActive ? 'active' : ''}`}>
@@ -926,16 +934,6 @@ User's follow-up question: ${userMessage}`;
                           <div className="config-item">
                             <span className="config-label">Model</span>
                             <span className="config-value">{config.model}</span>
-                          </div>
-                        </div>
-                        <div className="config-row">
-                          <div className="config-item">
-                            <span className="config-label">Max Tokens</span>
-                            <span className="config-value">{config.maxTokens?.toLocaleString()}</span>
-                          </div>
-                          <div className="config-item">
-                            <span className="config-label">Temperature</span>
-                            <span className="config-value">{config.temperature}</span>
                           </div>
                         </div>
                       </div>
@@ -1296,14 +1294,40 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         success,
         message: success ? 'Connection successful!' : 'Connection failed'
       });
+
+      // Auto-hide message after delay
+      const delay = success ? 3000 : 5000;
+      const timeoutId = setTimeout(() => {
+        setTestResult(null);
+      }, delay);
+
+      // Store timeout ID for potential cleanup
+      (window as any).testResultTimeout = timeoutId;
     } catch (error) {
       setTestResult({
         success: false,
         message: 'Test failed: ' + (error instanceof Error ? error.message : 'Unknown error')
       });
+
+      // Auto-hide error message after 5 seconds
+      const timeoutId = setTimeout(() => {
+        setTestResult(null);
+      }, 5000);
+
+      // Store timeout ID for potential cleanup
+      (window as any).testResultTimeout = timeoutId;
     } finally {
       setIsTestingConnection(false);
     }
+  };
+
+  const dismissTestResult = () => {
+    // Clear any existing timeout
+    if ((window as any).testResultTimeout) {
+      clearTimeout((window as any).testResultTimeout);
+      delete (window as any).testResultTimeout;
+    }
+    setTestResult(null);
   };
 
   return (
@@ -1503,8 +1527,22 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         </div>
 
             {testResult && (
-              <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
-                {testResult.message}
+              <div className={`test-notification ${testResult.success ? 'success' : 'error'}`}>
+                <div className="test-notification-content">
+                  <span className="test-notification-icon">
+                    {testResult.success ? '✓' : '✗'}
+                  </span>
+                  <span className="test-notification-message">
+                    {testResult.message}
+                  </span>
+                  <button
+                    className="test-notification-dismiss"
+                    onClick={dismissTestResult}
+                    aria-label="Dismiss notification"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
             )}
           </form>
