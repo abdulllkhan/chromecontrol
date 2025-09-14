@@ -11,6 +11,7 @@
   border-radius: 0;
   box-shadow: none;
   overflow: hidden;
+  position: relative;
 }
 
 .task-management.loading {
@@ -437,10 +438,10 @@
 }
 
 .btn {
-  padding: 6px 12px;
+  padding: 8px 16px;
   border: 1px solid transparent;
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: 6px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -448,6 +449,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .btn-small {
@@ -549,32 +553,40 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  width: 100%;
+  height: 100%;
+  background: white;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
+  align-items: stretch;
+  justify-content: stretch;
+  z-index: 9999;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
 }
 
 .modal {
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  max-width: 600px;
+  border-radius: 0;
+  box-shadow: none;
   width: 100%;
-  max-height: 90vh;
+  height: 100%;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
+  position: relative;
+  overflow: hidden;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
+  padding: 16px 20px;
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
+  background: white;
 }
 
 .modal-header h3 {
@@ -584,25 +596,48 @@
   color: #1f2937;
 }
 
+.modal-header .btn-secondary {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.modal-header .btn-secondary:hover {
+  background: #f3f4f6;
+}
+
 .modal-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  overflow-x: hidden;
+  padding: 20px;
+  min-height: 0;
+  background: white;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding: 16px 24px;
+  padding: 16px 20px;
   border-top: 1px solid #e5e7eb;
-  background: #f9fafb;
+  background: white;
   flex-shrink: 0;
 }
 
 /* Form Styles for Modals */
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  width: 100%;
 }
 
 .form-group label {
@@ -619,12 +654,14 @@
 .form-group textarea,
 .form-group select {
   width: 100%;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 14px;
   transition: all 0.2s ease;
   background: white;
+  box-sizing: border-box;
+  margin: 0;
 }
 
 .form-group input[type="text"]:hover,
@@ -785,6 +822,377 @@
 .detail-item span.disabled {
   color: #ef4444;
   font-weight: 500;
+}
+
+/* Create and Edit Task Modal Specific Styles */
+.create-task-modal,
+.edit-task-modal {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  max-width: none;
+}
+
+.create-task-modal .modal-content,
+.edit-task-modal .modal-content {
+  padding: 20px;
+  background: white;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.create-task-modal .form-group,
+.edit-task-modal .form-group {
+  margin-bottom: 12px;
+}
+
+.create-task-modal .form-group label,
+.edit-task-modal .form-group label {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.create-task-modal form,
+.edit-task-modal form {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.create-task-modal textarea,
+.edit-task-modal textarea {
+  min-height: 60px;
+  max-height: 120px;
+  resize: vertical;
+}
+
+.create-task-modal .form-group small,
+.edit-task-modal .form-group small {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.create-task-modal .form-actions,
+.edit-task-modal .form-actions {
+  margin-top: 16px;
+  padding-top: 12px;
+}
+
+/* ============================================================================
+   FULLSCREEN MODAL - NEW IMPLEMENTATION
+   ============================================================================ */
+
+.fullscreen-modal-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  z-index: 10000;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.fullscreen-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  height: 60px;
+  box-sizing: border-box;
+}
+
+.fullscreen-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+  color: #6b7280;
+}
+
+.modal-close-btn:hover {
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+.fullscreen-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px;
+  background: #fafafa;
+  min-height: 0;
+}
+
+.fullscreen-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.fullscreen-modal-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.fullscreen-modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.fullscreen-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.task-form {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.task-form .form-group {
+  margin-bottom: 0;
+  width: 100%;
+}
+
+.task-form .form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #374151;
+  font-size: 14px;
+}
+
+.task-form .form-group input[type="text"],
+.task-form .form-group input[type="email"],
+.task-form .form-group textarea,
+.task-form .form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  box-sizing: border-box;
+  margin: 0;
+  font-family: inherit;
+}
+
+.task-form .form-group textarea {
+  min-height: 80px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.task-form .form-group input:focus,
+.task-form .form-group textarea:focus,
+.task-form .form-group select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.task-form .form-group input.error,
+.task-form .form-group textarea.error,
+.task-form .form-group select.error {
+  border-color: #ef4444;
+}
+
+.task-form .form-group .error-text {
+  display: block;
+  margin-top: 4px;
+  color: #ef4444;
+  font-size: 12px;
+}
+
+.task-form .form-group small {
+  display: block;
+  margin-top: 4px;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.task-form .form-group input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+}
+
+.fullscreen-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  height: 70px;
+  box-sizing: border-box;
+}
+
+.fullscreen-modal-footer .btn {
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.fullscreen-modal-footer .btn-primary {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.fullscreen-modal-footer .btn-primary:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.fullscreen-modal-footer .btn-secondary {
+  background: white;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.fullscreen-modal-footer .btn-secondary:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+/* Modal Button Styling */
+.modal .btn-primary,
+.modal .btn-secondary {
+  min-width: 80px;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+/* Fix modal scrollbar and overflow */
+.modal-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Ensure modal takes full viewport in extension sidebar */
+body:has(.modal-overlay) {
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+/* Reset parent containers when modal is shown */
+#sidebar-root:has(.modal-overlay),
+.sidebar-container:has(.modal-overlay) {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Fix modal positioning to ignore parent transforms */
+.task-management .modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+/* Ensure forms don't overflow */
+.create-task-modal .form-group,
+.edit-task-modal .form-group {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.create-task-modal textarea,
+.edit-task-modal textarea {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Make sure modal content is scrollable */
+.create-task-modal .modal-content,
+.edit-task-modal .modal-content {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* Fix for form actions */
+.create-task-modal .form-actions,
+.edit-task-modal .form-actions {
+  position: sticky;
+  bottom: 0;
+  background: white;
+  padding: 16px 0;
+  margin-top: auto;
+  border-top: 1px solid #e5e7eb;
+}
+
+.modal .form-actions .btn {
+  height: 36px;
+}
+
+/* Ensure dropdowns in modals render properly */
+.modal select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 8px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-right: 32px;
 }
 
 /* Export Modal */

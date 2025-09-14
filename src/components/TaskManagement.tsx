@@ -824,17 +824,16 @@ Please:
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal create-task-modal">
-        <div className="modal-header">
-          <h3>Create New Task</h3>
-          <button className="btn btn-secondary" onClick={onCancel}>
-            <CloseIcon size={16} />
-          </button>
-        </div>
+    <div className="fullscreen-modal-container">
+      <div className="fullscreen-modal-header">
+        <h3>Create New Task</h3>
+        <button className="modal-close-btn" onClick={onCancel}>
+          <CloseIcon size={20} />
+        </button>
+      </div>
 
-        <div className="modal-content">
-          <form onSubmit={handleSubmit}>
+      <div className="fullscreen-modal-body">
+        <form onSubmit={handleSubmit} className="task-form">
             {/* Template Selection */}
             <div className="form-group">
               <label>Template:</label>
@@ -940,16 +939,16 @@ Please:
               <small>Separate multiple tags with commas</small>
             </div>
 
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={onCancel}>
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">
-                Create Task
-              </button>
-            </div>
-          </form>
-        </div>
+        </form>
+      </div>
+
+      <div className="fullscreen-modal-footer">
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          Cancel
+        </button>
+        <button className="btn btn-primary" onClick={handleSubmit}>
+          Create Task
+        </button>
       </div>
     </div>
   );
@@ -1036,17 +1035,16 @@ const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, onSave, onCancel })
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal edit-task-modal">
-        <div className="modal-header">
-          <h3>Edit Task</h3>
-          <button className="btn btn-secondary" onClick={onCancel}>
-            <CloseIcon size={16} />
-          </button>
-        </div>
+    <div className="fullscreen-modal-container">
+      <div className="fullscreen-modal-header">
+        <h3>Edit Task</h3>
+        <button className="modal-close-btn" onClick={onCancel}>
+          <CloseIcon size={20} />
+        </button>
+      </div>
 
-        <div className="modal-content">
-          <form onSubmit={handleSubmit}>
+      <div className="fullscreen-modal-body">
+        <form onSubmit={handleSubmit} className="task-form">
             {/* Task Name */}
             <div className="form-group">
               <label htmlFor="edit-task-name">Task Name *</label>
@@ -1146,16 +1144,16 @@ const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, onSave, onCancel })
               <small>Disabled tasks won't appear in suggestions</small>
             </div>
 
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={onCancel}>
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">
-                Save Changes
-              </button>
-            </div>
-          </form>
-        </div>
+        </form>
+      </div>
+
+      <div className="fullscreen-modal-footer">
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          Cancel
+        </button>
+        <button className="btn btn-primary" onClick={handleSubmit}>
+          Save Changes
+        </button>
       </div>
     </div>
   );
