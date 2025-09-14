@@ -1089,34 +1089,40 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
   };
 
   return (
-    <div className="ai-config-modal">
-      <div className="modal-header">
+    <div className="fullscreen-ai-modal-container">
+      <div className="fullscreen-ai-modal-header">
         <h3>AI Configuration</h3>
-        <button onClick={onCancel} className="btn-close">
+        <button onClick={onCancel} className="modal-close-btn">
           <CloseIcon size={20} />
         </button>
       </div>
 
-      <div className="ai-config-info">
-        <p>Configure your AI service to enable intelligent suggestions and automation.</p>
-        <div className="info-box">
-          <strong>
-            {provider === 'openai' ? 'OpenAI' : 'Claude'} API Key Required
-          </strong>
-          <p>Get your API key from <a 
-            href={provider === 'openai' 
-              ? 'https://platform.openai.com/api-keys' 
-              : 'https://console.anthropic.com/'
-            } 
-            target="_blank" 
-            rel="noopener noreferrer"
-          >
-            {provider === 'openai' ? 'OpenAI Platform' : 'Anthropic Console'}
-          </a></p>
-        </div>
-      </div>
+      <div className="fullscreen-ai-modal-body">
+        <div className="ai-config-wrapper">
+          <div className="ai-config-info">
+            <p>Configure your AI service to enable intelligent suggestions and automation.</p>
+            <div className="info-alert">
+              <span className="alert-icon">i</span>
+              <div>
+                <strong>{provider === 'openai' ? 'OpenAI' : 'Claude'} API Key Required</strong>
+                <p>Get your API key from{' '}
+                  <a
+                    href={provider === 'openai'
+                      ? 'https://platform.openai.com/api-keys'
+                      : 'https://console.anthropic.com/'
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="api-link"
+                  >
+                    {provider === 'openai' ? 'OpenAI Platform' : 'Anthropic Console'}
+                  </a>
+                </p>
+              </div>
+            </div>
+          </div>
 
-      <form onSubmit={handleSubmit} className="ai-config-form">
+          <form onSubmit={handleSubmit} className="ai-config-form">
         <div className="form-section">
           <div className="form-section-title">
             Provider Selection
@@ -1159,14 +1165,18 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
                 className={errors.apiKey ? 'error' : ''}
                 placeholder={provider === 'openai' ? 'sk-...' : 'sk-ant-...'}
               />
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="password-toggle"
                 onClick={(e) => {
-                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                  input.type = input.type === 'password' ? 'text' : 'password';
-                  e.currentTarget.textContent = input.type === 'password' ? 'Show' : 'Hide';
+                  const input = document.getElementById('api-key') as HTMLInputElement;
+                  if (input) {
+                    const isPassword = input.type === 'password';
+                    input.type = isPassword ? 'text' : 'password';
+                    e.currentTarget.textContent = isPassword ? 'Hide' : 'Show';
+                  }
                 }}
+                title="Toggle visibility"
               >
                 Show
               </button>
@@ -1249,25 +1259,31 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         </div>
         </div>
 
-        <div className="form-actions">
-          <button type="button" onClick={onCancel} className="btn-cancel">Cancel</button>
-          <button
-            type="button"
-            onClick={handleTestConnection}
-            disabled={isTestingConnection}
-            className="btn-test"
-          >
-            {isTestingConnection ? 'Testing...' : 'Test Connection'}
-          </button>
-          <button type="submit" className="btn-save">Save Configuration</button>
+            {testResult && (
+              <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
+                {testResult.message}
+              </div>
+            )}
+          </form>
         </div>
+      </div>
 
-        {testResult && (
-          <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
-            {testResult.message}
-          </div>
-        )}
-      </form>
+      <div className="fullscreen-ai-modal-footer">
+        <button type="button" onClick={onCancel} className="btn btn-secondary">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleTestConnection}
+          disabled={isTestingConnection}
+          className="btn btn-warning"
+        >
+          {isTestingConnection ? 'Testing...' : 'Test Connection'}
+        </button>
+        <button onClick={handleSubmit} className="btn btn-primary">
+          Save Configuration
+        </button>
+      </div>
     </div>
   );
 };
