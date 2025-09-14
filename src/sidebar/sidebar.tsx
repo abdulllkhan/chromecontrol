@@ -795,11 +795,11 @@ User's follow-up question: ${userMessage}`;
         )}
       </div>
 
-      {/* Single Chat Interface for Results */}
+      {/* Chat Interface for Task Results */}
       {testResult && (
         <div className="execution-result-overlay">
           <div className="execution-result-header">
-            <h3>{currentExecutingSuggestion?.title || 'Task Result'}</h3>
+            <h3>{currentExecutingSuggestion?.title || 'Task Chat'}</h3>
             <button className="close-result-btn" onClick={() => {
               setTestResult(null);
               setCurrentExecutingSuggestion(null);
@@ -810,9 +810,9 @@ User's follow-up question: ${userMessage}`;
             </button>
           </div>
           
-          {/* Single Chat Body - No separate sections */}
+          {/* Chat Only Body */}
           <div className="chat-only-body">
-            {/* All Messages in One Flow */}
+            {/* Chat Messages */}
             <div className="chat-messages">
               {chatMessages.map((message, index) => (
                 <div key={index} className={`chat-message ${message.role}`}>
@@ -838,7 +838,7 @@ User's follow-up question: ${userMessage}`;
                 placeholder="Ask a follow-up question..."
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                onKeyPress={(e) => {
+                onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSendChatMessage();
