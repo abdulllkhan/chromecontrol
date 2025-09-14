@@ -795,7 +795,7 @@ User's follow-up question: ${userMessage}`;
         )}
       </div>
 
-      {/* Single Chat Interface for Results */}
+      {/* Task Execution Result Modal with Chat Support */}
       {testResult && (
         <div className="execution-result-overlay">
           <div className="execution-result-header">
@@ -810,56 +810,96 @@ User's follow-up question: ${userMessage}`;
             </button>
           </div>
           
-          {/* Single Chat Body - No separate sections */}
-          <div className="chat-only-body">
-            {/* All Messages in One Flow */}
-            <div className="chat-messages">
-              {chatMessages.map((message, index) => (
-                <div key={index} className={`chat-message ${message.role}`}>
-                  <div className="message-content">
-                    {message.content}
+          {/* Main Output/Result Display */}
+          <div className="execution-main-body">
+            {/* Primary Output Section */}
+            <div className="output-section">
+              <div className="output-header">
+                <h4>Task Output</h4>
+                {testResult.success && (
+                  <span className="output-status success">✓ Success</span>
+                )}
+                {!testResult.success && (
+                  <span className="output-status error">✗ Failed</span>
+                )}
+              </div>
+              <div className="output-content">
+                {testResult.content && (
+                  <pre className="output-text">{testResult.content}</pre>
+                )}
+                {testResult.error && (
+                  <div className="output-error">
+                    <strong>Error:</strong> {testResult.error}
                   </div>
-                </div>
-              ))}
-              {isProcessingChat && (
-                <div className="chat-message assistant processing">
-                  <div className="message-content">
-                    <LoadingSpinner size="small" />
+                )}
+                {testResult.automationSummary && (
+                  <div className="output-summary">
+                    <strong>Summary:</strong> {testResult.automationSummary}
                   </div>
+                )}
+              </div>
+              <div className="output-meta">
+                <span>Execution time: {testResult.executionTime}ms</span>
+                <span>Format: {testResult.format}</span>
+              </div>
+            </div>
+            
+            {/* Chat Section - Secondary/Collapsible */}
+            <div className="chat-section">
+              <div className="chat-header">
+                <h4>Follow-up Chat</h4>
+                <span className="chat-badge">{chatMessages.length > 1 ? chatMessages.length - 1 : 0}</span>
+              </div>
+              
+              {/* Chat Messages */}
+              <div className="chat-messages">
+                {chatMessages.map((message, index) => (
+                  <div key={index} className={`chat-message ${message.role}`}>
+                    <div className="message-content">
+                      {message.content}
+                    </div>
+                  </div>
+                ))}
+                {isProcessingChat && (
+                  <div className="chat-message assistant processing">
+                    <div className="message-content">
+                      <LoadingSpinner size="small" />
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Chat Input */}
+              <div className="chat-input-container">
+                <input
+                  type="text"
+                  className="chat-input"
+                  placeholder="Ask a follow-up question..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendChatMessage();
+                    }
+                  }}
+                  disabled={isProcessingChat || !aiService}
+                />
+                <button
+                  className="chat-send-btn"
+                  onClick={handleSendChatMessage}
+                  disabled={isProcessingChat || !chatInput.trim() || !aiService}
+                >
+                  {isProcessingChat ? <LoadingSpinner size="small" /> : <SendIcon />}
+                </button>
+              </div>
+              
+              {!aiService && (
+                <div className="chat-warning">
+                  Please configure AI settings to use chat feature
                 </div>
               )}
             </div>
-            
-            {/* Chat Input */}
-            <div className="chat-input-container">
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ask a follow-up question..."
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendChatMessage();
-                  }
-                }}
-                disabled={isProcessingChat || !aiService}
-              />
-              <button
-                className="chat-send-btn"
-                onClick={handleSendChatMessage}
-                disabled={isProcessingChat || !chatInput.trim() || !aiService}
-              >
-                {isProcessingChat ? <LoadingSpinner size="small" /> : <SendIcon />}
-              </button>
-            </div>
-            
-            {!aiService && (
-              <div className="chat-warning">
-                Please configure AI settings to use chat feature
-              </div>
-            )}
           </div>
         </div>
       )}
