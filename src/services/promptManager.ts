@@ -62,7 +62,8 @@ export class PromptManager {
       maxVariableLength: 2000,
       allowedVariables: [
         'domain',
-        'pageTitle', 
+        'pageTitle',
+        'title', // Alias for pageTitle for user convenience
         'selectedText',
         'mainText',
         'headings',
@@ -173,6 +174,7 @@ export class PromptManager {
     const variableMap: Record<string, () => string> = {
       domain: () => context.domain,
       pageTitle: () => context.pageTitle,
+      title: () => context.pageTitle, // Alias for pageTitle for user convenience
       selectedText: () => context.selectedText || '',
       mainText: () => context.extractedContent.mainText,
       headings: () => context.extractedContent.headings.map(h => h.content).join('\n'),
@@ -550,6 +552,7 @@ export class PromptManager {
     const descriptions: Record<string, string> = {
       domain: 'Current website domain (e.g., example.com)',
       pageTitle: 'Title of the current web page',
+      title: 'Title of the current web page (alias for pageTitle)',
       selectedText: 'Text selected by the user on the page',
       mainText: 'Main text content extracted from the page',
       headings: 'All headings found on the page',

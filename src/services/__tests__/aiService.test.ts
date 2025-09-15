@@ -444,10 +444,11 @@ describe('AIError', () => {
     const error = new AIError('Test error', 'TEST_CODE');
     expect(error.retryable).toBe(false);
   });
-});  /
-/ ============================================================================
-  // ENHANCED AI SERVICE TESTS FOR MCP CONTEXT SUPPORT
-  // ============================================================================
+});
+
+// ============================================================================
+// ENHANCED AI SERVICE TESTS FOR MCP CONTEXT SUPPORT
+// ============================================================================
 
   describe('Enhanced AI Service with MCP Context', () => {
     beforeEach(() => {

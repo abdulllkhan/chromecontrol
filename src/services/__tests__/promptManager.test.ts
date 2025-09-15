@@ -358,7 +358,7 @@ describe('PromptManager', () => {
       debugManager.debugPromptExecution('test-task', 'prompt 2');
       
       const history = debugManager.getDebugHistory('test-task');
-      expect(history).toHaveLength(0); // Debug history is only stored during processCustomTaskPrompt
+      expect(history).toHaveLength(2); // Debug history is stored by debugPromptExecution calls
     });
 
     it('should clear debug history', () => {

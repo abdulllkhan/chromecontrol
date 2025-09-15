@@ -431,7 +431,7 @@ export class MCPServerManager {
    */
   private async startServerDiscovery(): Promise<void> {
     // Check server health every 30 seconds
-    this.discoveryInterval = window.setInterval(async () => {
+    this.discoveryInterval = setInterval(async () => {
       await this.performHealthChecks();
     }, 30000);
   }
