@@ -1,4 +1,7 @@
 // Background service worker for the Agentic Chrome Extension
+import { mcpService } from '../services/mcpService.js';
+import { WebsiteContext, PageContent, UserPreferences, CustomTask, MCPContext } from '../types/index.js';
+
 console.log('chromeControl background script loaded');
 
 // Handle extension icon click to open side panel
@@ -68,6 +71,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'MANAGE_STORAGE':
       handleStorageOperation(request, sender, sendResponse);
       break;
+    case 'BUILD_MCP_CONTEXT':
+      handleMCPContextBuilding(request, sender, sendResponse);
+      break;
+    case 'UPDATE_MCP_CONFIG':
+      handleMCPConfigUpdate(request, sender, sendResponse);
+      break;
     default:
       sendResponse({ success: false, message: 'Unknown message type' });
   }
@@ -108,6 +117,86 @@ async function handleStorageOperation(request: any, sender: chrome.runtime.Messa
     }
   } catch (error) {
     sendResponse({ success: false, error: error.message });
+  }
+}
+
+// MCP Context building handler
+async function handleMCPContextBuilding(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response: any) => void) {
+  try {
+    const { websiteContext, pageContent, includeUserPreferences, includeCustomTasks } = request;
+    
+    let userPreferences: UserPreferences | undefined;
+    let customTasks: CustomTask[] | undefined;
+    
+    // Load additional data if requested
+    if (includeUserPreferences) {
+      const result = await chrome.storage.local.get(['userPreferences']);
+      userPreferences = result.userPreferences;
+    }
+    
+    if (includeCustomTasks) {
+      const result = await chrome.storage.local.get(['customTasks']);
+      customTasks = result.customTasks ? Object.values(result.customTasks) : [];
+    }
+    
+    // Build MCP context
+    const mcpContext = await mcpService.buildMCPContext(
+      websiteContext,
+      pageContent,
+      userPreferences,
+      customTasks
+    );
+    
+    sendResponse({ 
+      success: true, 
+      mcpContext,
+      message: 'MCP context built successfully'
+    });
+  } catch (error) {
+    console.error('Failed to build MCP context:', error);
+    sendResponse({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      message: 'Failed to build MCP context'
+    });
+  }
+}
+
+// MCP Configuration update handler
+async function handleMCPConfigUpdate(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response: any) => void) {
+  try {
+    const { config, serverConfig, operation } = request;
+    
+    if (config) {
+      mcpService.updateConfig(config);
+    }
+    
+    if (serverConfig && operation) {
+      switch (operation) {
+        case 'add':
+          mcpService.addServerConfig(serverConfig);
+          break;
+        case 'remove':
+          mcpService.removeServerConfig(serverConfig.name);
+          break;
+        default:
+          throw new Error(`Unknown server config operation: ${operation}`);
+      }
+    }
+    
+    sendResponse({ 
+      success: true, 
+      config: mcpService.getConfig(),
+      serverConfigs: mcpService.getServerConfigs(),
+      message: 'MCP configuration updated successfully'
+    });
+  } catch (error) {
+    console.error('Failed to update MCP configuration:', error);
+    sendResponse({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      message: 'Failed to update MCP configuration'
+    });
   }
 }
 
