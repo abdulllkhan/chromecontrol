@@ -310,6 +310,86 @@ interface ErrorHandler {
 - Test on different operating systems
 - Verify accessibility compliance
 
+## MCP Integration Architecture
+
+### Model Context Protocol Implementation
+
+The extension will implement MCP (Model Context Protocol) patterns for structured context management:
+
+```typescript
+interface MCPContext {
+  resources: MCPResource[]
+  tools: MCPTool[]
+  prompts: MCPPrompt[]
+  metadata: MCPMetadata
+}
+
+interface MCPResource {
+  uri: string
+  name: string
+  description?: string
+  mimeType?: string
+  content: string | ArrayBuffer
+}
+
+interface MCPTool {
+  name: string
+  description: string
+  inputSchema: JSONSchema
+  handler: (args: any) => Promise<any>
+}
+```
+
+### Enhanced Prompt Management System
+
+**Purpose**: Properly handle custom task prompt templates and provide advanced templating capabilities.
+
+**Interface**:
+```typescript
+interface PromptManager {
+  processCustomTaskPrompt(task: CustomTask, context: ExecutionContext): Promise<string>
+  injectTemplateVariables(template: string, context: TemplateContext): string
+  validatePromptTemplate(template: string): ValidationResult
+  debugPromptExecution(taskId: string, finalPrompt: string): void
+}
+
+interface TemplateContext {
+  domain: string
+  pageTitle: string
+  selectedText?: string
+  extractedContent: CleanTextContent
+  userInput?: Record<string, any>
+}
+```
+
+### Intelligent Text Extraction Engine
+
+**Purpose**: Extract clean, structured content from web pages instead of raw HTML.
+
+**Interface**:
+```typescript
+interface TextExtractionEngine {
+  extractCleanContent(document: Document): CleanTextContent
+  extractSelectedContent(selection: Selection): CleanTextContent
+  identifyMainContent(document: Document): Element[]
+  removeNoiseElements(content: string): string
+}
+
+interface CleanTextContent {
+  mainText: string
+  headings: TextBlock[]
+  paragraphs: TextBlock[]
+  lists: ListBlock[]
+  metadata: ContentMetadata
+}
+
+interface TextBlock {
+  content: string
+  level?: number
+  context: string
+}
+```
+
 ## Implementation Considerations
 
 ### Chrome Extension Architecture
@@ -317,6 +397,24 @@ interface ErrorHandler {
 - Implement service worker for background processing
 - Use content scripts for page interaction
 - Leverage Chrome's storage and permissions APIs
+
+### MCP Integration Strategy
+- Implement MCP-compliant context structures
+- Support MCP server connections for external tools
+- Use structured resource and tool patterns
+- Maintain compatibility with existing AI services
+
+### Enhanced Prompt Processing
+- Fix custom task prompt template usage in AI requests
+- Implement template variable injection system
+- Add prompt validation and debugging capabilities
+- Ensure custom prompts override generic system prompts
+
+### Intelligent Content Extraction
+- Replace simple HTML text extraction with semantic parsing
+- Implement main content area detection algorithms
+- Add support for dynamic content and shadow DOM
+- Provide clean, structured text for AI processing
 
 ### AI Integration Strategy
 - Support multiple AI providers (OpenAI, Claude, local models)

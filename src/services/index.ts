@@ -44,6 +44,9 @@ export * from './lazyLoader.js';
 export * from './optimizedDOMService.js';
 export * from './performanceOptimizer.js';
 
+// MCP (Model Context Protocol) service
+export * from './mcpService.js';
+
 // Service examples (for development and testing)
 export * from './patternEngineExample.js';
 export * from './aiServiceExample.js';
