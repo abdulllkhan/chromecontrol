@@ -75,7 +75,7 @@ const createMockTask = (overrides: Partial<CustomTask> = {}): CustomTask => ({
   name: 'Test Task',
   description: 'A test task for unit testing',
   websitePatterns: ['example\\.com', 'test\\.org'],
-  promptTemplate: 'Generate content for {{domain}} with title: {{title}}',
+  promptTemplate: 'Generate content for {{domain}} with title: {{pageTitle}}',
   outputFormat: OutputFormat.PLAIN_TEXT,
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
@@ -710,7 +710,7 @@ describe('TaskManager', () => {
       const taskData = createTaskTemplate(
         'Integration Test Task',
         'A task for integration testing',
-        'Generate content for {{domain}}: {{title}}',
+        'Generate content for {{domain}}: {{pageTitle}}',
         ['integration\\.test']
       );
 
@@ -722,7 +722,7 @@ describe('TaskManager', () => {
         id: taskId,
         name: 'Integration Test Task',
         description: 'A task for integration testing',
-        promptTemplate: 'Generate content for {{domain}}: {{title}}',
+        promptTemplate: 'Generate content for {{domain}}: {{pageTitle}}',
         websitePatterns: ['integration\\.test']
       });
       vi.spyOn(mockStorageService, 'getCustomTask').mockResolvedValue(createdTask);
