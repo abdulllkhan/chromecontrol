@@ -23,6 +23,7 @@ import {
 
 import { ChromeStorageService } from './storage.js';
 import { AIService, AIError } from './aiService.js';
+import { PromptManager } from './promptManager.js';
 
 // ============================================================================
 // TASK MANAGER INTERFACES
@@ -31,6 +32,7 @@ import { AIService, AIError } from './aiService.js';
 export interface TaskManagerConfig {
   storageService: ChromeStorageService;
   aiService: AIService;
+  promptManager?: PromptManager;
   enableValidation: boolean;
   enableTesting: boolean;
   maxExecutionTime: number;
@@ -83,9 +85,11 @@ export class TaskManager {
   private config: TaskManagerConfig;
   private executionCache = new Map<string, TaskResult>();
   private associationRules: TaskAssociationRule[] = [];
+  private promptManager: PromptManager;
 
   constructor(config: TaskManagerConfig) {
     this.config = config;
+    this.promptManager = config.promptManager || new PromptManager();
     this.initializeAssociationRules();
   }
 
@@ -851,11 +855,11 @@ export class TaskManager {
   }
 
   /**
-   * Builds AI request with injected context
+   * Builds AI request with injected context using PromptManager
    */
   private async buildAIRequestWithContext(task: CustomTask, context: ExecutionContext): Promise<AIRequest> {
-    // Inject context variables into prompt template
-    const injectedPrompt = this.injectContextIntoPrompt(task.promptTemplate, context);
+    // Use PromptManager to process custom task prompt template
+    const processedPrompt = await this.promptManager.processCustomTaskPrompt(task, context);
     
     // Determine task type based on task configuration
     const taskType = this.determineTaskType(task);
@@ -863,8 +867,13 @@ export class TaskManager {
     // Build security constraints based on website context
     const securityConstraints = this.buildSecurityConstraints(context.websiteContext);
 
+    // Debug logging to verify custom prompt usage
+    console.log(`[TaskManager] Using custom prompt for task ${task.id}:`);
+    console.log(`[TaskManager] Original template: ${task.promptTemplate.substring(0, 100)}...`);
+    console.log(`[TaskManager] Processed prompt: ${processedPrompt.substring(0, 100)}...`);
+
     return {
-      prompt: injectedPrompt,
+      prompt: processedPrompt, // Use processed prompt from PromptManager
       context: context.websiteContext,
       pageContent: context.pageContent, // Pass page content for richer context
       taskType,
@@ -877,7 +886,8 @@ export class TaskManager {
   }
 
   /**
-   * Injects context variables into prompt template
+   * Injects context variables into prompt template (DEPRECATED - use PromptManager instead)
+   * @deprecated Use PromptManager.processCustomTaskPrompt() instead
    */
   private injectContextIntoPrompt(template: string, context: ExecutionContext): string {
     let injectedPrompt = template;

@@ -16,6 +16,9 @@ export * from './aiService.js';
 // Task management service
 export * from './taskManager.js';
 
+// Prompt management service
+export * from './promptManager.js';
+
 // Suggestion engine service
 export * from './suggestionEngine.js';
 

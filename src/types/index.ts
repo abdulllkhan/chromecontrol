@@ -1005,6 +1005,94 @@ export interface MCPContextConfig {
 }
 
 // ============================================================================
+// PROMPT MANAGEMENT TYPES
+// ============================================================================
+
+/**
+ * Template context for variable injection in custom task prompts
+ */
+export interface TemplateContext {
+  domain: string;
+  pageTitle: string;
+  selectedText?: string;
+  extractedContent: CleanTextContent;
+  userInput?: Record<string, unknown>;
+  websiteContext: WebsiteContext;
+  pageContent: PageContent;
+}
+
+/**
+ * Clean text content extracted from web pages
+ */
+export interface CleanTextContent {
+  mainText: string;
+  headings: TextBlock[];
+  paragraphs: TextBlock[];
+  lists: ListBlock[];
+  metadata: ContentMetadata;
+}
+
+/**
+ * Text block with context information
+ */
+export interface TextBlock {
+  content: string;
+  level?: number;
+  context: string;
+}
+
+/**
+ * List block structure
+ */
+export interface ListBlock {
+  type: 'ordered' | 'unordered';
+  items: string[];
+  context: string;
+}
+
+/**
+ * Content metadata for extracted text
+ */
+export interface ContentMetadata {
+  wordCount: number;
+  readingTime: number;
+  language?: string;
+  extractedAt: Date;
+  source: string;
+}
+
+/**
+ * Template validation result
+ */
+export interface TemplateValidationResult {
+  isValid: boolean;
+  errors: TemplateValidationError[];
+  warnings: string[];
+  variables: TemplateVariable[];
+}
+
+/**
+ * Template validation error
+ */
+export interface TemplateValidationError {
+  message: string;
+  position?: number;
+  variable?: string;
+  severity: 'error' | 'warning';
+}
+
+/**
+ * Template variable definition
+ */
+export interface TemplateVariable {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'object';
+  required: boolean;
+  description?: string;
+  defaultValue?: unknown;
+}
+
+// ============================================================================
 // TYPE GUARDS
 // ============================================================================
 

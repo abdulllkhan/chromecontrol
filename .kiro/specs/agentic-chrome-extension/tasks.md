@@ -222,7 +222,7 @@ The extension successfully bridges the gap between user needs and AI capabilitie
   - Add logging to track which prompt is actually sent to AI service
   - _Requirements: 12.1, 12.2, 12.4_
 
-- [ ] 27. Implement Template Variable Injection System
+- [x] 27. Implement Template Variable Injection System
   - Create PromptManager service for processing custom task prompts
   - Implement template variable injection for {{domain}}, {{pageTitle}}, {{selectedText}}
   - Add TemplateContext interface and context building logic
