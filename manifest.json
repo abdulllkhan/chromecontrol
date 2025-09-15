@@ -10,7 +10,8 @@
     "scripting",
     "clipboardWrite",
     "notifications",
-    "sidePanel"
+    "sidePanel",
+    "alarms"
   ],
   "optional_permissions": [
     "background"
@@ -19,8 +20,7 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {

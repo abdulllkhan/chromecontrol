@@ -79,19 +79,27 @@ export class TextExtractionEngine {
    */
   public extractCleanContent(document: Document): CleanTextContent {
     try {
+      // Extract all types of code content
+      const allCodeContent = this.extractAllCodeContent(document);
+
+      // If we have code content, return it as the main content
+      if (allCodeContent && allCodeContent.mainText.length > 10) {
+        return allCodeContent;
+      }
+
       // Find main content areas
       const mainContentElements = this.identifyMainContent(document);
-      
+
       // Extract structured content from main areas
       const extractedContent = this.extractStructuredContent(mainContentElements);
-      
+
       // Clean and process the content
       const cleanContent = this.processExtractedContent(extractedContent);
-      
+
       return cleanContent;
     } catch (error) {
       console.error('Error extracting clean content:', error);
-      
+
       // Fallback to basic extraction
       return this.fallbackExtraction(document);
     }
@@ -107,8 +115,7 @@ export class TextExtractionEngine {
       }
 
       const range = selection.getRangeAt(0);
-      const container = range.commonAncestorContainer;
-      
+
       // Create a temporary element to hold the selection
       const tempDiv = document.createElement('div');
       tempDiv.appendChild(range.cloneContents());
@@ -372,9 +379,14 @@ export class TextExtractionEngine {
   /**
    * Cleans text content by removing extra whitespace and noise
    */
-  private cleanText(text: string): string {
+  private cleanText(text: string, preserveFormatting: boolean = false): string {
     if (!text) return '';
-    
+
+    if (preserveFormatting) {
+      // For code content, preserve formatting
+      return text.trim();
+    }
+
     return text
       .replace(/\s+/g, ' ') // Multiple spaces to single space
       .replace(/[\r\n]+/g, ' ') // Newlines to spaces
@@ -434,14 +446,14 @@ export class TextExtractionEngine {
   /**
    * Generates content metadata
    */
-  private generateContentMetadata(mainText: string, paragraphs: TextBlock[]): ContentMetadata {
+  private generateContentMetadata(mainText: string, paragraphs: TextBlock[], extractionType?: string, codeBlocks?: number): ContentMetadata {
     const wordCount = this.countWords(mainText);
     const readingTime = Math.ceil(wordCount / 200); // Assume 200 WPM reading speed
-    
+
     // Detect language (basic heuristic)
-    const language = this.detectLanguage(mainText);
-    
-    return {
+    const language = extractionType === 'code-focused' ? 'code' : this.detectLanguage(mainText);
+
+    const metadata: ContentMetadata = {
       wordCount,
       readingTime,
       language,
@@ -449,6 +461,16 @@ export class TextExtractionEngine {
       paragraphCount: paragraphs.length,
       hasStructuredContent: paragraphs.length > 0
     };
+
+    if (extractionType) {
+      (metadata as any).extractionType = extractionType;
+    }
+
+    if (codeBlocks !== undefined) {
+      (metadata as any).codeBlocks = codeBlocks;
+    }
+
+    return metadata;
   }
 
   /**
@@ -550,6 +572,299 @@ export class TextExtractionEngine {
     }
     
     return cloned;
+  }
+
+  /**
+   * Extracts all code content from the page, combining multiple sources
+   */
+  private extractAllCodeContent(document: Document): CleanTextContent | null {
+    const allContent: string[] = [];
+    const allHeadings: TextBlock[] = [];
+    const allParagraphs: TextBlock[] = [];
+    let totalCodeBlocks = 0;
+
+    // Try each extraction method and combine results
+    const extractors = [
+      () => this.extractMonacoEditorContent(document),
+      () => this.extractCodeMirrorContent(document),
+      () => this.extractContentEditableCode(document),
+      () => this.extractGenericCodeBlocks(document)
+    ];
+
+    for (const extractor of extractors) {
+      const result = extractor();
+      if (result && result.mainText.length > 10) {
+        allContent.push(result.mainText);
+        allHeadings.push(...result.headings);
+        allParagraphs.push(...result.paragraphs);
+        if ((result.metadata as any).codeBlocks) {
+          totalCodeBlocks += (result.metadata as any).codeBlocks;
+        }
+      }
+    }
+
+    if (allContent.length === 0) return null;
+
+    // Combine all content
+    const combinedContent = allContent.join('\n\n');
+
+    return {
+      mainText: combinedContent,
+      headings: allHeadings,
+      paragraphs: allParagraphs,
+      lists: [],
+      metadata: this.generateContentMetadata(combinedContent, allParagraphs, 'code-focused', totalCodeBlocks)
+    };
+  }
+
+  /**
+   * Extracts code content from code editors (Monaco, CodeMirror, etc.)
+   */
+  private extractCodeContent(document: Document): CleanTextContent | null {
+    const codeExtractors = [
+      // Monaco Editor (used by LeetCode, VS Code online, etc.)
+      () => this.extractMonacoEditorContent(document),
+      // CodeMirror
+      () => this.extractCodeMirrorContent(document),
+      // Generic code blocks
+      () => this.extractGenericCodeBlocks(document),
+      // Contenteditable code areas
+      () => this.extractContentEditableCode(document)
+    ];
+
+    for (const extractor of codeExtractors) {
+      const result = extractor();
+      if (result && result.mainText.length > 10) {
+        return result;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Extracts code from Monaco Editor (LeetCode, VS Code online)
+   */
+  private extractMonacoEditorContent(document: Document): CleanTextContent | null {
+    // Check for Monaco editor
+    const monacoEditor = document.querySelector('.monaco-editor');
+    if (!monacoEditor) return null;
+
+    let codeContent = '';
+    let codeBlocks = 0;
+
+    // Method 1: Extract from view-lines (visible code)
+    const viewLines = monacoEditor.querySelectorAll('.view-lines .view-line');
+    if (viewLines.length > 0) {
+      const lines: string[] = [];
+      viewLines.forEach(line => {
+        const text = (line as HTMLElement).textContent || '';
+        lines.push(text);
+      });
+      codeContent = lines.join('\n');
+      codeBlocks++;
+    }
+
+    // Method 2: Extract from textarea (input area) - useful for incomplete code
+    const textarea = monacoEditor.querySelector('textarea.inputarea, textarea.monaco-mouse-cursor-text');
+    if (textarea && (textarea as HTMLTextAreaElement).value) {
+      const textareaContent = (textarea as HTMLTextAreaElement).value;
+      if (textareaContent.length > codeContent.length) {
+        codeContent = textareaContent;
+      }
+      if (textareaContent.length > 10) codeBlocks++;
+    }
+
+    // Method 3: Check for hidden input areas or data attributes
+    const hiddenInputs = monacoEditor.querySelectorAll('input[type="hidden"], [data-value], [data-code]');
+    hiddenInputs.forEach(input => {
+      const value = (input as HTMLInputElement).value ||
+                   input.getAttribute('data-value') ||
+                   input.getAttribute('data-code');
+      if (value && value.length > codeContent.length) {
+        codeContent = value;
+      }
+    });
+
+    if (codeContent.length < 10) return null;
+
+    // Also extract problem description if available
+    const problemContent = this.extractProblemDescription(document);
+    const { headings, paragraphs } = problemContent;
+
+    // Format the content with "Editor Content" header
+    const formattedContent = `=== Editor Content ===\n${codeContent}`;
+
+    return {
+      mainText: formattedContent,
+      headings,
+      paragraphs,
+      lists: [],
+      metadata: this.generateContentMetadata(formattedContent, paragraphs, 'code-focused', codeBlocks)
+    };
+  }
+
+  /**
+   * Extracts code from CodeMirror editor
+   */
+  private extractCodeMirrorContent(document: Document): CleanTextContent | null {
+    const codeMirror = document.querySelector('.CodeMirror');
+    if (!codeMirror) return null;
+
+    let codeContent = '';
+    let codeBlocks = 0;
+
+    // Extract from CodeMirror lines
+    const codeLines = codeMirror.querySelectorAll('.CodeMirror-line');
+    if (codeLines.length > 0) {
+      const lines: string[] = [];
+      codeLines.forEach(line => {
+        const text = (line as HTMLElement).textContent || '';
+        lines.push(text);
+      });
+      codeContent = lines.join('\n');
+      codeBlocks++;
+    }
+
+    // Check for CodeMirror textarea
+    const textarea = codeMirror.querySelector('textarea');
+    if (textarea && (textarea as HTMLTextAreaElement).value) {
+      const textareaContent = (textarea as HTMLTextAreaElement).value;
+      if (textareaContent.length > codeContent.length) {
+        codeContent = textareaContent;
+      }
+      if (textareaContent.length > 10) codeBlocks++;
+    }
+
+    if (codeContent.length < 10) return null;
+
+    const problemContent = this.extractProblemDescription(document);
+    const { headings, paragraphs } = problemContent;
+
+    // Format the content with "Editor Content" header
+    const formattedContent = `=== Editor Content ===\n${codeContent}`;
+
+    return {
+      mainText: formattedContent,
+      headings,
+      paragraphs,
+      lists: [],
+      metadata: this.generateContentMetadata(formattedContent, paragraphs, 'code-focused', codeBlocks)
+    };
+  }
+
+  /**
+   * Extracts code from generic pre/code blocks
+   */
+  private extractGenericCodeBlocks(document: Document): CleanTextContent | null {
+    const codeBlocks = document.querySelectorAll('pre code, pre.code, .code-block, .highlight, pre');
+    if (codeBlocks.length === 0) return null;
+
+    const codeContents: string[] = [];
+    codeBlocks.forEach(block => {
+      // Preserve the original formatting including indentation
+      const text = (block as HTMLElement).innerText || (block as HTMLElement).textContent || '';
+      if (text.trim().length > 10) {
+        // Don't trim individual lines to preserve indentation
+        codeContents.push(text);
+      }
+    });
+
+    if (codeContents.length === 0) return null;
+
+    const codeContent = codeContents.join('\n\n');
+    const problemContent = this.extractProblemDescription(document);
+    const { headings, paragraphs } = problemContent;
+
+    // Format the content with "Code Blocks" header
+    const formattedContent = `=== Code Blocks ===\n${codeContent}`;
+
+    return {
+      mainText: formattedContent,
+      headings,
+      paragraphs,
+      lists: [],
+      metadata: this.generateContentMetadata(formattedContent, paragraphs, 'code-focused', codeContents.length)
+    };
+  }
+
+  /**
+   * Extracts code from contenteditable elements
+   */
+  private extractContentEditableCode(document: Document): CleanTextContent | null {
+    const editableCode = document.querySelectorAll('[contenteditable="true"].code-editor, [contenteditable="true"].editor, .ace_editor');
+    if (editableCode.length === 0) return null;
+
+    const codeContents: string[] = [];
+    editableCode.forEach(editor => {
+      const text = (editor as HTMLElement).textContent || '';
+      if (text.trim().length > 10) {
+        codeContents.push(text.trim());
+      }
+    });
+
+    if (codeContents.length === 0) return null;
+
+    const codeContent = codeContents.join('\n\n');
+    const problemContent = this.extractProblemDescription(document);
+    const { headings, paragraphs } = problemContent;
+
+    // Format the content with "Editor Content" header
+    const formattedContent = `=== Editor Content ===\n${codeContent}`;
+
+    return {
+      mainText: formattedContent,
+      headings,
+      paragraphs,
+      lists: [],
+      metadata: this.generateContentMetadata(formattedContent, paragraphs, 'code-focused', codeContents.length)
+    };
+  }
+
+  /**
+   * Extracts problem description from coding challenge pages
+   */
+  private extractProblemDescription(document: Document): { headings: TextBlock[], paragraphs: TextBlock[] } {
+    const headings: TextBlock[] = [];
+    const paragraphs: TextBlock[] = [];
+
+    // Common selectors for problem descriptions
+    const problemSelectors = [
+      '.question-content',
+      '.problem-statement',
+      '.challenge-description',
+      '.description',
+      '[data-cy="question-title"]',
+      '.content__u3I1'
+    ];
+
+    for (const selector of problemSelectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        // Extract headings
+        const headingElements = element.querySelectorAll('h1, h2, h3, h4');
+        headingElements.forEach(heading => {
+          const content = this.cleanText(heading.textContent || '');
+          if (content) {
+            const level = parseInt(heading.tagName.charAt(1));
+            headings.push({ content, level, context: this.getElementContext(heading) });
+          }
+        });
+
+        // Extract paragraphs
+        const paragraphElements = element.querySelectorAll('p, .example');
+        paragraphElements.forEach(para => {
+          const content = this.cleanText(para.textContent || '');
+          if (content && content.length > 20) {
+            paragraphs.push({ content, context: this.getElementContext(para) });
+          }
+        });
+
+        break;
+      }
+    }
+
+    return { headings, paragraphs };
   }
 
   /**

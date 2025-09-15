@@ -9,7 +9,7 @@
     "build:prod": "vite build --mode production",
     "build:dev": "vite build --mode development && npm run copy-content && npm run copy-assets",
     "clean": "rm -rf dist",
-    "copy-content": "cp src/content/content-simple.js dist/content.js",
+    "copy-content": "cp src/content/content-enhanced.js dist/content.js",
     "copy-assets": "cp manifest.json sidebar.html dist/ && cp -r icons dist/",
     "package": "npm run build && npm run create-zip",
     "create-zip": "cd dist && zip -r ../chrome-control.zip . && cd ..",

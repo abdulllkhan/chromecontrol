@@ -1062,6 +1062,8 @@ export interface ContentMetadata {
   source?: string;
   paragraphCount: number;
   hasStructuredContent: boolean;
+  extractionType?: string;
+  codeBlocks?: number;
 }
 
 /**
