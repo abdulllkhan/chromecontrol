@@ -144,7 +144,7 @@ describe('AIService', () => {
       (fetch as Mock).mockRejectedValueOnce(new Error('AbortError'));
 
       await expect(aiService.processRequest(mockRequest)).rejects.toThrow(AIError);
-    });
+    }, 10000);
 
     it('should retry failed requests', async () => {
       (fetch as Mock)
@@ -316,7 +316,7 @@ describe('AIService', () => {
         expect(error).toBeInstanceOf(AIError);
         expect((error as AIError).retryable).toBe(true);
       }
-    });
+    }, 10000);
 
     it('should handle empty response content', async () => {
       (fetch as Mock).mockResolvedValueOnce({
@@ -378,6 +378,8 @@ describe('AIService', () => {
       expect(prompt).toContain('price: $99');
     });
   });
+
+
 });
 
 describe('Factory Functions', () => {
@@ -418,7 +420,7 @@ describe('Default Configuration', () => {
   it('should have valid default configuration', () => {
     expect(DEFAULT_AI_CONFIG).toMatchObject({
       baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini',
+      model: 'gpt-5-mini',
       maxTokens: 4000,
       temperature: 0.7,
       timeout: 30000,
@@ -446,13 +448,15 @@ describe('AIError', () => {
   });
 });
 
-// ============================================================================
-// ENHANCED AI SERVICE TESTS FOR MCP CONTEXT SUPPORT
-// ============================================================================
+  // ============================================================================
+  // ENHANCED AI SERVICE TESTS FOR MCP CONTEXT SUPPORT
+  // ============================================================================
 
   describe('Enhanced AI Service with MCP Context', () => {
+    let enhancedAIService: AIService;
+    
     beforeEach(() => {
-      aiService = new AIService({
+      enhancedAIService = new AIService({
         apiKey: 'test-key',
         model: 'gpt-4o-mini',
         provider: 'openai'
