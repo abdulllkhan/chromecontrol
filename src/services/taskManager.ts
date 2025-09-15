@@ -542,6 +542,85 @@ export class TaskManager {
   }
 
   /**
+   * Execute a task with debug information enabled
+   */
+  async executeTaskWithDebug(
+    taskId: string, 
+    context: ExecutionContext
+  ): Promise<TaskResult & { debugInfo?: any }> {
+    return await this.executeTask(taskId, context, {
+      includeDebugInfo: true,
+      validateBeforeExecution: true
+    });
+  }
+
+  /**
+   * Get the final prompt that would be sent to AI for a task (without executing)
+   */
+  async previewTaskPrompt(taskId: string, context: ExecutionContext): Promise<string> {
+    const task = await this.getTask(taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+
+    const aiRequest = await this.buildAIRequestWithContext(task, context);
+    return aiRequest.prompt;
+  }
+
+  /**
+   * Test that custom task prompts are being used correctly
+   */
+  async testCustomPromptUsage(taskId: string): Promise<{
+    success: boolean;
+    customPromptTemplate: string;
+    finalPrompt: string;
+    isCustomPromptUsed: boolean;
+    details: string;
+  }> {
+    try {
+      const task = await this.getTask(taskId);
+      if (!task) {
+        return {
+          success: false,
+          customPromptTemplate: '',
+          finalPrompt: '',
+          isCustomPromptUsed: false,
+          details: `Task ${taskId} not found`
+        };
+      }
+
+      // Create sample context for testing
+      const sampleContext = await this.createSampleExecutionContext();
+      sampleContext.taskId = taskId;
+
+      // Build the AI request to see what prompt would be sent
+      const aiRequest = await this.buildAIRequestWithContext(task, sampleContext);
+
+      // Check if the custom prompt template is being used as the primary instruction
+      const isCustomPromptUsed = aiRequest.prompt.startsWith(task.promptTemplate) || 
+                                 aiRequest.prompt.includes(task.promptTemplate);
+
+      return {
+        success: true,
+        customPromptTemplate: task.promptTemplate,
+        finalPrompt: aiRequest.prompt,
+        isCustomPromptUsed,
+        details: isCustomPromptUsed 
+          ? 'Custom prompt template is being used correctly'
+          : 'WARNING: Custom prompt template may not be used as primary instruction'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        customPromptTemplate: '',
+        finalPrompt: '',
+        isCustomPromptUsed: false,
+        details: `Error testing prompt usage: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
    * Validates task data structure and content
    */
   private async validateTaskData(taskData: Partial<CustomTask>): Promise<TaskValidationResult> {
@@ -885,6 +964,14 @@ export class TaskManager {
     options: TaskExecutionOptions
   ): Promise<TaskResult> {
     try {
+      // Debug logging: Log the final prompt being sent to AI
+      if (options.includeDebugInfo) {
+        console.log(`[TaskManager Debug] Executing task: ${task.name}`);
+        console.log(`[TaskManager Debug] Custom prompt template: ${task.promptTemplate}`);
+        console.log(`[TaskManager Debug] Final AI request prompt: ${aiRequest.prompt}`);
+        console.log(`[TaskManager Debug] Task ID: ${aiRequest.taskId}`);
+      }
+
       // Execute AI request
       const aiResponse = await this.config.aiService.processRequest(aiRequest);
       
@@ -905,6 +992,16 @@ export class TaskManager {
       // Add automation summary if applicable
       if (aiResponse.automationInstructions && aiResponse.automationInstructions.length > 0) {
         result.automationSummary = `Generated ${aiResponse.automationInstructions.length} automation steps`;
+      }
+
+      // Add debug information to result if requested
+      if (options.includeDebugInfo) {
+        (result as any).debugInfo = {
+          customPromptTemplate: task.promptTemplate,
+          finalPromptSent: aiRequest.prompt,
+          taskId: aiRequest.taskId,
+          promptLength: aiRequest.prompt.length
+        };
       }
       
       return result;
@@ -978,31 +1075,27 @@ export class TaskManager {
    * Simple hash function for objects
    */
   private hashObject(obj: any): string {
-    const str = JSON.stringify(obj);
+    const str = JSON.stringify(obj, Object.keys(obj).sort());
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
+      hash = hash & hash; // Convert to 32-bit integer
     }
-    return Math.abs(hash).toString(36);
+    return hash.toString();
   }
 
   /**
-   * Clears execution cache for a specific task
+   * Clear execution cache for a specific task
    */
   private clearTaskExecutionCache(taskId: string): void {
     const keysToDelete: string[] = [];
-    
     for (const key of this.executionCache.keys()) {
       if (key.startsWith(`${taskId}_`)) {
         keysToDelete.push(key);
       }
     }
-    
-    for (const key of keysToDelete) {
-      this.executionCache.delete(key);
-    }
+    keysToDelete.forEach(key => this.executionCache.delete(key));
   }
 }
 

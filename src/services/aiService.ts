@@ -666,21 +666,46 @@ export class AIService {
    * Build prompt from AI request
    */
   private buildPrompt(request: AIRequest): string {
-    const { context, pageContent, taskType, prompt, userInput } = request;
+    const { context, pageContent, taskType, prompt, userInput, taskId } = request;
     
-    let systemPrompt = this.getSystemPrompt(taskType, request.outputFormat);
-    let contextPrompt = this.buildContextPrompt(context, pageContent);
-    let userPrompt = prompt;
+    // If this is a custom task (has taskId), use the custom prompt as primary instruction
+    // Otherwise, use system prompt + user prompt for generic requests
+    let finalPrompt: string;
+    
+    if (taskId) {
+      // For custom tasks: Use the custom prompt template as the main instruction
+      // and add context as supporting information
+      let contextPrompt = this.buildContextPrompt(context, pageContent);
+      finalPrompt = prompt; // Custom task prompt template is the primary instruction
+      
+      // Add context information to help the AI understand the current page
+      finalPrompt += `\n\nCurrent Page Context:\n${contextPrompt}`;
+      
+      // Add user input if provided
+      if (userInput && Object.keys(userInput).length > 0) {
+        const inputStr = Object.entries(userInput)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join('\n');
+        finalPrompt += `\n\nAdditional Input:\n${inputStr}`;
+      }
+    } else {
+      // For generic requests: Use system prompt + context + user prompt
+      let systemPrompt = this.getSystemPrompt(taskType, request.outputFormat);
+      let contextPrompt = this.buildContextPrompt(context, pageContent);
+      let userPrompt = prompt;
 
-    // Add user input if provided
-    if (userInput && Object.keys(userInput).length > 0) {
-      const inputStr = Object.entries(userInput)
-        .map(([key, value]) => `${key}: ${value}`)
-        .join('\n');
-      userPrompt += `\n\nAdditional Input:\n${inputStr}`;
+      // Add user input if provided
+      if (userInput && Object.keys(userInput).length > 0) {
+        const inputStr = Object.entries(userInput)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join('\n');
+        userPrompt += `\n\nAdditional Input:\n${inputStr}`;
+      }
+
+      finalPrompt = `${systemPrompt}\n\n${contextPrompt}\n\n${userPrompt}`;
     }
 
-    return `${systemPrompt}\n\n${contextPrompt}\n\n${userPrompt}`;
+    return finalPrompt;
   }
 
   /**

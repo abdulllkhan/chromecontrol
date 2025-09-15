@@ -215,7 +215,7 @@ The extension successfully bridges the gap between user needs and AI capabilitie
   - Create MCP metadata handling for structured data exchange
   - _Requirements: 11.1, 11.2, 11.4_
 
-- [ ] 26. Fix Custom Task Prompt Template Usage
+- [x] 26. Fix Custom Task Prompt Template Usage
   - Debug and fix TaskManager.executeTask to use CustomTask.promptTemplate
   - Update AIService.processRequest to properly map custom prompts to AIRequest.prompt
   - Ensure custom task prompts override generic system prompts in AI requests
