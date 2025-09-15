@@ -1117,7 +1117,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
   const [name, setName] = useState(configName || '');
   const [formData, setFormData] = useState({
     apiKey: config?.apiKey || '',
-    model: config?.model || (provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
+    model: config?.model || (provider === 'openai' ? 'gpt-5' : 'claude-sonnet-4-20250514'),
     maxTokens: config?.maxTokens || 8000,
     baseUrl: config?.baseUrl || (provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
   });
@@ -1142,7 +1142,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         
         const newFormData = {
           apiKey: '', // Never display existing API key for security
-          model: config.model || (newProvider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
+          model: config.model || (newProvider === 'openai' ? 'gpt-5' : 'claude-sonnet-4-20250514'),
           maxTokens: config.maxTokens || 8000,
           baseUrl: config.baseUrl || (newProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
         };
@@ -1203,7 +1203,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     setFormData(prev => {
       const newFormData = {
         ...prev,
-        model: provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022',
+        model: provider === 'openai' ? 'gpt-5' : 'claude-sonnet-4-20250514',
         baseUrl: provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1',
         // Preserve API key from config if available, otherwise keep current
         apiKey: config?.apiKey || prev.apiKey
@@ -1289,7 +1289,12 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     setTestResult(null);
 
     try {
-      const success = await onTest(formData as AIServiceConfig);
+      const testConfig: AIServiceConfig = {
+        ...formData,
+        apiKey: formData.apiKey?.trim() || '', // Ensure API key is trimmed
+        provider: 'auto' // Let AIService auto-detect the provider
+      };
+      const success = await onTest(testConfig);
       setTestResult({
         success,
         message: success ? 'Connection successful!' : 'Connection failed'
@@ -1405,7 +1410,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
                 // Update default values based on provider
                 setFormData(prev => ({
                   ...prev,
-                  model: newProvider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022',
+                  model: newProvider === 'openai' ? 'gpt-5' : 'claude-sonnet-4-20250514',
                   baseUrl: newProvider === 'openai'
                     ? 'https://api.openai.com/v1'
                     : 'https://api.anthropic.com/v1'
@@ -1483,11 +1488,11 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
                 </>
               ) : (
                 <>
-                  <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Latest)</option>
-                  <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
-                  <option value="claude-3-opus-20240229">Claude 3 Opus (Most Capable)</option>
-                  <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (Balanced)</option>
-                  <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast)</option>
+                  <option value="claude-opus-4-1-20250805">Claude Opus 4.1 (Latest & Most Powerful)</option>
+                  <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Best Balance)</option>
+                  <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast & Economical)</option>
+                  <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Legacy)</option>
+                  <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet (Legacy)</option>
                 </>
               )}
             </select>

@@ -623,11 +623,11 @@ const AIConfigurationManager: React.FC<AIConfigurationManagerProps> = ({
       case 'claude':
         return (
           <>
-            <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Latest)</option>
-            <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
-            <option value="claude-3-opus-20240229">Claude 3 Opus (Most Capable)</option>
-            <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (Balanced)</option>
-            <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast)</option>
+            <option value="claude-opus-4-1-20250805">Claude Opus 4.1 (Latest & Most Powerful)</option>
+            <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Best Balance)</option>
+            <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast & Economical)</option>
+            <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Legacy)</option>
+            <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet (Legacy)</option>
           </>
         );
       default:
@@ -667,7 +667,7 @@ const AIConfigurationManager: React.FC<AIConfigurationManagerProps> = ({
                 ...formData,
                 provider: e.target.value as 'openai' | 'claude' | 'local',
                 model: e.target.value === 'openai' ? 'gpt-5' :
-                       e.target.value === 'claude' ? 'claude-3-5-sonnet-20241022' : ''
+                       e.target.value === 'claude' ? 'claude-sonnet-4-20250514' : ''
               })}
             >
               <option value="openai">OpenAI</option>

@@ -489,7 +489,12 @@ const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onCancel, o
     setTestResult(null);
     
     try {
-      const success = await onTest(formData as AIServiceConfig);
+      const testConfig: AIServiceConfig = {
+        ...formData,
+        apiKey: formData.apiKey?.trim() || '', // Ensure API key is trimmed
+        provider: 'auto' // Let AIService auto-detect the provider
+      };
+      const success = await onTest(testConfig);
       setTestResult({
         success,
         message: success ? 'Connection successful!' : 'Connection failed'
@@ -577,11 +582,11 @@ const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onCancel, o
                 value={formData.model}
                 onChange={(e) => setFormData({ ...formData, model: e.target.value })}
               >
-                <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Latest)</option>
-                <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
-                <option value="claude-3-opus-20240229">Claude 3 Opus (Most Capable)</option>
-                <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (Balanced)</option>
-                <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast)</option>
+                <option value="claude-opus-4-1-20250805">Claude Opus 4.1 (Latest & Most Powerful)</option>
+                <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Best Balance)</option>
+                <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast & Economical)</option>
+                <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Legacy)</option>
+                <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet (Legacy)</option>
               </select>
             ) : (
               <input
