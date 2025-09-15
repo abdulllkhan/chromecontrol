@@ -186,6 +186,20 @@ export interface WebsitePattern {
   isEnabled: boolean;
 }
 
+export interface AIConfiguration {
+  id: string;
+  name: string;
+  provider: 'openai' | 'claude' | 'local';
+  apiKey: string;
+  model?: string;
+  maxTokens?: number;
+  temperature?: number;
+  baseUrl?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface UserPreferences {
   enabledCategories: WebsiteCategory[];
   customPatterns: CustomPattern[];
@@ -200,6 +214,8 @@ export interface UserPreferences {
     temperature?: number;
     baseUrl?: string;
   };
+  aiConfigurations?: AIConfiguration[];
+  activeAIConfigId?: string;
 }
 
 export interface CustomPattern {

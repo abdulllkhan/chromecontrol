@@ -6,17 +6,18 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import useErrorHandler from '../components/useErrorHandler';
 import { FullTaskManagement } from '../components/TaskManagement';
 import UserPreferencesComponent from '../components/UserPreferences';
-import { 
-  Suggestion, 
-  CustomTask, 
-  WebsiteContext, 
-  TaskResult, 
+import {
+  Suggestion,
+  CustomTask,
+  WebsiteContext,
+  TaskResult,
   OutputFormat,
   WebsiteCategory,
   PageContent,
   SecurityLevel,
   PageType,
-  TaskType
+  TaskType,
+  AIConfiguration
 } from '../types';
 import { 
   SuggestionEngine, 
@@ -50,6 +51,8 @@ interface PopupState {
   taskResult: TaskResult | null;
   aiConfigured: boolean;
   aiConfig: AIServiceConfig | null;
+  aiConfigurations: AIConfiguration[];
+  activeAIConfigId: string | null;
   theme: 'light' | 'dark';
   searchQuery: string;
   selectedCategory: string | null;
@@ -334,18 +337,148 @@ const SuggestionsView: React.FC<SuggestionsViewProps> = ({
 // COMPONENT: AI Configuration View
 // ============================================================================
 
-interface AIConfigViewProps {
-  config: AIServiceConfig | null;
-  onSave: (config: AIServiceConfig) => void;
+interface AIConfigManagerProps {
+  configurations: AIConfiguration[];
+  activeConfigId: string | null;
+  onSave: (config: AIConfiguration) => void;
+  onDelete: (configId: string) => void;
+  onSetActive: (configId: string) => void;
   onTest: (config: AIServiceConfig) => Promise<boolean>;
 }
 
-const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onTest }) => {
+interface AIConfigViewProps {
+  config: AIConfiguration | null;
+  onSave: (config: AIConfiguration) => void;
+  onCancel: () => void;
+  onTest: (config: AIServiceConfig) => Promise<boolean>;
+}
+
+// ============================================================================
+// COMPONENT: AI Configuration Manager
+// ============================================================================
+
+const AIConfigManager: React.FC<AIConfigManagerProps> = ({
+  configurations,
+  activeConfigId,
+  onSave,
+  onDelete,
+  onSetActive,
+  onTest
+}) => {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<AIConfiguration | null>(null);
+
+  const handleAddNew = () => {
+    setEditingConfig(null);
+    setShowAddForm(true);
+  };
+
+  const handleEdit = (config: AIConfiguration) => {
+    setEditingConfig(config);
+    setShowAddForm(true);
+  };
+
+  const handleSave = (config: AIConfiguration) => {
+    onSave(config);
+    setShowAddForm(false);
+    setEditingConfig(null);
+  };
+
+  const handleCancel = () => {
+    setShowAddForm(false);
+    setEditingConfig(null);
+  };
+
+  if (showAddForm) {
+    return (
+      <AIConfigView
+        config={editingConfig}
+        onSave={handleSave}
+        onCancel={handleCancel}
+        onTest={onTest}
+      />
+    );
+  }
+
+  return (
+    <div className="ai-config-manager">
+      <div className="config-header">
+        <h2>AI Configurations</h2>
+        <button className="btn btn-primary" onClick={handleAddNew}>
+          + Add Configuration
+        </button>
+      </div>
+
+      {configurations.length === 0 ? (
+        <div className="empty-state">
+          <p>No AI configurations yet. Add one to get started!</p>
+        </div>
+      ) : (
+        <div className="config-list">
+          {configurations.map(config => (
+            <div key={config.id} className={`config-item ${config.id === activeConfigId ? 'active' : ''}`}>
+              <div className="config-info">
+                <h3>{config.name}</h3>
+                <div className="config-meta">
+                  <span className="provider-badge">{config.provider}</span>
+                  <span className="model-badge">{config.model}</span>
+                  {config.id === activeConfigId && (
+                    <span className="active-badge">✓ Active</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="config-actions">
+                {config.id !== activeConfigId && (
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => onSetActive(config.id)}
+                  >
+                    Activate
+                  </button>
+                )}
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => handleEdit(config)}
+                >
+                  Edit
+                </button>
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => onDelete(config.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Always show the Add Configuration button at the bottom */}
+      {configurations.length > 0 && (
+        <div className="config-footer">
+          <button className="btn btn-primary btn-block" onClick={handleAddNew}>
+            + Add Another Configuration
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onCancel, onTest }) => {
   const [formData, setFormData] = useState({
+    id: config?.id || `config_${Date.now()}`,
+    name: config?.name || '',
+    provider: config?.provider || 'openai' as 'openai' | 'claude' | 'local',
     apiKey: config?.apiKey || '',
     model: config?.model || 'gpt-5',
     maxTokens: config?.maxTokens || 8000,
-    baseUrl: config?.baseUrl || 'https://api.openai.com/v1'
+    baseUrl: config?.baseUrl || 'https://api.openai.com/v1',
+    isActive: config?.isActive || false,
+    createdAt: config?.createdAt || new Date(),
+    updatedAt: new Date()
   });
   
   const [testing, setTesting] = useState(false);
@@ -356,7 +489,12 @@ const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onTest }) =
     setTestResult(null);
     
     try {
-      const success = await onTest(formData as AIServiceConfig);
+      const testConfig: AIServiceConfig = {
+        ...formData,
+        apiKey: formData.apiKey?.trim() || '', // Ensure API key is trimmed
+        provider: 'auto' // Let AIService auto-detect the provider
+      };
+      const success = await onTest(testConfig);
       setTestResult({
         success,
         message: success ? 'Connection successful!' : 'Connection failed'
@@ -373,19 +511,45 @@ const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onTest }) =
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData as AIServiceConfig);
+    onSave(formData as AIConfiguration);
   };
 
   return (
     <div className="ai-config-view">
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">AI Configuration</h2>
+          <h2 className="card-title">{config ? 'Edit Configuration' : 'New AI Configuration'}</h2>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>✕</button>
         </div>
-        
+
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">OpenAI API Key</label>
+            <label className="form-label">Configuration Name</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g., Production OpenAI"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Provider</label>
+            <select
+              className="form-select"
+              value={formData.provider}
+              onChange={(e) => setFormData({ ...formData, provider: e.target.value as 'openai' | 'claude' | 'local' })}
+            >
+              <option value="openai">OpenAI</option>
+              <option value="claude">Claude</option>
+              <option value="local">Local Model</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">API Key</label>
             <input
               type="password"
               className="form-input"
@@ -401,16 +565,38 @@ const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onTest }) =
 
           <div className="form-group">
             <label className="form-label">Model</label>
-            <select
-              className="form-select"
-              value={formData.model}
-              onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-            >
-              <option value="gpt-5">GPT-5 (Latest)</option>
-              <option value="gpt-5-mini">GPT-5 Mini (Fast)</option>
-              <option value="gpt-4o">GPT-4o (Optimized)</option>
-              <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
-            </select>
+            {formData.provider === 'openai' ? (
+              <select
+                className="form-select"
+                value={formData.model}
+                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+              >
+                <option value="gpt-5">GPT-5 (Latest)</option>
+                <option value="gpt-5-mini">GPT-5 Mini (Fast)</option>
+                <option value="gpt-4o">GPT-4o (Optimized)</option>
+                <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
+              </select>
+            ) : formData.provider === 'claude' ? (
+              <select
+                className="form-select"
+                value={formData.model}
+                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+              >
+                <option value="claude-opus-4-1-20250805">Claude Opus 4.1 (Latest & Most Powerful)</option>
+                <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Best Balance)</option>
+                <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast & Economical)</option>
+                <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Legacy)</option>
+                <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet (Legacy)</option>
+              </select>
+            ) : (
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Local model path or identifier"
+                value={formData.model}
+                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+              />
+            )}
           </div>
 
           <div className="form-group">
@@ -461,11 +647,18 @@ const AIConfigView: React.FC<AIConfigViewProps> = ({ config, onSave, onTest }) =
               {testing ? 'Testing...' : 'Test Connection'}
             </button>
             <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
+            <button
               type="submit"
               className="btn btn-primary"
-              disabled={!formData.apiKey}
+              disabled={!formData.apiKey || !formData.name}
             >
-              Save Configuration
+              {config ? 'Update Configuration' : 'Save Configuration'}
             </button>
           </div>
         </form>
@@ -568,6 +761,8 @@ export const ModernPopupApp: React.FC = () => {
     taskResult: null,
     aiConfigured: false,
     aiConfig: null,
+    aiConfigurations: [],
+    activeAIConfigId: null,
     theme: 'light',
     searchQuery: '',
     selectedCategory: null
@@ -614,8 +809,17 @@ export const ModernPopupApp: React.FC = () => {
         await storageService.initialize();
         
         const preferences = await storageService.getUserPreferences();
-        const aiConfig = preferences?.aiConfig || null;
-        const aiConfigured = !!(aiConfig?.apiKey);
+        const aiConfigurations = preferences?.aiConfigurations || [];
+        const activeAIConfigId = preferences?.activeAIConfigId || null;
+        const activeConfig = aiConfigurations.find(c => c.id === activeAIConfigId);
+        const aiConfig = activeConfig ? {
+          apiKey: activeConfig.apiKey,
+          model: activeConfig.model,
+          maxTokens: activeConfig.maxTokens,
+          temperature: activeConfig.temperature,
+          baseUrl: activeConfig.baseUrl
+        } as AIServiceConfig : null;
+        const aiConfigured = !!(activeConfig?.apiKey);
         
         const aiService = aiConfigured && aiConfig 
           ? new AIService(aiConfig)
@@ -672,7 +876,9 @@ export const ModernPopupApp: React.FC = () => {
           suggestions,
           customTasks: Object.values(customTasks),
           aiConfigured,
-          aiConfig
+          aiConfig,
+          aiConfigurations,
+          activeAIConfigId
         }));
       });
     };
@@ -701,26 +907,128 @@ export const ModernPopupApp: React.FC = () => {
     setExecutingTask(null);
   }, [executeWithErrorHandling]);
 
-  const handleSaveAIConfig = useCallback(async (config: AIServiceConfig) => {
+  const handleSaveAIConfig = useCallback(async (config: AIConfiguration) => {
     try {
       if (!storageService) throw new Error('Storage service not initialized');
-      
+
       const preferences = await storageService.getUserPreferences();
+      const existingConfigs = preferences?.aiConfigurations || [];
+
+      // Check if this is an update or a new configuration
+      const existingIndex = existingConfigs.findIndex(c => c.id === config.id);
+      let updatedConfigs: AIConfiguration[];
+
+      if (existingIndex >= 0) {
+        // Update existing configuration
+        updatedConfigs = [...existingConfigs];
+        updatedConfigs[existingIndex] = config;
+      } else {
+        // Add new configuration
+        updatedConfigs = [...existingConfigs, config];
+      }
+
+      // If this is the first configuration or it's set as active, make it the active one
+      const activeConfigId = config.isActive || !preferences?.activeAIConfigId
+        ? config.id
+        : preferences.activeAIConfigId;
+
       await storageService.updateUserPreferences({
         ...preferences,
-        aiConfig: config
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: activeConfigId
       });
+
+      const activeConfig = updatedConfigs.find(c => c.id === activeConfigId);
+      const aiServiceConfig = activeConfig ? {
+        apiKey: activeConfig.apiKey,
+        model: activeConfig.model,
+        maxTokens: activeConfig.maxTokens,
+        temperature: activeConfig.temperature,
+        baseUrl: activeConfig.baseUrl
+      } as AIServiceConfig : null;
 
       setState(prev => ({
         ...prev,
-        aiConfig: config,
-        aiConfigured: true,
-        activeView: 'suggestions'
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: activeConfigId,
+        aiConfig: aiServiceConfig,
+        aiConfigured: !!activeConfig?.apiKey
       }));
     } catch (error) {
       handleError(error, { component: 'AIConfig', action: 'save' });
     }
   }, [storageService, handleError]);
+
+  const handleDeleteAIConfig = useCallback(async (configId: string) => {
+    try {
+      if (!storageService) throw new Error('Storage service not initialized');
+
+      const preferences = await storageService.getUserPreferences();
+      const existingConfigs = preferences?.aiConfigurations || [];
+      const updatedConfigs = existingConfigs.filter(c => c.id !== configId);
+
+      // If we're deleting the active config, activate another one or null
+      let newActiveId = preferences?.activeAIConfigId;
+      if (newActiveId === configId) {
+        newActiveId = updatedConfigs.length > 0 ? updatedConfigs[0].id : null;
+      }
+
+      await storageService.updateUserPreferences({
+        ...preferences,
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: newActiveId
+      });
+
+      const activeConfig = updatedConfigs.find(c => c.id === newActiveId);
+      const aiServiceConfig = activeConfig ? {
+        apiKey: activeConfig.apiKey,
+        model: activeConfig.model,
+        maxTokens: activeConfig.maxTokens,
+        temperature: activeConfig.temperature,
+        baseUrl: activeConfig.baseUrl
+      } as AIServiceConfig : null;
+
+      setState(prev => ({
+        ...prev,
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: newActiveId,
+        aiConfig: aiServiceConfig,
+        aiConfigured: !!activeConfig?.apiKey
+      }));
+    } catch (error) {
+      handleError(error, { component: 'AIConfig', action: 'delete' });
+    }
+  }, [storageService, handleError]);
+
+  const handleSetActiveAIConfig = useCallback(async (configId: string) => {
+    try {
+      if (!storageService) throw new Error('Storage service not initialized');
+
+      const preferences = await storageService.getUserPreferences();
+      await storageService.updateUserPreferences({
+        ...preferences,
+        activeAIConfigId: configId
+      });
+
+      const activeConfig = state.aiConfigurations.find(c => c.id === configId);
+      const aiServiceConfig = activeConfig ? {
+        apiKey: activeConfig.apiKey,
+        model: activeConfig.model,
+        maxTokens: activeConfig.maxTokens,
+        temperature: activeConfig.temperature,
+        baseUrl: activeConfig.baseUrl
+      } as AIServiceConfig : null;
+
+      setState(prev => ({
+        ...prev,
+        activeAIConfigId: configId,
+        aiConfig: aiServiceConfig,
+        aiConfigured: !!activeConfig?.apiKey
+      }));
+    } catch (error) {
+      handleError(error, { component: 'AIConfig', action: 'setActive' });
+    }
+  }, [storageService, state.aiConfigurations, handleError]);
 
   const handleTestAIConfig = useCallback(async (config: AIServiceConfig): Promise<boolean> => {
     try {
@@ -821,9 +1129,12 @@ export const ModernPopupApp: React.FC = () => {
             )}
             
             {state.activeView === 'ai' && (
-              <AIConfigView
-                config={state.aiConfig}
+              <AIConfigManager
+                configurations={state.aiConfigurations}
+                activeConfigId={state.activeAIConfigId}
                 onSave={handleSaveAIConfig}
+                onDelete={handleDeleteAIConfig}
+                onSetActive={handleSetActiveAIConfig}
                 onTest={handleTestAIConfig}
               />
             )}

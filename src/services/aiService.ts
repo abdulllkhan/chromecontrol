@@ -32,6 +32,7 @@ export interface AIServiceConfig {
   maxRetries?: number;
   rateLimitRpm?: number; // requests per minute
   enableStreaming?: boolean;
+  provider?: 'openai' | 'claude' | 'auto'; // Add provider detection
 }
 
 export interface QueuedRequest {
@@ -80,16 +81,22 @@ export class AIService {
   private performanceMonitor?: PerformanceMonitor;
 
   constructor(config: AIServiceConfig) {
+    // Detect provider automatically if not specified
+    const detectedProvider = config.provider === 'auto' || !config.provider
+      ? this.detectProvider(config)
+      : config.provider;
+
     this.config = {
-      baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-5-mini', // Use the fast, cost-effective GPT-5 model
+      baseUrl: detectedProvider === 'claude' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1',
+      model: detectedProvider === 'claude' ? 'claude-sonnet-4-20250514' : 'gpt-5-mini',
       maxTokens: 4000,
       temperature: 0.7,
       timeout: 30000,
       maxRetries: 3,
       rateLimitRpm: 60,
       enableStreaming: false,
-      ...config
+      ...config,
+      provider: detectedProvider // Override provider after spreading config to ensure detected value is used
     };
 
     this.rateLimitState = {
@@ -100,6 +107,29 @@ export class AIService {
 
     // Start queue processing
     this.startQueueProcessor();
+  }
+
+  /**
+   * Detect AI provider based on configuration
+   */
+  private detectProvider(config: AIServiceConfig): 'openai' | 'claude' {
+    // Check API key format
+    if (config.apiKey?.startsWith('sk-ant-')) {
+      return 'claude';
+    }
+
+    // Check base URL
+    if (config.baseUrl?.includes('anthropic.com')) {
+      return 'claude';
+    }
+
+    // Check model name
+    if (config.model?.startsWith('claude-')) {
+      return 'claude';
+    }
+
+    // Default to OpenAI
+    return 'openai';
   }
 
   /**
@@ -288,21 +318,142 @@ export class AIService {
         return false;
       }
 
-      // Try with the configured model first, then fallback
-      const modelsToTry = [this.config.model, 'gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini'];
-      
-      for (const model of modelsToTry) {
-        const result = await this.tryTestWithModel(model);
-        if (result) {
-          return true;
-        }
+      console.log(`Testing ${this.config.provider} API connection...`);
+
+      if (this.config.provider === 'claude') {
+        return await this.testClaudeConnection();
+      } else {
+        return await this.testOpenAIConnection();
       }
-      
-      return false;
     } catch (error) {
       console.error('Connection test failed:', error);
       return false;
     }
+  }
+
+  /**
+   * Test Claude API connection
+   */
+  private async testClaudeConnection(): Promise<boolean> {
+    try {
+      // Use a reliable Claude model for testing
+      const testModel = this.config.model?.startsWith('claude-')
+        ? this.config.model
+        : 'claude-3-5-haiku-20241022'; // Fallback to reliable model
+
+      console.log(`Testing Claude with model: ${testModel}`);
+
+      // Build request payload for Claude
+      const requestBody: any = {
+        model: testModel,
+        max_tokens: 10,
+        messages: [
+          {
+            role: 'user',
+            content: 'Hi'
+          }
+        ]
+      };
+
+      // Only add temperature for non-Opus 4.1 models
+      if (testModel !== 'claude-opus-4-1-20250805') {
+        requestBody.temperature = 0.1;
+      }
+
+      // Build headers for Claude
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-api-key': this.config.apiKey.trim(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true' // Required for browser/extension requests
+      };
+
+      // Add beta headers for Claude 4 models
+      if (testModel.startsWith('claude-opus-4') || testModel.startsWith('claude-sonnet-4')) {
+        headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      try {
+        const response = await fetch(`${this.config.baseUrl}/messages`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          let errorDetails;
+          try {
+            const errorText = await response.text();
+            try {
+              errorDetails = JSON.parse(errorText);
+            } catch {
+              errorDetails = { message: errorText };
+            }
+          } catch {
+            errorDetails = { message: 'Unable to read error response' };
+          }
+
+          console.error(`Claude API test failed: ${response.status} ${response.statusText}`);
+          console.error('Error details:', errorDetails);
+          return false;
+        }
+
+        const data = await response.json();
+
+        // Validate Claude response structure
+        const isValid = !!(
+          data &&
+          data.content &&
+          Array.isArray(data.content) &&
+          data.content.length > 0 &&
+          data.content[0] &&
+          data.content[0].text &&
+          typeof data.content[0].text === 'string' &&
+          data.content[0].text.trim().length > 0
+        );
+
+        if (isValid) {
+          console.log(`✅ Claude API test successful with model: ${testModel}`);
+          console.log(`Response: "${data.content[0].text}"`);
+          return true;
+        } else {
+          console.error('Claude API test failed: Invalid response structure', data);
+          return false;
+        }
+
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        console.error('Claude API test request failed:', fetchError);
+        return false;
+      }
+
+    } catch (error) {
+      console.error('Claude connection test failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Test OpenAI API connection
+   */
+  private async testOpenAIConnection(): Promise<boolean> {
+    // Try with the configured model first, then fallback
+    const modelsToTry = [this.config.model, 'gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini'];
+
+    for (const model of modelsToTry) {
+      const result = await this.tryTestWithModel(model);
+      if (result) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -632,13 +783,13 @@ export class AIService {
   }
 
   /**
-   * Make API call to OpenAI
+   * Make API call to AI provider (OpenAI or Claude)
    */
   private async makeAPICall(apiRequest: any): Promise<any> {
     // Validate API key before making request
     if (!this.config.apiKey || this.config.apiKey.trim() === '') {
       throw new AIError(
-        'API key is missing. Please configure your OpenAI API key in the settings.',
+        `API key is missing. Please configure your ${this.config.provider === 'claude' ? 'Claude' : 'OpenAI'} API key in the settings.`,
         'NO_API_KEY',
         401,
         false
@@ -649,7 +800,24 @@ export class AIService {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      console.log('Making AI API request to:', `${this.config.baseUrl}/chat/completions`);
+      // Route to appropriate endpoint based on provider
+      if (this.config.provider === 'claude') {
+        return await this.makeClaudeAPICall(apiRequest, controller, timeoutId);
+      } else {
+        return await this.makeOpenAIAPICall(apiRequest, controller, timeoutId);
+      }
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  }
+
+  /**
+   * Make API call to OpenAI
+   */
+  private async makeOpenAIAPICall(apiRequest: any, controller: AbortController, timeoutId: NodeJS.Timeout): Promise<any> {
+    try {
+      console.log('Making OpenAI API request to:', `${this.config.baseUrl}/chat/completions`);
       const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -702,6 +870,132 @@ export class AIService {
         true
       );
     }
+  }
+
+  /**
+   * Make API call to Claude
+   */
+  private async makeClaudeAPICall(apiRequest: any, controller: AbortController, timeoutId: NodeJS.Timeout): Promise<any> {
+    try {
+      // Convert OpenAI format to Claude format
+      const claudeRequest = this.convertToClaudeFormat(apiRequest);
+
+      console.log('Making Claude API request to:', `${this.config.baseUrl}/messages`);
+
+      // Build headers for Claude
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-api-key': this.config.apiKey.trim(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true' // Required for browser/extension requests
+      };
+
+      // Add beta headers for Claude 4 models
+      if (this.config.model?.startsWith('claude-opus-4') || this.config.model?.startsWith('claude-sonnet-4')) {
+        headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+      }
+
+      const response = await fetch(`${this.config.baseUrl}/messages`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(claudeRequest),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        let errorMessage = `Claude API request failed: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error && errorData.error.message) {
+            errorMessage = `Claude API Error: ${errorData.error.message}`;
+          }
+        } catch (parseError) {
+          // Ignore JSON parsing errors for error response
+        }
+
+        throw new AIError(
+          errorMessage,
+          'API_ERROR',
+          response.status,
+          response.status >= 500 || response.status === 429
+        );
+      }
+
+      const result = await response.json();
+      console.log('Claude API request successful');
+
+      // Convert Claude response back to OpenAI format for consistency
+      return this.convertClaudeResponseToOpenAI(result);
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      if (error instanceof AIError) {
+        throw error;
+      }
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new AIError('Request timeout', 'TIMEOUT', undefined, true);
+      }
+
+      throw new AIError(
+        `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'NETWORK_ERROR',
+        undefined,
+        true
+      );
+    }
+  }
+
+  /**
+   * Convert OpenAI request format to Claude format
+   */
+  private convertToClaudeFormat(openAIRequest: any): any {
+    const claudeRequest: any = {
+      model: this.config.model || 'claude-3-5-haiku-20241022',
+      max_tokens: openAIRequest.max_tokens || this.config.maxTokens,
+      messages: openAIRequest.messages || []
+    };
+
+    // Only add temperature for non-Opus 4.1 models
+    if (this.config.model !== 'claude-opus-4-1-20250805' && openAIRequest.temperature !== undefined) {
+      claudeRequest.temperature = openAIRequest.temperature;
+    }
+
+    return claudeRequest;
+  }
+
+  /**
+   * Convert Claude response to OpenAI format
+   */
+  private convertClaudeResponseToOpenAI(claudeResponse: any): any {
+    // Claude response format: { content: [{ text: "..." }], ... }
+    // OpenAI format: { choices: [{ message: { content: "..." }, ... }], ... }
+
+    const content = claudeResponse.content?.[0]?.text || '';
+
+    return {
+      id: claudeResponse.id || 'claude-' + Date.now(),
+      object: 'chat.completion',
+      created: Date.now() / 1000,
+      model: claudeResponse.model || this.config.model,
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: content
+          },
+          finish_reason: claudeResponse.stop_reason || 'stop'
+        }
+      ],
+      usage: {
+        prompt_tokens: claudeResponse.usage?.input_tokens || 0,
+        completion_tokens: claudeResponse.usage?.output_tokens || 0,
+        total_tokens: (claudeResponse.usage?.input_tokens || 0) + (claudeResponse.usage?.output_tokens || 0)
+      }
+    };
   }
 
   /**

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude API Browser Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .btn-success { background-color: #27ae60; }
+        .btn-success:hover { background-color: #229954; }
+        .btn-warning { background-color: #f39c12; }
+        .btn-warning:hover { background-color: #e67e22; }
+        .btn-danger { background-color: #e74c3c; }
+        .btn-danger:hover { background-color: #c0392b; }
+
+        .log-container {
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+            padding: 15px;
+            border-radius: 4px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .log-success { color: #27ae60; }
+        .log-error { color: #e74c3c; }
+        .log-warning { color: #f39c12; }
+        .log-info { color: #3498db; }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-unknown { background-color: #bdc3c7; }
+        .status-success { background-color: #27ae60; }
+        .status-error { background-color: #e74c3c; }
+        .status-testing { background-color: #f39c12; animation: pulse 1s infinite; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .model-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .model-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: white;
+        }
+
+        .model-card h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+
+        .model-status {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Claude API Browser Test Suite</h1>
+
+        <!-- API Configuration Section -->
+        <div class="test-section">
+            <h2>API Configuration</h2>
+            <div class="form-group">
+                <label for="apiKey">Claude API Key:</label>
+                <input type="password" id="apiKey" placeholder="sk-ant-..." value="">
+            </div>
+            <div class="form-group">
+                <label for="baseUrl">Base URL:</label>
+                <input type="text" id="baseUrl" value="https://api.anthropic.com/v1">
+            </div>
+            <button onclick="saveConfig()">Save Configuration</button>
+            <button onclick="loadConfig()" class="btn-warning">Load from Extension</button>
+        </div>
+
+        <!-- Quick Test Section -->
+        <div class="test-section">
+            <h2>Quick Connection Test</h2>
+            <div class="form-group">
+                <label for="testModel">Test Model:</label>
+                <select id="testModel">
+                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Most Reliable)</option>
+                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Legacy)</option>
+                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Latest)</option>
+                    <option value="claude-opus-4-1-20250805">Claude Opus 4.1 (Most Powerful)</option>
+                </select>
+            </div>
+            <button onclick="quickTest()" id="quickTestBtn">🚀 Quick Test</button>
+            <button onclick="testAllModels()" id="testAllBtn" class="btn-success">🔍 Test All Models</button>
+        </div>
+
+        <!-- Claude Service Test Section -->
+        <div class="test-section">
+            <h2>Claude Service Integration Test</h2>
+            <div class="form-group">
+                <label for="testPrompt">Test Prompt:</label>
+                <textarea id="testPrompt" rows="3" placeholder="Enter a test prompt...">Explain quantum computing in one sentence.</textarea>
+            </div>
+            <button onclick="testClaudeService()" id="serviceTestBtn" class="btn-success">🧪 Test Claude Service</button>
+        </div>
+
+        <!-- Models Status Section -->
+        <div class="test-section">
+            <h2>Models Availability Status</h2>
+            <div class="model-grid" id="modelGrid">
+                <!-- Models will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Logs Section -->
+        <div class="test-section">
+            <h2>Test Logs</h2>
+            <button onclick="clearLogs()" class="btn-warning">Clear Logs</button>
+            <button onclick="exportLogs()" class="btn-info">Export Logs</button>
+            <div class="log-container" id="logContainer">
+Welcome to Claude API Test Suite!
+Enter your API key above and click "Quick Test" to get started.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Claude models configuration
+        const CLAUDE_MODELS = {
+            'claude-opus-4-1-20250805': {
+                name: 'Claude Opus 4.1 (Latest & Most Powerful)',
+                maxTokens: 1000000,
+                isLatest: true,
+                category: 'Claude 4'
+            },
+            'claude-sonnet-4-20250514': {
+                name: 'Claude Sonnet 4 (Best Balance)',
+                maxTokens: 1000000,
+                isLatest: true,
+                category: 'Claude 4'
+            },
+            'claude-3-5-haiku-20241022': {
+                name: 'Claude 3.5 Haiku (Fast & Economical)',
+                maxTokens: 200000,
+                isLatest: false,
+                category: 'Claude 3.5'
+            },
+            'claude-3-5-sonnet-20241022': {
+                name: 'Claude 3.5 Sonnet (Legacy)',
+                maxTokens: 200000,
+                isLatest: false,
+                category: 'Claude 3.5'
+            },
+            'claude-3-5-sonnet-20240620': {
+                name: 'Claude 3.5 Sonnet (Legacy)',
+                maxTokens: 200000,
+                isLatest: false,
+                category: 'Claude 3.5'
+            }
+        };
+
+        // Test state
+        let testResults = {};
+        let apiConfig = {
+            apiKey: '',
+            baseUrl: 'https://api.anthropic.com/v1'
+        };
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeModelGrid();
+            loadConfigFromStorage();
+        });
+
+        function log(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = `log-${type}`;
+
+            const logLine = `[${timestamp}] ${message}\n`;
+            container.innerHTML += `<span class="${className}">${logLine}</span>`;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logContainer').innerHTML = '';
+            log('Logs cleared', 'info');
+        }
+
+        function exportLogs() {
+            const logs = document.getElementById('logContainer').textContent;
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `claude-test-logs-${new Date().toISOString().slice(0, 10)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function saveConfig() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const baseUrl = document.getElementById('baseUrl').value.trim();
+
+            if (!apiKey) {
+                log('Please enter an API key', 'error');
+                return;
+            }
+
+            apiConfig.apiKey = apiKey;
+            apiConfig.baseUrl = baseUrl;
+
+            // Save to localStorage
+            localStorage.setItem('claude-test-config', JSON.stringify(apiConfig));
+
+            log('Configuration saved successfully', 'success');
+        }
+
+        function loadConfigFromStorage() {
+            const saved = localStorage.getItem('claude-test-config');
+            if (saved) {
+                const config = JSON.parse(saved);
+                document.getElementById('apiKey').value = config.apiKey || '';
+                document.getElementById('baseUrl').value = config.baseUrl || 'https://api.anthropic.com/v1';
+                apiConfig = config;
+                log('Configuration loaded from storage', 'info');
+            }
+        }
+
+        function loadConfig() {
+            // Try to load from Chrome extension storage
+            if (typeof chrome !== 'undefined' && chrome.storage) {
+                chrome.storage.local.get(['aiConfigurations', 'activeAIConfigId'], function(result) {
+                    if (result.aiConfigurations && result.activeAIConfigId) {
+                        const activeConfig = result.aiConfigurations.find(c => c.id === result.activeAIConfigId);
+                        if (activeConfig && activeConfig.provider === 'claude') {
+                            document.getElementById('apiKey').value = activeConfig.apiKey || '';
+                            document.getElementById('baseUrl').value = activeConfig.baseUrl || 'https://api.anthropic.com/v1';
+                            saveConfig();
+                            log('Configuration loaded from Chrome extension', 'success');
+                            return;
+                        }
+                    }
+                    log('No Claude configuration found in extension storage', 'warning');
+                });
+            } else {
+                log('Chrome extension APIs not available', 'warning');
+            }
+        }
+
+        function initializeModelGrid() {
+            const grid = document.getElementById('modelGrid');
+            grid.innerHTML = '';
+
+            for (const [modelId, config] of Object.entries(CLAUDE_MODELS)) {
+                const card = document.createElement('div');
+                card.className = 'model-card';
+                card.innerHTML = `
+                    <h4>${config.name}</h4>
+                    <div class="model-status">
+                        <span class="status-indicator status-unknown" id="status-${modelId}"></span>
+                        <span id="status-text-${modelId}">Not tested</span>
+                    </div>
+                    <div style="font-size: 12px; color: #666;">
+                        Category: ${config.category}<br>
+                        Max Tokens: ${config.maxTokens.toLocaleString()}<br>
+                        Model ID: ${modelId}
+                    </div>
+                    <button onclick="testSingleModel('${modelId}')" style="margin-top: 10px; width: 100%;">
+                        Test This Model
+                    </button>
+                `;
+                grid.appendChild(card);
+            }
+        }
+
+        function updateModelStatus(modelId, status, message) {
+            const indicator = document.getElementById(`status-${modelId}`);
+            const text = document.getElementById(`status-text-${modelId}`);
+
+            if (indicator && text) {
+                indicator.className = `status-indicator status-${status}`;
+                text.textContent = message;
+            }
+        }
+
+        async function testClaudeAPI(modelId, prompt = 'Hi') {
+            if (!apiConfig.apiKey) {
+                throw new Error('API key not configured');
+            }
+
+            const modelConfig = CLAUDE_MODELS[modelId];
+            if (!modelConfig) {
+                throw new Error(`Unknown model: ${modelId}`);
+            }
+
+            // Build request
+            const requestBody = {
+                model: modelId,
+                max_tokens: 20,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ]
+            };
+
+            // Add temperature for most models, but not Opus 4.1
+            if (modelId !== 'claude-opus-4-1-20250805') {
+                requestBody.temperature = 0.7;
+            }
+
+            // Build headers
+            const headers = {
+                'Content-Type': 'application/json',
+                'x-api-key': apiConfig.apiKey,
+                'anthropic-version': '2023-06-01'
+            };
+
+            // Add beta headers for Claude 4 models
+            if (modelConfig.isLatest) {
+                headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+            }
+
+            log(`Testing ${modelConfig.name}...`, 'info');
+            log(`Request: ${JSON.stringify(requestBody, null, 2)}`, 'info');
+
+            const startTime = Date.now();
+            const response = await fetch(`${apiConfig.baseUrl}/messages`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(requestBody)
+            });
+
+            const responseTime = Date.now() - startTime;
+
+            if (!response.ok) {
+                let errorDetails;
+                try {
+                    const errorText = await response.text();
+                    try {
+                        errorDetails = JSON.parse(errorText);
+                    } catch {
+                        errorDetails = { message: errorText };
+                    }
+                } catch {
+                    errorDetails = { message: 'Unable to read error response' };
+                }
+
+                throw new Error(`API Error (${response.status}): ${errorDetails.error?.message || errorDetails.message || 'Unknown error'}`);
+            }
+
+            const data = await response.json();
+
+            // Validate response
+            if (!data.content || !Array.isArray(data.content) || data.content.length === 0) {
+                throw new Error('Invalid response structure');
+            }
+
+            const content = data.content[0].text;
+            const usage = data.usage;
+
+            return {
+                success: true,
+                model: modelId,
+                responseTime,
+                content,
+                usage,
+                response: data
+            };
+        }
+
+        async function quickTest() {
+            const btn = document.getElementById('quickTestBtn');
+            btn.disabled = true;
+            btn.textContent = 'Testing...';
+
+            try {
+                if (!apiConfig.apiKey) {
+                    saveConfig();
+                    if (!apiConfig.apiKey) {
+                        throw new Error('Please enter your API key first');
+                    }
+                }
+
+                const modelId = document.getElementById('testModel').value;
+                updateModelStatus(modelId, 'testing', 'Testing...');
+
+                const result = await testClaudeAPI(modelId, 'Say "Hello!" in exactly one word.');
+
+                log(`✅ Quick test successful!`, 'success');
+                log(`Model: ${result.model}`, 'success');
+                log(`Response: "${result.content}"`, 'success');
+                log(`Response time: ${result.responseTime}ms`, 'success');
+                log(`Tokens: ${result.usage?.input_tokens || 'N/A'} input, ${result.usage?.output_tokens || 'N/A'} output`, 'success');
+
+                updateModelStatus(modelId, 'success', `Working (${result.responseTime}ms)`);
+                testResults[modelId] = result;
+
+            } catch (error) {
+                log(`❌ Quick test failed: ${error.message}`, 'error');
+                updateModelStatus(modelId, 'error', `Failed: ${error.message}`);
+                testResults[modelId] = { success: false, error: error.message };
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚀 Quick Test';
+            }
+        }
+
+        async function testSingleModel(modelId) {
+            try {
+                if (!apiConfig.apiKey) {
+                    saveConfig();
+                    if (!apiConfig.apiKey) {
+                        throw new Error('Please enter your API key first');
+                    }
+                }
+
+                updateModelStatus(modelId, 'testing', 'Testing...');
+
+                const result = await testClaudeAPI(modelId, 'Say "Hello!" in exactly one word.');
+
+                log(`✅ ${CLAUDE_MODELS[modelId].name} test successful!`, 'success');
+                log(`Response: "${result.content}"`, 'success');
+                log(`Response time: ${result.responseTime}ms`, 'success');
+
+                updateModelStatus(modelId, 'success', `Working (${result.responseTime}ms)`);
+                testResults[modelId] = result;
+
+            } catch (error) {
+                log(`❌ ${CLAUDE_MODELS[modelId].name} test failed: ${error.message}`, 'error');
+                updateModelStatus(modelId, 'error', `Failed`);
+                testResults[modelId] = { success: false, error: error.message };
+            }
+        }
+
+        async function testAllModels() {
+            const btn = document.getElementById('testAllBtn');
+            btn.disabled = true;
+            btn.textContent = 'Testing All Models...';
+
+            try {
+                if (!apiConfig.apiKey) {
+                    saveConfig();
+                    if (!apiConfig.apiKey) {
+                        throw new Error('Please enter your API key first');
+                    }
+                }
+
+                log('🔍 Starting comprehensive model testing...', 'info');
+
+                const modelIds = Object.keys(CLAUDE_MODELS);
+                const results = [];
+
+                for (const modelId of modelIds) {
+                    try {
+                        updateModelStatus(modelId, 'testing', 'Testing...');
+                        const result = await testClaudeAPI(modelId);
+                        results.push(result);
+                        updateModelStatus(modelId, 'success', `Working (${result.responseTime}ms)`);
+                        testResults[modelId] = result;
+
+                        // Add delay between requests to avoid rate limiting
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    } catch (error) {
+                        log(`❌ ${CLAUDE_MODELS[modelId].name}: ${error.message}`, 'error');
+                        updateModelStatus(modelId, 'error', 'Failed');
+                        testResults[modelId] = { success: false, error: error.message };
+                    }
+                }
+
+                // Generate summary
+                const successful = results.filter(r => r.success);
+                const failed = Object.keys(CLAUDE_MODELS).length - successful.length;
+
+                log('📊 Test Summary:', 'info');
+                log(`✅ Successful: ${successful.length}/${Object.keys(CLAUDE_MODELS).length}`, 'success');
+                log(`❌ Failed: ${failed}/${Object.keys(CLAUDE_MODELS).length}`, failed > 0 ? 'error' : 'success');
+
+                if (successful.length > 0) {
+                    const fastest = successful.reduce((prev, curr) =>
+                        prev.responseTime < curr.responseTime ? prev : curr
+                    );
+                    log(`🏆 Fastest model: ${CLAUDE_MODELS[fastest.model].name} (${fastest.responseTime}ms)`, 'success');
+                }
+
+                const claude4Working = successful.filter(r => CLAUDE_MODELS[r.model].isLatest);
+                if (claude4Working.length > 0) {
+                    log(`🆕 Claude 4 models are available and working!`, 'success');
+                } else {
+                    log(`⚠️ Claude 4 models are not available yet. Use Claude 3.5 models.`, 'warning');
+                }
+
+            } catch (error) {
+                log(`❌ Test suite failed: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 Test All Models';
+            }
+        }
+
+        async function testClaudeService() {
+            const btn = document.getElementById('serviceTestBtn');
+            btn.disabled = true;
+            btn.textContent = 'Testing Service...';
+
+            try {
+                if (!apiConfig.apiKey) {
+                    saveConfig();
+                    if (!apiConfig.apiKey) {
+                        throw new Error('Please enter your API key first');
+                    }
+                }
+
+                const prompt = document.getElementById('testPrompt').value.trim();
+                if (!prompt) {
+                    throw new Error('Please enter a test prompt');
+                }
+
+                // Use the fastest working model
+                const workingModels = Object.keys(testResults).filter(id => testResults[id].success);
+                if (workingModels.length === 0) {
+                    throw new Error('No working models found. Run "Test All Models" first.');
+                }
+
+                const modelId = workingModels[0];
+                log(`🧪 Testing Claude Service with model: ${CLAUDE_MODELS[modelId].name}`, 'info');
+                log(`Prompt: "${prompt}"`, 'info');
+
+                const result = await testClaudeAPI(modelId, prompt);
+
+                log(`✅ Claude Service test successful!`, 'success');
+                log(`Response: "${result.content}"`, 'success');
+                log(`Response time: ${result.responseTime}ms`, 'success');
+                log(`Tokens used: ${result.usage?.input_tokens || 'N/A'} input, ${result.usage?.output_tokens || 'N/A'} output`, 'success');
+
+            } catch (error) {
+                log(`❌ Claude Service test failed: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🧪 Test Claude Service';
+            }
+        }
+    </script>
+</body>
+</html>

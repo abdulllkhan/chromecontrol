@@ -15,7 +15,8 @@ import {
   SecurityLevel,
   PageType,
   TaskType,
-  SecurityConstraints
+  SecurityConstraints,
+  AIConfiguration
 } from '../types';
 import type { TaskResult } from '../types';
 import {
@@ -65,11 +66,14 @@ interface SidebarState {
   error: string | null;
   hasAIConfig: boolean;
   activeTab: 'suggestions' | 'tasks' | 'ai' | 'settings';
+  aiConfigurations: AIConfiguration[];
+  activeAIConfigId: string | null;
 }
 
 interface AIConfigProps {
   config?: AIServiceConfig;
-  onSave: (config: AIServiceConfig) => void;
+  configName?: string;
+  onSave: (config: AIServiceConfig, name: string) => void;
   onCancel: () => void;
   onTest: (config: AIServiceConfig) => Promise<boolean>;
 }
@@ -84,7 +88,9 @@ const SidebarApp: React.FC = () => {
     isLoading: true,
     error: null,
     hasAIConfig: false,
-    activeTab: 'suggestions'
+    activeTab: 'suggestions',
+    aiConfigurations: [],
+    activeAIConfigId: null
   });
 
   // Service instances
@@ -103,6 +109,7 @@ const SidebarApp: React.FC = () => {
   const [aiService, setAIService] = useState<AIService | null>(null);
   const [aiConfig, setAIConfig] = useState<AIServiceConfig | null>(null);
   const [provider, setProvider] = useState<'openai' | 'claude'>('openai');
+  const [editingConfigId, setEditingConfigId] = useState<string | null>(null);
 
   // Enhanced error handling
   const { error: globalError, retry, clearError, executeWithErrorHandling } = useErrorHandler({
@@ -166,9 +173,30 @@ const SidebarApp: React.FC = () => {
       console.log('🔍 SIDEBAR: Loading AI configuration from storage...');
       const preferences = await storageService.getUserPreferences();
       console.log('📋 SIDEBAR: Loaded preferences:', preferences);
-      const loadedAiConfig = preferences?.aiConfig || null;
+
+      // Load multiple configurations
+      const aiConfigurations = preferences?.aiConfigurations || [];
+      const activeAIConfigId = preferences?.activeAIConfigId || null;
+
+      // Find the active configuration
+      const activeConfig = aiConfigurations.find(c => c.id === activeAIConfigId);
+      let loadedAiConfig = null;
+
+      if (activeConfig) {
+        loadedAiConfig = {
+          apiKey: activeConfig.apiKey,
+          model: activeConfig.model,
+          maxTokens: activeConfig.maxTokens,
+          temperature: activeConfig.temperature,
+          baseUrl: activeConfig.baseUrl
+        } as AIServiceConfig;
+      } else {
+        // Fallback to old single config if exists
+        loadedAiConfig = preferences?.aiConfig || null;
+      }
+
       console.log('🔧 SIDEBAR: AI Config from storage:', loadedAiConfig);
-      const hasAIConfig = !!(loadedAiConfig?.apiKey);
+      const hasAIConfig = !!(loadedAiConfig?.apiKey) || aiConfigurations.length > 0;
       console.log('✅ SIDEBAR: AI Configured:', hasAIConfig);
       
       // Store the config in state for the AI config component
@@ -335,6 +363,8 @@ const SidebarApp: React.FC = () => {
         suggestions,
         tasks,
         hasAIConfig,
+        aiConfigurations,
+        activeAIConfigId,
         isLoading: false,
         error: null
       }));
@@ -484,9 +514,9 @@ User's follow-up question: ${userMessage}`;
   }, [chatInput, aiService, isProcessingChat, currentExecutingSuggestion, testResult, chatMessages, state.websiteContext]);
 
   // Handle AI configuration
-  const handleAISave = useCallback(async (config: AIServiceConfig) => {
+  const handleAISave = useCallback(async (config: AIServiceConfig, configName?: string) => {
     console.log('🎯 SIDEBAR: handleAISave called with config:', config);
-    
+
     if (!storageService) {
       console.error('❌ SIDEBAR: Storage service not available');
       setState(prev => ({ ...prev, error: 'Storage service not available' }));
@@ -497,23 +527,66 @@ User's follow-up question: ${userMessage}`;
     try {
       console.log('💾 SIDEBAR: Starting save process...');
       console.log('💾 SIDEBAR: Config to save:', JSON.stringify(config, null, 2));
-      
-      // Save AI config to user preferences
+
+      // Save AI config to user preferences in new format
       const preferences = await storageService.getUserPreferences();
       console.log('📋 SIDEBAR: Current preferences:', JSON.stringify(preferences, null, 2));
-      
+
+      // Create a new AI configuration
+      const newAIConfig: AIConfiguration = {
+        id: editingConfigId || `config_${Date.now()}`,
+        name: configName || (editingConfigId
+          ? state.aiConfigurations.find(c => c.id === editingConfigId)?.name || 'Updated Configuration'
+          : `Configuration ${(state.aiConfigurations?.length || 0) + 1}`),
+        provider: config.baseUrl?.includes('anthropic') ? 'claude' : 'openai',
+        apiKey: config.apiKey,
+        model: config.model,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature || 0.7,
+        baseUrl: config.baseUrl,
+        isActive: false,
+        createdAt: editingConfigId
+          ? state.aiConfigurations.find(c => c.id === editingConfigId)?.createdAt || new Date()
+          : new Date(),
+        updatedAt: new Date()
+      };
+
+      // Update or add the configuration - use state.aiConfigurations as source of truth
+      let updatedConfigs = [...(state.aiConfigurations || [])];
+      if (editingConfigId) {
+        const index = updatedConfigs.findIndex(c => c.id === editingConfigId);
+        if (index >= 0) {
+          // Update existing configuration
+          updatedConfigs[index] = newAIConfig;
+        } else {
+          // This shouldn't happen, but handle it gracefully
+          console.warn('Configuration to edit not found, adding as new');
+          updatedConfigs.push(newAIConfig);
+        }
+      } else {
+        // Add new configuration
+        updatedConfigs.push(newAIConfig);
+      }
+
+      // If this is the first config or we're editing the active one, make it active
+      const activeConfigId = (!preferences.activeAIConfigId || editingConfigId === preferences.activeAIConfigId)
+        ? newAIConfig.id
+        : preferences.activeAIConfigId;
+
       const updatedPreferences = {
         ...preferences,
-        aiConfig: config
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: activeConfigId,
+        aiConfig: config // Keep backward compatibility
       };
       console.log('💾 SIDEBAR: Updated preferences to save:', JSON.stringify(updatedPreferences, null, 2));
-      
+
       await storageService.updateUserPreferences(updatedPreferences);
       console.log('✅ SIDEBAR: Preferences saved to storage');
-      
+
       // Verify the save
       const verifyPrefs = await storageService.getUserPreferences();
-      console.log('🔍 SIDEBAR: Verification - saved config:', verifyPrefs?.aiConfig);
+      console.log('🔍 SIDEBAR: Verification - saved configs:', verifyPrefs?.aiConfigurations);
       
       // Update local state
       console.log('🔧 SIDEBAR: Updating React state...');
@@ -523,11 +596,18 @@ User's follow-up question: ${userMessage}`;
       const newAIService = new AIService(config);
       setAIService(newAIService);
       
-      setState(prev => ({ ...prev, hasAIConfig: true, error: null }));
+      setState(prev => ({
+        ...prev,
+        hasAIConfig: true,
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: activeConfigId,
+        error: null
+      }));
       setShowAIConfig(false);
-      
+      setEditingConfigId(null);
+
       console.log('✅ SIDEBAR: AI configuration saved successfully!');
-      alert('AI Configuration saved successfully! Close and reopen sidebar to verify persistence.');
+      alert('AI Configuration saved successfully! The new configuration has been added.');
       
       // Reinitialize with new AI service
       await initializeSidebar();
@@ -537,7 +617,7 @@ User's follow-up question: ${userMessage}`;
       setState(prev => ({ ...prev, error: errorMessage }));
       alert('Failed to save configuration: ' + errorMessage);
     }
-  }, [storageService, initializeSidebar]);
+  }, [storageService, initializeSidebar, state.aiConfigurations, editingConfigId]);
 
   const handleAITest = useCallback(async (config: AIServiceConfig): Promise<boolean> => {
     try {
@@ -549,6 +629,90 @@ User's follow-up question: ${userMessage}`;
       return false;
     }
   }, []);
+
+  const handleSetActiveConfig = useCallback(async (configId: string) => {
+    if (!storageService) return;
+
+    try {
+      const preferences = await storageService.getUserPreferences();
+      if (!preferences) return;
+
+      await storageService.updateUserPreferences({
+        ...preferences,
+        activeAIConfigId: configId
+      });
+
+      const activeConfig = state.aiConfigurations.find(c => c.id === configId);
+      if (activeConfig) {
+        const aiServiceConfig: AIServiceConfig = {
+          apiKey: activeConfig.apiKey,
+          model: activeConfig.model,
+          maxTokens: activeConfig.maxTokens,
+          temperature: activeConfig.temperature,
+          baseUrl: activeConfig.baseUrl
+        };
+        setAIConfig(aiServiceConfig);
+        setAIService(new AIService(aiServiceConfig));
+      }
+
+      setState(prev => ({
+        ...prev,
+        activeAIConfigId: configId,
+        hasAIConfig: true
+      }));
+    } catch (error) {
+      console.error('Failed to set active config:', error);
+    }
+  }, [storageService, state.aiConfigurations]);
+
+  const handleDeleteConfig = useCallback(async (configId: string) => {
+    if (!storageService) return;
+
+    try {
+      const preferences = await storageService.getUserPreferences();
+      if (!preferences) return;
+
+      const updatedConfigs = (preferences.aiConfigurations || []).filter(c => c.id !== configId);
+      let newActiveId = preferences.activeAIConfigId;
+
+      if (newActiveId === configId) {
+        newActiveId = updatedConfigs.length > 0 ? updatedConfigs[0].id : null;
+      }
+
+      await storageService.updateUserPreferences({
+        ...preferences,
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: newActiveId
+      });
+
+      setState(prev => ({
+        ...prev,
+        aiConfigurations: updatedConfigs,
+        activeAIConfigId: newActiveId,
+        hasAIConfig: updatedConfigs.length > 0
+      }));
+
+      if (newActiveId && updatedConfigs.length > 0) {
+        const activeConfig = updatedConfigs.find(c => c.id === newActiveId);
+        if (activeConfig) {
+          const aiServiceConfig: AIServiceConfig = {
+            apiKey: activeConfig.apiKey,
+            model: activeConfig.model,
+            maxTokens: activeConfig.maxTokens,
+            temperature: activeConfig.temperature,
+            baseUrl: activeConfig.baseUrl
+          };
+          setAIConfig(aiServiceConfig);
+          setAIService(new AIService(aiServiceConfig));
+        }
+      } else {
+        setAIConfig(null);
+        setAIService(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete config:', error);
+    }
+  }, [storageService]);
 
   // Render loading state
   if (state.isLoading) {
@@ -716,79 +880,112 @@ User's follow-up question: ${userMessage}`;
 
         {state.activeTab === 'ai' && (
           <div className="ai-panel">
-            {!state.hasAIConfig ? (
-              <div className="ai-setup">
-                <h3>AI Configuration Required</h3>
-                <p>Configure your AI service to enable intelligent suggestions and automation.</p>
+            <div className="ai-configurations-header">
+              <h3>AI Configurations</h3>
+              <button
+                className="add-config-button"
+                onClick={() => {
+                  setEditingConfigId(null);
+                  setShowAIConfig(true);
+                }}
+              >
+                + Add Configuration
+              </button>
+            </div>
+
+            {state.aiConfigurations.length === 0 ? (
+              <div className="ai-empty-state">
+                <p>No AI configurations yet.</p>
                 <button
                   className="setup-ai-button"
-                  onClick={() => setShowAIConfig(true)}
+                  onClick={() => {
+                    setEditingConfigId(null);
+                    setShowAIConfig(true);
+                  }}
                 >
-                  Configure AI Service
+                  Add Your First Configuration
                 </button>
               </div>
             ) : (
-              <div className="ai-status">
-                <div className="ai-status-header">
-                  <h3>AI Service Connected</h3>
-                  <span className="ai-status-badge">Active</span>
-                </div>
-                
-                {aiConfig && (
-                  <div className="ai-config-details">
-                    <div className="config-section">
-                      <h4>Provider</h4>
-                      <div className="config-value">
-                        {aiConfig.baseUrl?.includes('anthropic') || aiConfig.model?.includes('claude') ? 'Claude' : 'OpenAI'}
-                      </div>
-                    </div>
-                    
-                    <div className="config-section">
-                      <h4>Model</h4>
-                      <div className="config-value">{aiConfig.model}</div>
-                    </div>
-                    
-                    <div className="config-row">
-                      <div className="config-section">
-                        <h4>Max Tokens</h4>
-                        <div className="config-value">{aiConfig.maxTokens?.toLocaleString()}</div>
+              <div className="ai-configs-list">
+                {state.aiConfigurations
+                  .sort((a, b) => {
+                    // Active configuration first
+                    if (a.id === state.activeAIConfigId) return -1;
+                    if (b.id === state.activeAIConfigId) return 1;
+                    // Then sort by creation date (newest first)
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                  })
+                  .map((config) => {
+                  const isActive = config.id === state.activeAIConfigId;
+                  return (
+                    <div key={config.id} className={`ai-config-card ${isActive ? 'active' : ''}`}>
+                      <div className="config-header">
+                        <h4>{config.name}</h4>
+                        {isActive && <span className="active-badge">Active</span>}
                       </div>
 
-                      <div className="config-section">
-                        <h4>API Endpoint</h4>
-                        <div className="config-value" style={{ fontSize: '12px' }}>{aiConfig.baseUrl || 'Default'}</div>
+                      <div className="config-details">
+                        <div className="config-row">
+                          <div className="config-item">
+                            <span className="config-label">Provider</span>
+                            <span className="config-value">{config.provider}</span>
+                          </div>
+                          <div className="config-item">
+                            <span className="config-label">Model</span>
+                            <span className="config-value">{config.model}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="config-actions">
+                        {!isActive && (
+                          <button
+                            className="activate-button"
+                            onClick={() => handleSetActiveConfig(config.id)}
+                          >
+                            Activate
+                          </button>
+                        )}
+                        <button
+                          className="edit-button"
+                          onClick={() => {
+                            setEditingConfigId(config.id);
+                            setShowAIConfig(true);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="delete-button"
+                          onClick={() => {
+                            if (confirm(`Delete configuration "${config.name}"?`)) {
+                              handleDeleteConfig(config.id);
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
+                        <button
+                          className="test-button"
+                          onClick={async () => {
+                            const testConfig: AIServiceConfig = {
+                              apiKey: config.apiKey,
+                              model: config.model,
+                              maxTokens: config.maxTokens,
+                              temperature: config.temperature,
+                              baseUrl: config.baseUrl
+                            };
+                            const success = await handleAITest(testConfig);
+                            alert(success ? 'Connection test successful!' : 'Connection test failed!');
+                          }}
+                        >
+                          Test
+                        </button>
                       </div>
                     </div>
-                    
-                    <div className="config-section">
-                      <h4>Status</h4>
-                      <div className="config-value">
-                        {aiConfig.apiKey ? 'API Key Configured' : 'No API Key'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="ai-actions">
-                  <button
-                    className="reconfigure-ai-button"
-                    onClick={() => setShowAIConfig(true)}
-                  >
-                    Update Configuration
-                  </button>
-                  
-                  <button
-                    className="test-ai-button"
-                    onClick={async () => {
-                      if (aiConfig) {
-                        const success = await handleAITest(aiConfig);
-                        alert(success ? 'Connection test successful!' : 'Connection test failed!');
-                      }
-                    }}
-                  >
-                    Test Connection
-                  </button>
-                </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -875,10 +1072,25 @@ User's follow-up question: ${userMessage}`;
       {showAIConfig && storageService && (
         <div className="modal-overlay">
           <AIConfigComponent
-            key={aiConfig?.apiKey ? `configured-${aiConfig.apiKey.substring(0, 8)}` : 'unconfigured'}
-            config={aiConfig || undefined}
+            key={editingConfigId || 'new'}
+            config={editingConfigId ? (() => {
+              const editConfig = state.aiConfigurations.find(c => c.id === editingConfigId);
+              return editConfig ? {
+                apiKey: editConfig.apiKey,
+                model: editConfig.model,
+                maxTokens: editConfig.maxTokens,
+                temperature: editConfig.temperature,
+                baseUrl: editConfig.baseUrl
+              } as AIServiceConfig : undefined;
+            })() : undefined}
+            configName={editingConfigId
+              ? state.aiConfigurations.find(c => c.id === editingConfigId)?.name
+              : ''}
             onSave={handleAISave}
-            onCancel={() => setShowAIConfig(false)}
+            onCancel={() => {
+              setShowAIConfig(false);
+              setEditingConfigId(null);
+            }}
             onTest={handleAITest}
           />
         </div>
@@ -890,6 +1102,7 @@ User's follow-up question: ${userMessage}`;
 // AI Configuration Component (simplified version of popup component)
 const AIConfigComponent: React.FC<AIConfigProps> = ({
   config,
+  configName,
   onSave,
   onCancel,
   onTest
@@ -901,9 +1114,10 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     }
     return 'openai';
   });
+  const [name, setName] = useState(configName || '');
   const [formData, setFormData] = useState({
     apiKey: config?.apiKey || '',
-    model: config?.model || (provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
+    model: config?.model || (provider === 'openai' ? 'gpt-5' : 'claude-sonnet-4-20250514'),
     maxTokens: config?.maxTokens || 8000,
     baseUrl: config?.baseUrl || (provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
   });
@@ -927,8 +1141,8 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         console.log('🔧 SIDEBAR: Detected provider:', newProvider);
         
         const newFormData = {
-          apiKey: config.apiKey || '',
-          model: config.model || (newProvider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022'),
+          apiKey: '', // Never display existing API key for security
+          model: config.model || (newProvider === 'openai' ? 'gpt-5' : 'claude-sonnet-4-20250514'),
           maxTokens: config.maxTokens || 8000,
           baseUrl: config.baseUrl || (newProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1')
         };
@@ -989,7 +1203,7 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     setFormData(prev => {
       const newFormData = {
         ...prev,
-        model: provider === 'openai' ? 'gpt-5' : 'claude-3-5-sonnet-20241022',
+        model: provider === 'openai' ? 'gpt-5' : 'claude-sonnet-4-20250514',
         baseUrl: provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1',
         // Preserve API key from config if available, otherwise keep current
         apiKey: config?.apiKey || prev.apiKey
@@ -1034,14 +1248,20 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     e.preventDefault();
     console.log('🚀 SIDEBAR: Save button clicked!');
     console.log('📝 SIDEBAR: Form data to save:', formData);
-    
+    console.log('📝 SIDEBAR: Configuration name:', name);
+
+    if (!name.trim()) {
+      setErrors({ ...errors, name: 'Configuration name is required' });
+      return;
+    }
+
     if (validateForm()) {
       console.log('✅ SIDEBAR: Form validation passed');
       setTestResult({ success: true, message: 'Saving configuration...' });
-      
+
       try {
-        console.log('💾 SIDEBAR: Calling onSave with config:', formData);
-        await onSave(formData as AIServiceConfig);
+        console.log('💾 SIDEBAR: Calling onSave with config and name:', formData, name);
+        await onSave(formData as AIServiceConfig, name.trim());
         console.log('✅ SIDEBAR: onSave completed successfully');
         setTestResult({ success: true, message: 'Configuration saved successfully!' });
         
@@ -1069,19 +1289,50 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
     setTestResult(null);
 
     try {
-      const success = await onTest(formData as AIServiceConfig);
+      const testConfig: AIServiceConfig = {
+        ...formData,
+        apiKey: formData.apiKey?.trim() || '', // Ensure API key is trimmed
+        provider: 'auto' // Let AIService auto-detect the provider
+      };
+      const success = await onTest(testConfig);
       setTestResult({
         success,
         message: success ? 'Connection successful!' : 'Connection failed'
       });
+
+      // Auto-hide message after delay
+      const delay = success ? 3000 : 5000;
+      const timeoutId = setTimeout(() => {
+        setTestResult(null);
+      }, delay);
+
+      // Store timeout ID for potential cleanup
+      (window as any).testResultTimeout = timeoutId;
     } catch (error) {
       setTestResult({
         success: false,
         message: 'Test failed: ' + (error instanceof Error ? error.message : 'Unknown error')
       });
+
+      // Auto-hide error message after 5 seconds
+      const timeoutId = setTimeout(() => {
+        setTestResult(null);
+      }, 5000);
+
+      // Store timeout ID for potential cleanup
+      (window as any).testResultTimeout = timeoutId;
     } finally {
       setIsTestingConnection(false);
     }
+  };
+
+  const dismissTestResult = () => {
+    // Clear any existing timeout
+    if ((window as any).testResultTimeout) {
+      clearTimeout((window as any).testResultTimeout);
+      delete (window as any).testResultTimeout;
+    }
+    setTestResult(null);
   };
 
   return (
@@ -1121,27 +1372,67 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
           <form onSubmit={handleSubmit} className="ai-config-form">
         <div className="form-section">
           <div className="form-section-title">
-            Provider Selection
+            Configuration Name <span className="required-star">*</span>
           </div>
-          
-          <div className="provider-selection">
-            <div 
-              className={`provider-option ${provider === 'openai' ? 'selected' : ''}`}
-              onClick={() => setProvider('openai')}
-            >
-              <div className="provider-logo">OpenAI</div>
-              <div className="provider-name">OpenAI</div>
-              <div className="provider-description">GPT-5, GPT-5 Mini, GPT-4o</div>
+          <div className="input-wrapper">
+            <input
+              type="text"
+              className={`form-input styled-input ${errors.name ? 'error' : ''}`}
+              placeholder="Give your configuration a descriptive name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (errors.name) {
+                  setErrors({ ...errors, name: '' });
+                }
+              }}
+              autoFocus
+            />
+            <div className="input-hint">
+              {name ? `${name.length}/50 characters` : 'e.g., "Production API", "Development Testing"'}
             </div>
-            
-            <div 
-              className={`provider-option ${provider === 'claude' ? 'selected' : ''}`}
-              onClick={() => setProvider('claude')}
+          </div>
+          {errors.name && <div className="error-message">{errors.name}</div>}
+        </div>
+
+        <div className="form-section">
+          <div className="form-section-title">
+            AI Provider <span className="required-star">*</span>
+          </div>
+
+          <div className="select-wrapper">
+            <select
+              className="form-select styled-select"
+              value={provider}
+              onChange={(e) => {
+                const newProvider = e.target.value as 'openai' | 'claude';
+                setProvider(newProvider);
+                // Update default values based on provider
+                setFormData(prev => ({
+                  ...prev,
+                  model: newProvider === 'openai' ? 'gpt-5' : 'claude-sonnet-4-20250514',
+                  baseUrl: newProvider === 'openai'
+                    ? 'https://api.openai.com/v1'
+                    : 'https://api.anthropic.com/v1'
+                }));
+              }}
             >
-              <div className="provider-logo">Claude</div>
-              <div className="provider-name">Claude</div>
-              <div className="provider-description">Anthropic AI Assistant</div>
-            </div>
+              <option value="openai">OpenAI (GPT-5, GPT-4o, GPT-5 Mini)</option>
+              <option value="claude">Claude (Anthropic AI Assistant)</option>
+            </select>
+            <div className="select-arrow">▼</div>
+          </div>
+
+          <div className="provider-info">
+            {provider === 'openai' ? (
+              <span className="info-badge openai">
+                OpenAI API
+              </span>
+            ) : (
+              <span className="info-badge claude">
+                Anthropic API
+              </span>
+            )}
           </div>
         </div>
 
@@ -1197,11 +1488,11 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
                 </>
               ) : (
                 <>
-                  <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Latest)</option>
-                  <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
-                  <option value="claude-3-opus-20240229">Claude 3 Opus (Most Capable)</option>
-                  <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (Balanced)</option>
-                  <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast)</option>
+                  <option value="claude-opus-4-1-20250805">Claude Opus 4.1 (Latest & Most Powerful)</option>
+                  <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Best Balance)</option>
+                  <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast & Economical)</option>
+                  <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Legacy)</option>
+                  <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet (Legacy)</option>
                 </>
               )}
             </select>
@@ -1241,8 +1532,22 @@ const AIConfigComponent: React.FC<AIConfigProps> = ({
         </div>
 
             {testResult && (
-              <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
-                {testResult.message}
+              <div className={`test-notification ${testResult.success ? 'success' : 'error'}`}>
+                <div className="test-notification-content">
+                  <span className="test-notification-icon">
+                    {testResult.success ? '✓' : '✗'}
+                  </span>
+                  <span className="test-notification-message">
+                    {testResult.message}
+                  </span>
+                  <button
+                    className="test-notification-dismiss"
+                    onClick={dismissTestResult}
+                    aria-label="Dismiss notification"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
             )}
           </form>
