@@ -20,7 +20,6 @@ interface TaskManagementProps {
   taskManager: TaskManager;
   storageService: ChromeStorageService;
   websiteContext: WebsiteContext | null;
-  onOpenPromptDebugger?: (task: CustomTask, mode: 'validation' | 'preview' | 'debug') => void;
 }
 
 interface TaskLibraryViewProps {
@@ -30,7 +29,6 @@ interface TaskLibraryViewProps {
   onDelete: (taskId: string) => void;
   onToggle: (taskId: string, enabled: boolean) => void;
   onExport: (taskIds: string[]) => void;
-  onOpenPromptDebugger?: (task: CustomTask, mode: 'validation' | 'preview' | 'debug') => void;
 }
 
 
@@ -78,8 +76,7 @@ interface TaskOrganizationOptions {
 export const FullTaskManagement: React.FC<TaskManagementProps> = ({
   taskManager,
   storageService,
-  websiteContext,
-  onOpenPromptDebugger
+  websiteContext
 }) => {
   const [tasks, setTasks] = useState<CustomTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -245,7 +242,6 @@ export const FullTaskManagement: React.FC<TaskManagementProps> = ({
           onDelete={handleDelete}
           onToggle={handleToggle}
           onExport={handleExport}
-          onOpenPromptDebugger={onOpenPromptDebugger}
         />
       )}
 
@@ -292,8 +288,7 @@ const TaskLibraryView: React.FC<TaskLibraryViewProps> = ({
   onDuplicate,
   onDelete,
   onToggle,
-  onExport,
-  onOpenPromptDebugger
+  onExport
 }) => {
   const [organizationOptions, setOrganizationOptions] = useState<TaskOrganizationOptions>({
     sortBy: 'name',
@@ -644,15 +639,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
         <button className="btn btn-small btn-secondary" onClick={onDuplicate}>
           <DuplicateIcon size={14} /> Duplicate
         </button>
-        {onOpenPromptDebugger && (
-          <button 
-            className="btn btn-small btn-info" 
-            onClick={() => onOpenPromptDebugger(task, 'validation')}
-            title="Debug Prompt Template"
-          >
-            <SettingsIcon size={14} /> Debug
-          </button>
-        )}
         <button className="btn btn-small btn-danger" onClick={onDelete}>
           <DeleteIcon size={14} /> Delete
         </button>
