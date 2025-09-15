@@ -1,8 +1,20 @@
 // Content script for the Agentic Chrome Extension
-import type { PageContent, FormElement, LinkElement, AutomationStep, AutomationResult, SecurityLevel } from '../types';
+import type { PageContent, FormElement, LinkElement, AutomationStep, CleanTextContent } from '../types';
+import { SecurityLevel } from '../types';
 import { AutomationEngine, AutomationPermissions, PageContext } from '../services/automationEngine';
 import { OptimizedDOMService, createOptimizedDOMService, DOM_CONFIGS } from '../services/optimizedDOMService';
 import { PerformanceMonitor, createPerformanceMonitor, PERFORMANCE_CONFIGS } from '../services/performanceMonitor';
+import { textExtractionEngine } from '../services/textExtractionEngine';
+
+// Define AutomationResult interface locally since it's not exported from types
+interface AutomationResult {
+  success: boolean;
+  completedSteps: number;
+  extractedData?: Record<string, any>;
+  error?: string;
+  executionTime: number;
+  stepResults?: any[];
+}
 
 console.log('Agentic Chrome Extension content script loaded on:', window.location.href);
 
@@ -20,19 +32,20 @@ optimizedDOM.setPerformanceMonitor(performanceMonitor);
 /**
  * Extracts comprehensive page content for analysis
  */
-async function extractPageContent(): Promise<PageContent> {
+async function extractPageContent(): Promise<PageContent & { cleanContent?: CleanTextContent }> {
   const operationId = performanceMonitor.startOperation('extract-page-content');
   
   try {
-    const [headings, textContent, forms, links, metadata] = await Promise.all([
+    const [headings, textContent, forms, links, metadata, cleanContent] = await Promise.all([
       extractHeadings(),
       extractTextContent(),
       extractForms(),
       extractLinks(),
-      extractMetadata()
+      extractMetadata(),
+      extractCleanContent()
     ]);
 
-    const content: PageContent = {
+    const content: PageContent & { cleanContent?: CleanTextContent } = {
       url: window.location.href,
       title: document.title,
       headings,
@@ -40,7 +53,8 @@ async function extractPageContent(): Promise<PageContent> {
       forms,
       links,
       metadata,
-      extractedAt: new Date()
+      extractedAt: new Date(),
+      cleanContent // Add structured clean content
     };
 
     performanceMonitor.endOperation(operationId, true);
@@ -65,56 +79,142 @@ async function extractHeadings(): Promise<string[]> {
 }
 
 /**
- * Extracts main text content from the page, excluding navigation and ads
+ * Extracts clean, structured text content from the page using TextExtractionEngine
  */
 async function extractTextContent(): Promise<string> {
   const operationId = performanceMonitor.startOperation('extract-text-content');
   
   try {
-    // Try main content areas first
-    const contentSelectors = [
-      'main', 'article', '[role="main"]', '.content', '#content',
-      '.post', '.article', '.entry-content', '.page-content'
-    ];
+    // Use TextExtractionEngine for intelligent content extraction
+    const cleanContent = textExtractionEngine.extractCleanContent(document);
     
-    for (const selector of contentSelectors) {
-      const result = await optimizedDOM.extractText(selector, {
-        includeHidden: false,
-        maxLength: 5000,
-        sanitize: true
-      });
-      
-      if (result.success && result.data && result.data.length > 0) {
-        const text = result.data.join(' ');
-        if (text.length > 100) {
-          performanceMonitor.endOperation(operationId, true);
-          return text;
+    performanceMonitor.endOperation(operationId, true);
+    return cleanContent.mainText;
+  } catch (error) {
+    performanceMonitor.endOperation(operationId, false, error instanceof Error ? error.message : 'Unknown error');
+    
+    // Fallback to basic extraction if TextExtractionEngine fails
+    try {
+      const bodyText = document.body?.textContent || '';
+      return textExtractionEngine.removeNoiseElements(bodyText).slice(0, 5000);
+    } catch (fallbackError) {
+      console.error('Fallback text extraction failed:', fallbackError);
+      return '';
+    }
+  }
+}
+
+/**
+ * Extracts clean content structure from the page using TextExtractionEngine
+ */
+async function extractCleanContent(): Promise<CleanTextContent> {
+  const operationId = performanceMonitor.startOperation('extract-clean-content');
+  
+  try {
+    const cleanContent = textExtractionEngine.extractCleanContent(document);
+    performanceMonitor.endOperation(operationId, true);
+    return cleanContent;
+  } catch (error) {
+    performanceMonitor.endOperation(operationId, false, error instanceof Error ? error.message : 'Unknown error');
+    
+    // Return empty structure on error
+    return {
+      mainText: '',
+      headings: [],
+      paragraphs: [],
+      lists: [],
+      metadata: {
+        wordCount: 0,
+        readingTime: 0,
+        language: 'unknown',
+        extractedAt: new Date(),
+        paragraphCount: 0,
+        hasStructuredContent: false
+      }
+    };
+  }
+}
+
+/**
+ * Extracts selected text content using TextExtractionEngine
+ */
+function extractSelectedText(): CleanTextContent | null {
+  try {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      return null;
+    }
+    
+    return textExtractionEngine.extractSelectedContent(selection);
+  } catch (error) {
+    console.error('Error extracting selected text:', error);
+    return null;
+  }
+}
+
+/**
+ * Handles dynamic content extraction including iframes and shadow DOM
+ */
+async function extractDynamicContent(): Promise<{
+  mainContent: CleanTextContent;
+  iframeContent: CleanTextContent[];
+  shadowDOMContent: CleanTextContent[];
+}> {
+  const operationId = performanceMonitor.startOperation('extract-dynamic-content');
+  
+  try {
+    // Extract main document content
+    const mainContent = textExtractionEngine.extractCleanContent(document);
+    
+    // Extract content from accessible iframes
+    const iframeContent: CleanTextContent[] = [];
+    const iframes = Array.from(document.querySelectorAll('iframe'));
+    
+    for (const iframe of iframes) {
+      try {
+        // Only try to access same-origin iframes
+        if (iframe.contentDocument && iframe.contentWindow) {
+          const iframeDoc = iframe.contentDocument;
+          const content = textExtractionEngine.extractCleanContent(iframeDoc);
+          if (content.mainText.length > 50) {
+            iframeContent.push(content);
+          }
         }
+      } catch (error) {
+        // Cross-origin iframe access will fail, which is expected
+        console.debug('Cannot access iframe content (likely cross-origin):', error);
       }
     }
     
-    // Fallback to body content, excluding unwanted elements
-    const excludeSelectors = [
-      'script', 'style', 'nav', 'header', 'footer', 
-      '[class*="ad"]', '[class*="advertisement"]', '[id*="ad"]',
-      '[class*="sidebar"]', '[class*="menu"]', '[role="navigation"]'
-    ].join(', ');
+    // Extract content from shadow DOM elements
+    const shadowDOMContent: CleanTextContent[] = [];
+    const elementsWithShadow = Array.from(document.querySelectorAll('*'));
     
-    const bodyResult = await optimizedDOM.extractText(`body *:not(${excludeSelectors})`, {
-      includeHidden: false,
-      maxLength: 5000,
-      sanitize: true
-    });
-    
-    const textContent = bodyResult.success && bodyResult.data 
-      ? bodyResult.data.join(' ').slice(0, 5000)
-      : '';
+    for (const element of elementsWithShadow) {
+      try {
+        if (element.shadowRoot) {
+          // Create a temporary document fragment to use with TextExtractionEngine
+          const tempDoc = document.implementation.createHTMLDocument('shadow');
+          tempDoc.body.innerHTML = element.shadowRoot.innerHTML;
+          
+          const content = textExtractionEngine.extractCleanContent(tempDoc);
+          if (content.mainText.length > 50) {
+            shadowDOMContent.push(content);
+          }
+        }
+      } catch (error) {
+        console.debug('Cannot access shadow DOM content:', error);
+      }
+    }
     
     performanceMonitor.endOperation(operationId, true);
-    return textContent;
+    return { mainContent, iframeContent, shadowDOMContent };
   } catch (error) {
     performanceMonitor.endOperation(operationId, false, error instanceof Error ? error.message : 'Unknown error');
-    return '';
+    
+    // Return basic content on error
+    const mainContent = textExtractionEngine.extractCleanContent(document);
+    return { mainContent, iframeContent: [], shadowDOMContent: [] };
   }
 }
 
@@ -270,7 +370,7 @@ async function extractMetadata(): Promise<Record<string, string>> {
 /**
  * Sanitizes page content before sending to AI services
  */
-function sanitizePageContent(content: PageContent): PageContent {
+function sanitizePageContent(content: PageContent & { cleanContent?: CleanTextContent }): PageContent & { cleanContent?: CleanTextContent } {
   const sensitivePatterns = [
     // Email patterns
     /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
@@ -317,7 +417,90 @@ function sanitizePageContent(content: PageContent): PageContent {
   });
   sanitizedContent.metadata = sanitizedMetadata;
   
+  // Sanitize clean content if present
+  if (sanitizedContent.cleanContent) {
+    const cleanContent = { ...sanitizedContent.cleanContent };
+    
+    // Sanitize main text
+    sensitivePatterns.forEach(pattern => {
+      cleanContent.mainText = cleanContent.mainText.replace(pattern, '[REDACTED]');
+    });
+    
+    // Sanitize headings
+    cleanContent.headings = cleanContent.headings.map(heading => ({
+      ...heading,
+      content: sensitivePatterns.reduce((text, pattern) => 
+        text.replace(pattern, '[REDACTED]'), heading.content)
+    }));
+    
+    // Sanitize paragraphs
+    cleanContent.paragraphs = cleanContent.paragraphs.map(paragraph => ({
+      ...paragraph,
+      content: sensitivePatterns.reduce((text, pattern) => 
+        text.replace(pattern, '[REDACTED]'), paragraph.content)
+    }));
+    
+    // Sanitize lists
+    cleanContent.lists = cleanContent.lists.map(list => ({
+      ...list,
+      items: list.items.map(item => 
+        sensitivePatterns.reduce((text, pattern) => 
+          text.replace(pattern, '[REDACTED]'), item))
+    }));
+    
+    sanitizedContent.cleanContent = cleanContent;
+  }
+  
   return sanitizedContent;
+}
+
+/**
+ * Sanitizes clean text content structure
+ */
+function sanitizeCleanContent(cleanContent: CleanTextContent): CleanTextContent {
+  const sensitivePatterns = [
+    // Email patterns
+    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+    // Phone patterns
+    /(\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}/g,
+    // Credit card patterns (basic)
+    /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
+    // SSN patterns
+    /\b\d{3}-\d{2}-\d{4}\b/g,
+    // API keys and tokens (basic patterns)
+    /\b[A-Za-z0-9]{32,}\b/g
+  ];
+  
+  const sanitized = { ...cleanContent };
+  
+  // Sanitize main text
+  sensitivePatterns.forEach(pattern => {
+    sanitized.mainText = sanitized.mainText.replace(pattern, '[REDACTED]');
+  });
+  
+  // Sanitize headings
+  sanitized.headings = sanitized.headings.map(heading => ({
+    ...heading,
+    content: sensitivePatterns.reduce((text, pattern) => 
+      text.replace(pattern, '[REDACTED]'), heading.content)
+  }));
+  
+  // Sanitize paragraphs
+  sanitized.paragraphs = sanitized.paragraphs.map(paragraph => ({
+    ...paragraph,
+    content: sensitivePatterns.reduce((text, pattern) => 
+      text.replace(pattern, '[REDACTED]'), paragraph.content)
+  }));
+  
+  // Sanitize lists
+  sanitized.lists = sanitized.lists.map(list => ({
+    ...list,
+    items: list.items.map(item => 
+      sensitivePatterns.reduce((text, pattern) => 
+        text.replace(pattern, '[REDACTED]'), item))
+  }));
+  
+  return sanitized;
 }
 
 /**
@@ -646,6 +829,79 @@ let lastUrl = window.location.href;
 let lastTitle = document.title;
 let pageChangeObserver: MutationObserver | null = null;
 let contentChangeTimeout: NodeJS.Timeout | null = null;
+let dynamicContentObserver: MutationObserver | null = null;
+
+/**
+ * Initializes dynamic content monitoring for better text extraction
+ */
+function initializeDynamicContentMonitoring(): void {
+  // Clean up existing observer
+  if (dynamicContentObserver) {
+    dynamicContentObserver.disconnect();
+  }
+  
+  dynamicContentObserver = new MutationObserver((mutations) => {
+    let hasSignificantChange = false;
+    
+    for (const mutation of mutations) {
+      // Monitor for new iframes
+      if (mutation.type === 'childList') {
+        const addedNodes = Array.from(mutation.addedNodes);
+        
+        for (const node of addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node as Element;
+            
+            // Check for new iframes
+            if (element.tagName === 'IFRAME' || element.querySelector('iframe')) {
+              hasSignificantChange = true;
+              break;
+            }
+            
+            // Check for elements with shadow DOM
+            if ((element as any).shadowRoot) {
+              hasSignificantChange = true;
+              break;
+            }
+            
+            // Check for significant content additions
+            if (element.textContent && element.textContent.length > 100) {
+              hasSignificantChange = true;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (hasSignificantChange) break;
+    }
+    
+    if (hasSignificantChange) {
+      // Debounce dynamic content updates
+      if (contentChangeTimeout) {
+        clearTimeout(contentChangeTimeout);
+      }
+      
+      contentChangeTimeout = setTimeout(() => {
+        chrome.runtime.sendMessage({
+          type: 'DYNAMIC_CONTENT_CHANGED',
+          url: window.location.href,
+          timestamp: Date.now()
+        }).catch(() => {
+          // Ignore errors if background script is not ready
+        });
+      }, 1000); // Wait 1 second for changes to settle
+    }
+  });
+  
+  // Observe the entire document for dynamic changes
+  dynamicContentObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: false,
+    characterData: false
+  });
+}
 
 /**
  * Initializes page change detection using MutationObserver
@@ -781,6 +1037,48 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       return true; // Keep message channel open for async response
       
+    case 'GET_CLEAN_CONTENT':
+      extractCleanContent()
+        .then(cleanContent => {
+          sendResponse({ success: true, cleanContent });
+        })
+        .catch(error => {
+          sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to extract clean content' 
+          });
+        });
+      return true; // Keep message channel open for async response
+      
+    case 'GET_SELECTED_TEXT':
+      try {
+        const selectedContent = extractSelectedText();
+        sendResponse({ 
+          success: true, 
+          selectedContent,
+          hasSelection: selectedContent !== null 
+        });
+      } catch (error) {
+        sendResponse({ 
+          success: false, 
+          error: error instanceof Error ? error.message : 'Failed to extract selected text' 
+        });
+      }
+      break;
+      
+    case 'GET_DYNAMIC_CONTENT':
+      extractDynamicContent()
+        .then(dynamicContent => {
+          sendResponse({ success: true, dynamicContent });
+        })
+        .catch(error => {
+          sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to extract dynamic content' 
+          });
+        });
+      return true; // Keep message channel open for async response
+      
     case 'GET_PAGE_INFO':
       try {
         const pageInfo = {
@@ -910,6 +1208,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'REINITIALIZE':
       try {
         initializePageChangeDetection();
+        initializeDynamicContentMonitoring();
         sendResponse({ success: true });
       } catch (error) {
         sendResponse({ 
@@ -939,6 +1238,9 @@ function initialize(): void {
   // Initialize page change detection
   initializePageChangeDetection();
   
+  // Initialize dynamic content monitoring
+  initializeDynamicContentMonitoring();
+  
   // Notify background script that content script is ready
   chrome.runtime.sendMessage({ 
     type: 'CONTENT_SCRIPT_READY', 
@@ -967,6 +1269,9 @@ if (document.readyState === 'loading') {
 window.addEventListener('beforeunload', () => {
   if (pageChangeObserver) {
     pageChangeObserver.disconnect();
+  }
+  if (dynamicContentObserver) {
+    dynamicContentObserver.disconnect();
   }
   if (contentChangeTimeout) {
     clearTimeout(contentChangeTimeout);

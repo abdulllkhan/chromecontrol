@@ -111,18 +111,50 @@ export class PromptManager {
         templateContext
       );
 
-      // Debug logging
+      const processingTime = Date.now() - startTime;
+
+      // Enhanced debug logging with full context
       if (this.config.enableDebugLogging) {
-        this.logPromptProcessing(task.id, task.promptTemplate, processedPrompt, templateContext);
+        this.debugPromptExecutionWithContext(
+          task.id,
+          task.promptTemplate,
+          processedPrompt,
+          templateContext,
+          processingTime
+        );
       }
 
-      const processingTime = Date.now() - startTime;
       console.log(`[PromptManager] Processed prompt for task ${task.id} in ${processingTime}ms`);
 
       return processedPrompt;
 
     } catch (error) {
+      const processingTime = Date.now() - startTime;
       console.error(`[PromptManager] Failed to process prompt for task ${task.id}:`, error);
+      
+      // Log the error for debugging
+      if (this.config.enableDebugLogging) {
+        const errorDebugInfo: PromptDebugInfo = {
+          originalTemplate: task.promptTemplate,
+          detectedVariables: this.extractVariableNames(task.promptTemplate),
+          injectedVariables: {},
+          processingSteps: [
+            `Processing started`,
+            `Error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            `Falling back to original template`
+          ],
+          warnings: [`Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
+          timestamp: new Date(),
+          executionTime: processingTime
+        };
+
+        const history = this.debugHistory.get(task.id) || [];
+        history.push(errorDebugInfo);
+        if (history.length > 10) {
+          history.shift();
+        }
+        this.debugHistory.set(task.id, history);
+      }
       
       // Return original template as fallback
       return task.promptTemplate;
@@ -290,7 +322,7 @@ export class PromptManager {
   /**
    * Creates debugging information for prompt execution
    */
-  debugPromptExecution(taskId: string, finalPrompt: string): void {
+  debugPromptExecution(taskId: string, finalPrompt: string, originalTemplate?: string): void {
     if (!this.config.enableDebugLogging) {
       return;
     }
@@ -300,13 +332,84 @@ export class PromptManager {
     console.log(finalPrompt);
     console.log('='.repeat(50));
 
+    // Create debug info entry
+    const debugInfo: PromptDebugInfo = {
+      originalTemplate: originalTemplate || 'Unknown template',
+      detectedVariables: originalTemplate ? this.extractVariableNames(originalTemplate) : [],
+      injectedVariables: {
+        finalPromptLength: finalPrompt.length,
+        timestamp: new Date().toISOString()
+      },
+      processingSteps: [
+        `Final prompt generated with ${finalPrompt.length} characters`,
+        `Debug logged at ${new Date().toLocaleString()}`
+      ],
+      warnings: [],
+      timestamp: new Date(),
+      executionTime: 0
+    };
+
     // Store debug history
     const history = this.debugHistory.get(taskId) || [];
+    history.push(debugInfo);
+    
+    // Keep only last 10 entries
     if (history.length > 10) {
-      history.shift(); // Keep only last 10 entries
+      history.shift();
     }
     
     this.debugHistory.set(taskId, history);
+  }
+
+  /**
+   * Enhanced debugging with full execution context
+   */
+  debugPromptExecutionWithContext(
+    taskId: string,
+    originalTemplate: string,
+    finalPrompt: string,
+    context: TemplateContext,
+    executionTime: number
+  ): void {
+    if (!this.config.enableDebugLogging) {
+      return;
+    }
+
+    const debugInfo: PromptDebugInfo = {
+      originalTemplate,
+      detectedVariables: this.extractVariableNames(originalTemplate),
+      injectedVariables: {
+        domain: context.domain,
+        pageTitle: context.pageTitle,
+        selectedText: context.selectedText ? 'Present' : 'Not provided',
+        mainTextLength: context.extractedContent.mainText.length,
+        headingsCount: context.extractedContent.headings.length,
+        finalPromptLength: finalPrompt.length
+      },
+      processingSteps: [
+        `Template processing started`,
+        `Detected ${this.extractVariableNames(originalTemplate).length} variables`,
+        `Injected context from ${context.domain}`,
+        `Generated final prompt with ${finalPrompt.length} characters`,
+        `Processing completed in ${executionTime}ms`
+      ],
+      warnings: this.validatePromptTemplate(originalTemplate).warnings,
+      timestamp: new Date(),
+      executionTime
+    };
+
+    // Store debug history
+    const history = this.debugHistory.get(taskId) || [];
+    history.push(debugInfo);
+    
+    // Keep only last 10 entries
+    if (history.length > 10) {
+      history.shift();
+    }
+    
+    this.debugHistory.set(taskId, history);
+
+    console.log(`[PromptManager Debug] Enhanced debug info for task ${taskId}:`, debugInfo);
   }
 
   // ============================================================================
@@ -607,6 +710,113 @@ export class PromptManager {
         errors
       };
     }
+  }
+
+  /**
+   * Analyzes an error to determine if it's a prompt issue or system processing issue
+   */
+  analyzeExecutionError(error: Error, taskId: string, originalTemplate: string): {
+    errorType: 'prompt' | 'system' | 'validation' | 'network';
+    userFriendlyMessage: string;
+    technicalDetails: string;
+    suggestedFix?: string;
+  } {
+    const errorMessage = error.message.toLowerCase();
+    
+    // Prompt-related errors
+    if (errorMessage.includes('template validation failed') || 
+        errorMessage.includes('unknown template variable') ||
+        errorMessage.includes('malformed template variable')) {
+      return {
+        errorType: 'prompt',
+        userFriendlyMessage: 'There is an issue with your custom prompt template.',
+        technicalDetails: error.message,
+        suggestedFix: 'Check your template syntax and ensure all variables use the {{variableName}} format.'
+      };
+    }
+
+    // Validation errors
+    if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
+      return {
+        errorType: 'validation',
+        userFriendlyMessage: 'The prompt template failed validation checks.',
+        technicalDetails: error.message,
+        suggestedFix: 'Use the template validator to identify and fix syntax issues.'
+      };
+    }
+
+    // Network/API errors
+    if (errorMessage.includes('network') || 
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('api') ||
+        errorMessage.includes('connection')) {
+      return {
+        errorType: 'network',
+        userFriendlyMessage: 'Unable to connect to the AI service.',
+        technicalDetails: error.message,
+        suggestedFix: 'Check your internet connection and AI service configuration.'
+      };
+    }
+
+    // System processing errors (default)
+    return {
+      errorType: 'system',
+      userFriendlyMessage: 'An unexpected system error occurred during processing.',
+      technicalDetails: error.message,
+      suggestedFix: 'Try again, or contact support if the issue persists.'
+    };
+  }
+
+  /**
+   * Gets comprehensive debugging information for a task
+   */
+  getTaskDebuggingInfo(taskId: string): {
+    debugHistory: PromptDebugInfo[];
+    recentErrors: Array<{
+      timestamp: Date;
+      error: string;
+      errorType: string;
+    }>;
+    executionStats: {
+      totalExecutions: number;
+      successfulExecutions: number;
+      averageExecutionTime: number;
+      lastExecution?: Date;
+    };
+  } {
+    const history = this.debugHistory.get(taskId) || [];
+    
+    // Extract error information
+    const recentErrors = history
+      .filter(entry => entry.warnings.length > 0)
+      .slice(-5) // Last 5 errors
+      .map(entry => ({
+        timestamp: entry.timestamp || new Date(),
+        error: entry.warnings.join(', '),
+        errorType: entry.warnings.some(w => w.includes('template')) ? 'prompt' : 'system'
+      }));
+
+    // Calculate execution statistics
+    const totalExecutions = history.length;
+    const successfulExecutions = history.filter(entry => entry.warnings.length === 0).length;
+    const executionTimes = history
+      .filter(entry => entry.executionTime && entry.executionTime > 0)
+      .map(entry => entry.executionTime!);
+    const averageExecutionTime = executionTimes.length > 0 
+      ? executionTimes.reduce((sum, time) => sum + time, 0) / executionTimes.length 
+      : 0;
+    const lastExecution = history.length > 0 ? history[history.length - 1].timestamp : undefined;
+
+    return {
+      debugHistory: history,
+      recentErrors,
+      executionStats: {
+        totalExecutions,
+        successfulExecutions,
+        averageExecutionTime,
+        lastExecution
+      }
+    };
   }
 }
 

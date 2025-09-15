@@ -229,21 +229,21 @@ The extension successfully bridges the gap between user needs and AI capabilitie
   - Create template validation and error handling for invalid syntax
   - _Requirements: 12.3, 12.6_
 
-- [ ] 28. Build Intelligent Text Extraction Engine
+- [x] 28. Build Intelligent Text Extraction Engine
   - Create TextExtractionEngine service to replace simple HTML text copying
   - Implement semantic content parsing that preserves structure while removing noise
   - Add main content area detection algorithms (readability-style parsing)
   - Create CleanTextContent interface and structured text output
   - _Requirements: 13.1, 13.2, 13.3, 13.4_
 
-- [ ] 29. Enhance Content Script for Better Text Extraction
+- [x] 29. Enhance Content Script for Better Text Extraction
   - Update content script to use new TextExtractionEngine
   - Implement selected text extraction with proper formatting and context
   - Add support for dynamic content, iframes, and shadow DOM elements
   - Replace raw HTML extraction in page analysis with clean text extraction
   - _Requirements: 13.5, 13.6_
 
-- [ ] 30. Add Prompt Debugging and Validation Tools
+- [x] 30. Add Prompt Debugging and Validation Tools
   - Create prompt debugging interface in sidebar for viewing final prompts sent to AI
   - Implement prompt template validation with helpful error messages
   - Add prompt preview functionality for custom task creation

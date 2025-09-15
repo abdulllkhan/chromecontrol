@@ -1058,7 +1058,9 @@ export interface ContentMetadata {
   readingTime: number;
   language?: string;
   extractedAt: Date;
-  source: string;
+  source?: string;
+  paragraphCount: number;
+  hasStructuredContent: boolean;
 }
 
 /**
@@ -1069,6 +1071,30 @@ export interface TemplateValidationResult {
   errors: TemplateValidationError[];
   warnings: string[];
   variables: TemplateVariable[];
+}
+
+/**
+ * Prompt debugging information for task execution
+ */
+export interface PromptDebugInfo {
+  originalTemplate: string;
+  detectedVariables: string[];
+  injectedVariables: Record<string, unknown>;
+  processingSteps: string[];
+  warnings: string[];
+  timestamp?: Date;
+  executionTime?: number;
+}
+
+/**
+ * Prompt preview result for testing templates
+ */
+export interface PromptPreviewResult {
+  processedPrompt: string;
+  variables: Record<string, string>;
+  errors: string[];
+  warnings: string[];
+  validationResult: TemplateValidationResult;
 }
 
 /**

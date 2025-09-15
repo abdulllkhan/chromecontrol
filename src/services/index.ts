@@ -50,6 +50,9 @@ export * from './performanceOptimizer.js';
 // MCP (Model Context Protocol) service
 export * from './mcpService.js';
 
+// Text extraction engine service
+export * from './textExtractionEngine.js';
+
 // Service examples (for development and testing)
 export * from './patternEngineExample.js';
 export * from './aiServiceExample.js';
