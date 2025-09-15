@@ -204,6 +204,66 @@ The extension successfully bridges the gap between user needs and AI capabilitie
   - Add proper tab ID validation for chrome.tabs.sendMessage calls
   - _Requirements: 3.4, 5.5, 1.4_
 
+## NEW IMPLEMENTATION TASKS
+
+### MCP Integration and Prompt Management Enhancements
+
+- [ ] 25. Implement MCP Context Management System
+  - Create MCPContext interface and supporting types in types/index.ts
+  - Implement MCP resource and tool pattern structures
+  - Add MCP-compliant context building in background service worker
+  - Create MCP metadata handling for structured data exchange
+  - _Requirements: 11.1, 11.2, 11.4_
+
+- [ ] 26. Fix Custom Task Prompt Template Usage
+  - Debug and fix TaskManager.executeTask to use CustomTask.promptTemplate
+  - Update AIService.processRequest to properly map custom prompts to AIRequest.prompt
+  - Ensure custom task prompts override generic system prompts in AI requests
+  - Add logging to track which prompt is actually sent to AI service
+  - _Requirements: 12.1, 12.2, 12.4_
+
+- [ ] 27. Implement Template Variable Injection System
+  - Create PromptManager service for processing custom task prompts
+  - Implement template variable injection for {{domain}}, {{pageTitle}}, {{selectedText}}
+  - Add TemplateContext interface and context building logic
+  - Create template validation and error handling for invalid syntax
+  - _Requirements: 12.3, 12.6_
+
+- [ ] 28. Build Intelligent Text Extraction Engine
+  - Create TextExtractionEngine service to replace simple HTML text copying
+  - Implement semantic content parsing that preserves structure while removing noise
+  - Add main content area detection algorithms (readability-style parsing)
+  - Create CleanTextContent interface and structured text output
+  - _Requirements: 13.1, 13.2, 13.3, 13.4_
+
+- [ ] 29. Enhance Content Script for Better Text Extraction
+  - Update content script to use new TextExtractionEngine
+  - Implement selected text extraction with proper formatting and context
+  - Add support for dynamic content, iframes, and shadow DOM elements
+  - Replace raw HTML extraction in page analysis with clean text extraction
+  - _Requirements: 13.5, 13.6_
+
+- [ ] 30. Add Prompt Debugging and Validation Tools
+  - Create prompt debugging interface in sidebar for viewing final prompts sent to AI
+  - Implement prompt template validation with helpful error messages
+  - Add prompt preview functionality for custom task creation
+  - Create error reporting system to distinguish prompt vs system processing issues
+  - _Requirements: 12.5, 12.6_
+
+- [ ] 31. Integrate MCP Server Connection Support
+  - Add MCP server configuration interface in user preferences
+  - Implement MCP server discovery and tool registration
+  - Create MCP tool execution pipeline for enhanced AI capabilities
+  - Add fallback handling when MCP servers are unavailable
+  - _Requirements: 11.3, 11.5_
+
+- [ ] 32. Update Task Execution Pipeline
+  - Refactor task execution to use new PromptManager and TextExtractionEngine
+  - Ensure proper integration of MCP context in AI requests
+  - Update error handling to provide better debugging information
+  - Add comprehensive testing for custom task prompt template usage
+  - _Requirements: 12.1, 12.2, 11.2_
+
 ## 🚀 Current Status & Next Steps
 
 **Latest Achievement:** Successfully converted chromeControl extension from popup to sidebar architecture with full error resolution.
@@ -215,9 +275,9 @@ The extension successfully bridges the gap between user needs and AI capabilitie
 4. **Content Script**: Improved communication between sidebar and content scripts
 5. **Build System**: Updated Vite configuration for sidebar build process
 
-### Current Focus:
-1. **Sidebar Testing**: Ensure all functionality works correctly in sidebar mode
-2. **ChatGPT Integration**: Plan future integration with ChatGPT account login (postponed per user request)
-3. **Performance Optimization**: Monitor sidebar performance and responsiveness
-4. **User Experience**: Refine sidebar UI for persistent, always-visible operation
-5. **Extension Distribution**: Package sidebar version for testing and deployment
+### Current Focus - New Enhancement Tasks:
+1. **MCP Integration**: Implement Model Context Protocol for structured context management
+2. **Prompt Management Fix**: Ensure custom task prompt templates are properly used in AI requests
+3. **Text Extraction**: Replace raw HTML copying with intelligent, clean text extraction
+4. **Template Variables**: Add support for {{domain}}, {{pageTitle}}, {{selectedText}} in custom prompts
+5. **Debugging Tools**: Add prompt debugging and validation capabilities

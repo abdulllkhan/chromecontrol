@@ -119,3 +119,41 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 2. WHEN sending data to AI agents THEN the extension SHALL exclude sensitive form data, passwords, and personal information
 3. WHEN the user is on a secure site (banking, healthcare) THEN the extension SHALL provide additional privacy warnings
 4. WHEN the extension stores data THEN it SHALL use Chrome's secure storage APIs and encrypt sensitive information
+
+### Requirement 11
+
+**User Story:** As a developer using the extension, I want MCP (Model Context Protocol) integration for proper context management, so that AI interactions have consistent, structured context and can leverage external tools and resources.
+
+#### Acceptance Criteria
+
+1. WHEN the extension processes AI requests THEN it SHALL use MCP-compliant context structures for consistent data exchange
+2. WHEN custom tasks are executed THEN the extension SHALL provide structured context following MCP resource and tool patterns
+3. WHEN the extension connects to AI services THEN it SHALL support MCP server connections for enhanced capabilities
+4. WHEN context data is passed between components THEN it SHALL follow MCP message format specifications
+5. IF MCP servers are configured THEN the extension SHALL automatically discover and utilize available tools and resources
+
+### Requirement 12
+
+**User Story:** As a web user creating custom tasks, I want the extension to properly use my custom prompt templates when executing tasks, so that my personalized AI instructions are actually sent to the AI service instead of being ignored.
+
+#### Acceptance Criteria
+
+1. WHEN executing a custom task THEN the extension SHALL use the task's `promptTemplate` field as the primary prompt sent to the AI service
+2. WHEN a custom task has a `promptTemplate` THEN the extension SHALL NOT use generic prompts or override the user's custom prompt
+3. WHEN processing custom task prompts THEN the extension SHALL inject current page context into template variables like {{domain}}, {{pageTitle}}, {{selectedText}}
+4. WHEN building AI requests for custom tasks THEN the extension SHALL properly map the custom prompt to the AIRequest.prompt field
+5. WHEN debugging task execution THEN users SHALL be able to see exactly what prompt was sent to the AI service
+6. WHEN custom tasks fail THEN the extension SHALL clearly indicate whether the issue is with the custom prompt or system processing
+
+### Requirement 13
+
+**User Story:** As a web user, I want intelligent text extraction that provides clean, structured content instead of raw HTML, so that AI tasks receive high-quality, relevant text data for better processing results.
+
+#### Acceptance Criteria
+
+1. WHEN extracting page content THEN the extension SHALL use intelligent text extraction that removes HTML tags, scripts, and styling
+2. WHEN processing page text THEN the extension SHALL preserve semantic structure (headings, paragraphs, lists) while removing noise
+3. WHEN extracting content THEN the extension SHALL identify and prioritize main content areas over navigation, ads, and sidebars
+4. WHEN text extraction occurs THEN the extension SHALL provide clean, readable text that maintains logical flow and context
+5. WHEN users select text THEN the extension SHALL extract the selected content with proper formatting and context
+6. WHEN extracting from complex pages THEN the extension SHALL handle dynamic content, iframes, and shadow DOM elements appropriately
