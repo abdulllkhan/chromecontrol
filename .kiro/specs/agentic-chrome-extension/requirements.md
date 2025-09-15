@@ -2,20 +2,20 @@
 
 ## Introduction
 
-This feature involves creating an intelligent Chrome extension that analyzes the current website URL and content to provide contextual AI-powered suggestions. The extension will offer custom suggestions tailored to specific websites, allow users to select from these suggestions, and then execute AI agent tasks that either generate copyable responses or perform automated actions on the website.
+This feature involves creating chromeControl, an intelligent Chrome extension that analyzes the current website URL and content to provide contextual AI-powered suggestions through a sidebar interface. chromeControl will offer custom suggestions tailored to specific websites, allow users to select from these suggestions, and then execute AI agent tasks that either generate copyable responses or perform automated actions on the website.
 
 ## Requirements
 
 ### Requirement 1
 
-**User Story:** As a web user, I want the Chrome extension to automatically detect the current website and provide relevant suggestions, so that I can quickly access AI-powered assistance tailored to that specific site.
+**User Story:** As a web user, I want chromeControl to automatically detect the current website and provide relevant suggestions, so that I can quickly access AI-powered assistance tailored to that specific site.
 
 #### Acceptance Criteria
 
-1. WHEN the user navigates to any website THEN the extension SHALL analyze the URL and page content
-2. WHEN the extension detects a supported website THEN it SHALL display contextual suggestions in the extension popup
-3. WHEN the extension detects an unsupported website THEN it SHALL provide generic AI assistance options
-4. IF the page content changes significantly THEN the extension SHALL update the available suggestions
+1. WHEN the user navigates to any website THEN chromeControl SHALL analyze the URL and page content
+2. WHEN chromeControl detects a supported website THEN it SHALL display contextual suggestions in the sidebar interface
+3. WHEN chromeControl detects an unsupported website THEN it SHALL provide generic AI assistance options
+4. IF the page content changes significantly THEN chromeControl SHALL update the available suggestions
 
 ### Requirement 2
 
@@ -23,10 +23,10 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 
 #### Acceptance Criteria
 
-1. WHEN the user is on a social media platform THEN the extension SHALL offer suggestions like "Generate engaging post", "Analyze sentiment", "Suggest hashtags"
-2. WHEN the user is on an e-commerce site THEN the extension SHALL offer suggestions like "Compare products", "Find better deals", "Generate review summary"
-3. WHEN the user is on a professional platform (LinkedIn, job sites) THEN the extension SHALL offer suggestions like "Optimize profile", "Generate cover letter", "Analyze job posting"
-4. WHEN the user is on a content/news site THEN the extension SHALL offer suggestions like "Summarize article", "Fact-check claims", "Generate discussion points"
+1. WHEN the user is on a social media platform THEN chromeControl SHALL offer suggestions like "Generate engaging post", "Analyze sentiment", "Suggest hashtags"
+2. WHEN the user is on an e-commerce site THEN chromeControl SHALL offer suggestions like "Compare products", "Find better deals", "Generate review summary"
+3. WHEN the user is on a professional platform (LinkedIn, job sites) THEN chromeControl SHALL offer suggestions like "Optimize profile", "Generate cover letter", "Analyze job posting"
+4. WHEN the user is on a content/news site THEN chromeControl SHALL offer suggestions like "Summarize article", "Fact-check claims", "Generate discussion points"
 
 ### Requirement 3
 
@@ -34,10 +34,10 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 
 #### Acceptance Criteria
 
-1. WHEN the user clicks on a suggestion THEN the extension SHALL send the request to an AI agent with relevant page context
-2. WHEN the AI agent processes the request THEN the extension SHALL display a loading indicator
-3. WHEN the AI agent completes the task THEN the extension SHALL present the result in an accessible format
-4. IF the AI agent encounters an error THEN the extension SHALL display a user-friendly error message with retry options
+1. WHEN the user clicks on a suggestion THEN chromeControl SHALL send the request to an AI agent with relevant page context
+2. WHEN the AI agent processes the request THEN chromeControl SHALL display a loading indicator
+3. WHEN the AI agent completes the task THEN chromeControl SHALL present the result in an accessible format
+4. IF the AI agent encounters an error THEN chromeControl SHALL display a user-friendly error message with retry options
 
 ### Requirement 4
 
@@ -45,10 +45,10 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 
 #### Acceptance Criteria
 
-1. WHEN the AI agent generates text content THEN the extension SHALL provide a "Copy to Clipboard" button
-2. WHEN the user clicks "Copy to Clipboard" THEN the extension SHALL copy the content and show a confirmation message
-3. WHEN the generated content is formatted text THEN the extension SHALL preserve formatting options (plain text, HTML, markdown)
-4. WHEN the content is copied THEN the extension SHALL automatically highlight relevant input fields on the page where it could be pasted
+1. WHEN the AI agent generates text content THEN chromeControl SHALL provide a "Copy to Clipboard" button
+2. WHEN the user clicks "Copy to Clipboard" THEN chromeControl SHALL copy the content and show a confirmation message
+3. WHEN the generated content is formatted text THEN chromeControl SHALL preserve formatting options (plain text, HTML, markdown)
+4. WHEN the content is copied THEN chromeControl SHALL automatically highlight relevant input fields on the page where it could be pasted
 
 ### Requirement 5
 
@@ -56,11 +56,11 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 
 #### Acceptance Criteria
 
-1. WHEN the user selects an automation suggestion THEN the extension SHALL request permission to interact with the page
-2. WHEN permission is granted THEN the extension SHALL execute the automated task using DOM manipulation
-3. WHEN performing automated actions THEN the extension SHALL provide real-time feedback on progress
-4. WHEN automation is complete THEN the extension SHALL summarize what actions were performed
-5. IF automation fails THEN the extension SHALL fall back to providing manual instructions
+1. WHEN the user selects an automation suggestion THEN chromeControl SHALL request permission to interact with the page
+2. WHEN permission is granted THEN chromeControl SHALL execute the automated task using DOM manipulation
+3. WHEN performing automated actions THEN chromeControl SHALL provide real-time feedback on progress
+4. WHEN automation is complete THEN chromeControl SHALL summarize what actions were performed
+5. IF automation fails THEN chromeControl SHALL fall back to providing manual instructions
 
 ### Requirement 6
 
@@ -68,10 +68,10 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 
 #### Acceptance Criteria
 
-1. WHEN the user accesses extension settings THEN they SHALL be able to view all configured website patterns
+1. WHEN the user accesses chromeControl settings THEN they SHALL be able to view all configured website patterns
 2. WHEN the user adds a new website pattern THEN they SHALL be able to define custom suggestions for that pattern
 3. WHEN the user modifies existing suggestions THEN the changes SHALL take effect immediately on matching websites
-4. WHEN the user disables suggestions for a website THEN the extension SHALL only show generic options for that site
+4. WHEN the user disables suggestions for a website THEN chromeControl SHALL only show generic options for that site
 
 ### Requirement 7
 
@@ -91,8 +91,8 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 
 #### Acceptance Criteria
 
-1. WHEN the user is on any website THEN they SHALL have access to an "Add Task" button in the extension popup
-2. WHEN the user clicks "Add Task" THEN the extension SHALL pre-populate the website pattern with the current domain
+1. WHEN the user is on any website THEN they SHALL have access to an "Add Task" button in the sidebar interface
+2. WHEN the user clicks "Add Task" THEN chromeControl SHALL pre-populate the website pattern with the current domain
 3. WHEN adding a task THEN the user SHALL be able to define task parameters using the current page context as examples
 4. WHEN the user saves the new task THEN it SHALL immediately appear in the suggestions for the current website
 5. WHEN adding a task THEN the user SHALL be able to test it immediately on the current page
@@ -106,8 +106,8 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 1. WHEN the user accesses task management THEN they SHALL see all custom tasks organized by website or category
 2. WHEN viewing custom tasks THEN the user SHALL be able to edit, duplicate, delete, or disable individual tasks
 3. WHEN managing tasks THEN the user SHALL be able to export and import task configurations for backup or sharing
-4. WHEN a task is used frequently THEN the extension SHALL track usage statistics and suggest optimizations
-5. WHEN tasks conflict or overlap THEN the extension SHALL provide recommendations for consolidation
+4. WHEN a task is used frequently THEN chromeControl SHALL track usage statistics and suggest optimizations
+5. WHEN tasks conflict or overlap THEN chromeControl SHALL provide recommendations for consolidation
 
 ### Requirement 10
 
@@ -115,10 +115,10 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 
 #### Acceptance Criteria
 
-1. WHEN the extension analyzes page content THEN it SHALL only process publicly visible content
-2. WHEN sending data to AI agents THEN the extension SHALL exclude sensitive form data, passwords, and personal information
-3. WHEN the user is on a secure site (banking, healthcare) THEN the extension SHALL provide additional privacy warnings
-4. WHEN the extension stores data THEN it SHALL use Chrome's secure storage APIs and encrypt sensitive information
+1. WHEN chromeControl analyzes page content THEN it SHALL only process publicly visible content
+2. WHEN sending data to AI agents THEN chromeControl SHALL exclude sensitive form data, passwords, and personal information
+3. WHEN the user is on a secure site (banking, healthcare) THEN chromeControl SHALL provide additional privacy warnings
+4. WHEN chromeControl stores data THEN it SHALL use Chrome's secure storage APIs and encrypt sensitive information
 
 ### Requirement 11
 
@@ -126,11 +126,11 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 
 #### Acceptance Criteria
 
-1. WHEN the extension processes AI requests THEN it SHALL use MCP-compliant context structures for consistent data exchange
-2. WHEN custom tasks are executed THEN the extension SHALL provide structured context following MCP resource and tool patterns
-3. WHEN the extension connects to AI services THEN it SHALL support MCP server connections for enhanced capabilities
+1. WHEN chromeControl processes AI requests THEN it SHALL use MCP-compliant context structures for consistent data exchange
+2. WHEN custom tasks are executed THEN chromeControl SHALL provide structured context following MCP resource and tool patterns
+3. WHEN chromeControl connects to AI services THEN it SHALL support MCP server connections for enhanced capabilities
 4. WHEN context data is passed between components THEN it SHALL follow MCP message format specifications
-5. IF MCP servers are configured THEN the extension SHALL automatically discover and utilize available tools and resources
+5. IF MCP servers are configured THEN chromeControl SHALL automatically discover and utilize available tools and resources
 
 ### Requirement 12
 
@@ -138,12 +138,12 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 
 #### Acceptance Criteria
 
-1. WHEN executing a custom task THEN the extension SHALL use the task's `promptTemplate` field as the primary prompt sent to the AI service
-2. WHEN a custom task has a `promptTemplate` THEN the extension SHALL NOT use generic prompts or override the user's custom prompt
-3. WHEN processing custom task prompts THEN the extension SHALL inject current page context into template variables like {{domain}}, {{pageTitle}}, {{selectedText}}
-4. WHEN building AI requests for custom tasks THEN the extension SHALL properly map the custom prompt to the AIRequest.prompt field
+1. WHEN executing a custom task THEN chromeControl SHALL use the task's `promptTemplate` field as the primary prompt sent to the AI service
+2. WHEN a custom task has a `promptTemplate` THEN chromeControl SHALL NOT use generic prompts or override the user's custom prompt
+3. WHEN processing custom task prompts THEN chromeControl SHALL inject current page context into template variables like {{domain}}, {{pageTitle}}, {{selectedText}}
+4. WHEN building AI requests for custom tasks THEN chromeControl SHALL properly map the custom prompt to the AIRequest.prompt field
 5. WHEN debugging task execution THEN users SHALL be able to see exactly what prompt was sent to the AI service
-6. WHEN custom tasks fail THEN the extension SHALL clearly indicate whether the issue is with the custom prompt or system processing
+6. WHEN custom tasks fail THEN chromeControl SHALL clearly indicate whether the issue is with the custom prompt or system processing
 
 ### Requirement 13
 
@@ -151,9 +151,22 @@ This feature involves creating an intelligent Chrome extension that analyzes the
 
 #### Acceptance Criteria
 
-1. WHEN extracting page content THEN the extension SHALL use intelligent text extraction that removes HTML tags, scripts, and styling
-2. WHEN processing page text THEN the extension SHALL preserve semantic structure (headings, paragraphs, lists) while removing noise
-3. WHEN extracting content THEN the extension SHALL identify and prioritize main content areas over navigation, ads, and sidebars
-4. WHEN text extraction occurs THEN the extension SHALL provide clean, readable text that maintains logical flow and context
-5. WHEN users select text THEN the extension SHALL extract the selected content with proper formatting and context
-6. WHEN extracting from complex pages THEN the extension SHALL handle dynamic content, iframes, and shadow DOM elements appropriately
+1. WHEN extracting page content THEN chromeControl SHALL use intelligent text extraction that removes HTML tags, scripts, and styling
+2. WHEN processing page text THEN chromeControl SHALL preserve semantic structure (headings, paragraphs, lists) while removing noise
+3. WHEN extracting content THEN chromeControl SHALL identify and prioritize main content areas over navigation, ads, and sidebars
+4. WHEN text extraction occurs THEN chromeControl SHALL provide clean, readable text that maintains logical flow and context
+5. WHEN users select text THEN chromeControl SHALL extract the selected content with proper formatting and context
+6. WHEN extracting from complex pages THEN chromeControl SHALL handle dynamic content, iframes, and shadow DOM elements appropriately
+
+### Requirement 14
+
+**User Story:** As a web user, I want to access the extension through a persistent sidebar interface, so that I can use AI-powered features without interrupting my browsing workflow or losing context when switching between tabs.
+
+#### Acceptance Criteria
+
+1. WHEN chromeControl is activated THEN it SHALL open a sidebar panel that persists across page navigation
+2. WHEN the user switches tabs THEN the sidebar SHALL update its context to reflect the current active tab
+3. WHEN the sidebar is open THEN it SHALL not interfere with the main page content or user interactions
+4. WHEN the user closes the sidebar THEN it SHALL remember the user's preference and remain closed until explicitly reopened
+5. WHEN the sidebar loads THEN it SHALL automatically detect and analyze the current page context
+6. WHEN the page content changes THEN the sidebar SHALL update its suggestions and available actions accordingly
