@@ -131,7 +131,7 @@ export class TextExtractionEngine {
     const candidates: Array<{ element: Element; score: number }> = [];
     
     // Get all potential content containers
-    const elements = document.querySelectorAll('div, article, section, main, p');
+    const elements = Array.from(document.querySelectorAll('div, article, section, main, p'));
     
     for (const element of elements) {
       const score = this.scoreElement(element);
@@ -277,7 +277,7 @@ export class TextExtractionEngine {
       }
       
       // Extract headings
-      const headingElements = element.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      const headingElements = Array.from(element.querySelectorAll('h1, h2, h3, h4, h5, h6'));
       for (const heading of headingElements) {
         if (!this.isNoiseElement(heading)) {
           const content = this.cleanText(heading.textContent || '');
@@ -293,7 +293,7 @@ export class TextExtractionEngine {
       }
       
       // Extract paragraphs
-      const paragraphElements = element.querySelectorAll('p');
+      const paragraphElements = Array.from(element.querySelectorAll('p'));
       for (const paragraph of paragraphElements) {
         if (!this.isNoiseElement(paragraph)) {
           const content = this.cleanText(paragraph.textContent || '');
@@ -307,11 +307,11 @@ export class TextExtractionEngine {
       }
       
       // Extract lists
-      const listElements = element.querySelectorAll('ul, ol');
+      const listElements = Array.from(element.querySelectorAll('ul, ol'));
       for (const list of listElements) {
         if (!this.isNoiseElement(list)) {
           const items = Array.from(list.querySelectorAll('li'))
-            .map(li => this.cleanText(li.textContent || ''))
+            .map(li => this.cleanText((li as HTMLElement).textContent || ''))
             .filter(item => item.length > 0);
           
           if (items.length > 0) {
@@ -543,7 +543,7 @@ export class TextExtractionEngine {
     ];
     
     for (const selector of noiseSelectors) {
-      const noiseElements = cloned.querySelectorAll(selector);
+      const noiseElements = Array.from(cloned.querySelectorAll(selector));
       for (const noiseElement of noiseElements) {
         noiseElement.remove();
       }

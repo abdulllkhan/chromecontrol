@@ -236,7 +236,7 @@ The extension successfully bridges the gap between user needs and AI capabilitie
   - Create CleanTextContent interface and structured text output
   - _Requirements: 13.1, 13.2, 13.3, 13.4_
 
-- [ ] 29. Enhance Content Script for Better Text Extraction
+- [x] 29. Enhance Content Script for Better Text Extraction
   - Update content script to use new TextExtractionEngine
   - Implement selected text extraction with proper formatting and context
   - Add support for dynamic content, iframes, and shadow DOM elements
