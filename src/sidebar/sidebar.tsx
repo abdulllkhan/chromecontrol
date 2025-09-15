@@ -34,6 +34,7 @@ import '../styles/TaskManagement.css';
 import '../styles/UserPreferences.css';
 import '../styles/SidebarStyles.css';
 import '../styles/Icons.css';
+import '../styles/PromptDebugger.css';
 import {
   getCategoryIcon,
   getPriorityIcon,
@@ -52,6 +53,8 @@ import {
   PauseIcon,
   SendIcon
 } from '../components/icons/IconComponents';
+import PromptDebugger from '../components/PromptDebugger';
+import { promptManager } from '../services/promptManager';
 
 // ============================================================================
 // SIDEBAR MAIN COMPONENT
@@ -110,6 +113,9 @@ const SidebarApp: React.FC = () => {
   const [aiConfig, setAIConfig] = useState<AIServiceConfig | null>(null);
   const [provider, setProvider] = useState<'openai' | 'claude'>('openai');
   const [editingConfigId, setEditingConfigId] = useState<string | null>(null);
+  const [showPromptDebugger, setShowPromptDebugger] = useState(false);
+  const [debuggerTask, setDebuggerTask] = useState<CustomTask | null>(null);
+  const [debuggerMode, setDebuggerMode] = useState<'validation' | 'preview' | 'debug'>('validation');
 
   // Enhanced error handling
   const { error: globalError, retry, clearError, executeWithErrorHandling } = useErrorHandler({
@@ -714,6 +720,18 @@ User's follow-up question: ${userMessage}`;
     }
   }, [storageService]);
 
+  // Handle prompt debugging
+  const handleOpenPromptDebugger = useCallback((task: CustomTask, mode: 'validation' | 'preview' | 'debug' = 'validation') => {
+    setDebuggerTask(task);
+    setDebuggerMode(mode);
+    setShowPromptDebugger(true);
+  }, []);
+
+  const handleClosePromptDebugger = useCallback(() => {
+    setShowPromptDebugger(false);
+    setDebuggerTask(null);
+  }, []);
+
   // Render loading state
   if (state.isLoading) {
     return (
@@ -872,8 +890,8 @@ User's follow-up question: ${userMessage}`;
             <FullTaskManagement
               taskManager={taskManager}
               storageService={storageService}
-              onClose={() => {}}
               websiteContext={state.websiteContext}
+              onOpenPromptDebugger={handleOpenPromptDebugger}
             />
           </div>
         )}
@@ -1092,6 +1110,24 @@ User's follow-up question: ${userMessage}`;
               setEditingConfigId(null);
             }}
             onTest={handleAITest}
+          />
+        </div>
+      )}
+
+      {/* Prompt Debugger Modal */}
+      {showPromptDebugger && debuggerTask && (
+        <div className="modal-overlay">
+          <PromptDebugger
+            task={debuggerTask}
+            promptManager={promptManager}
+            executionContext={state.websiteContext && state.pageContent ? {
+              websiteContext: state.websiteContext,
+              pageContent: state.pageContent,
+              taskId: debuggerTask.id,
+              userInput: {}
+            } : undefined}
+            onClose={handleClosePromptDebugger}
+            mode={debuggerMode}
           />
         </div>
       )}

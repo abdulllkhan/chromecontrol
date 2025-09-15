@@ -34,6 +34,18 @@
   padding: 16px 20px;
 }
 
+/* Button Styles */
+.btn.btn-info {
+  background-color: #17a2b8;
+  border-color: #17a2b8;
+  color: white;
+}
+
+.btn.btn-info:hover {
+  background-color: #138496;
+  border-color: #117a8b;
+}
+
 .header-actions {
   display: flex;
   gap: 8px;
