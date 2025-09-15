@@ -644,15 +644,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
         <button className="btn btn-small btn-secondary" onClick={onDuplicate}>
           <DuplicateIcon size={14} /> Duplicate
         </button>
-        {onOpenPromptDebugger && (
-          <button 
-            className="btn btn-small btn-info" 
-            onClick={() => onOpenPromptDebugger(task, 'validation')}
-            title="Debug Prompt Template"
-          >
-            <SettingsIcon size={14} /> Debug
-          </button>
-        )}
         <button className="btn btn-small btn-danger" onClick={onDelete}>
           <DeleteIcon size={14} /> Delete
         </button>
