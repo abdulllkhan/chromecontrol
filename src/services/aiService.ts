@@ -663,25 +663,35 @@ export class AIService {
   }
 
   /**
-   * Build prompt from AI request
+   * Build prompt from AI request with enhanced MCP context support
    */
   private buildPrompt(request: AIRequest): string {
     const { context, pageContent, taskType, prompt, userInput, taskId } = request;
+    
+    // Check if request has MCP context for enhanced processing
+    const mcpContext = (request as any).mcpContext;
     
     // If this is a custom task (has taskId), use the custom prompt as primary instruction
     // Otherwise, use system prompt + user prompt for generic requests
     let finalPrompt: string;
     
     if (taskId) {
-      // For custom tasks: Use the custom prompt template as the main instruction
-      // and add context as supporting information
-      let contextPrompt = this.buildContextPrompt(context, pageContent);
-      finalPrompt = prompt; // Custom task prompt template is the primary instruction
+      // For custom tasks: Use the processed prompt from PromptManager as the main instruction
+      finalPrompt = prompt; // This is already processed by PromptManager with variable injection
       
-      // Add context information to help the AI understand the current page
-      finalPrompt += `\n\nCurrent Page Context:\n${contextPrompt}`;
+      // Add MCP context information if available
+      if (mcpContext) {
+        const mcpContextInfo = this.buildMCPContextPrompt(mcpContext);
+        if (mcpContextInfo) {
+          finalPrompt += `\n\nStructured Context:\n${mcpContextInfo}`;
+        }
+      } else {
+        // Fallback to basic context if MCP context is not available
+        const contextPrompt = this.buildContextPrompt(context, pageContent);
+        finalPrompt += `\n\nPage Context:\n${contextPrompt}`;
+      }
       
-      // Add user input if provided
+      // Add user input if provided (this may already be injected by PromptManager)
       if (userInput && Object.keys(userInput).length > 0) {
         const inputStr = Object.entries(userInput)
           .map(([key, value]) => `${key}: ${value}`)
@@ -690,8 +700,10 @@ export class AIService {
       }
     } else {
       // For generic requests: Use system prompt + context + user prompt
-      let systemPrompt = this.getSystemPrompt(taskType, request.outputFormat);
-      let contextPrompt = this.buildContextPrompt(context, pageContent);
+      const systemPrompt = this.getSystemPrompt(taskType, request.outputFormat);
+      const contextPrompt = mcpContext 
+        ? this.buildMCPContextPrompt(mcpContext) || this.buildContextPrompt(context, pageContent)
+        : this.buildContextPrompt(context, pageContent);
       let userPrompt = prompt;
 
       // Add user input if provided
@@ -704,6 +716,11 @@ export class AIService {
 
       finalPrompt = `${systemPrompt}\n\n${contextPrompt}\n\n${userPrompt}`;
     }
+
+    // Log final prompt for debugging
+    console.log(`[AIService] Final prompt for ${taskId ? `task ${taskId}` : 'generic request'}:`);
+    console.log(`[AIService] Prompt length: ${finalPrompt.length} characters`);
+    console.log(`[AIService] Has MCP context: ${!!mcpContext}`);
 
     return finalPrompt;
   }
@@ -729,6 +746,74 @@ export class AIService {
     };
 
     return basePrompt + taskPrompts[taskType] + " " + formatPrompts[outputFormat];
+  }
+
+  /**
+   * Build MCP context prompt from structured MCP context
+   */
+  private buildMCPContextPrompt(mcpContext: any): string | null {
+    try {
+      if (!mcpContext || !mcpContext.resources) {
+        return null;
+      }
+
+      let contextPrompt = 'Structured Context (MCP):\n';
+      
+      // Add resource information
+      if (mcpContext.resources.length > 0) {
+        contextPrompt += '\nAvailable Resources:\n';
+        for (const resource of mcpContext.resources) {
+          contextPrompt += `- ${resource.name}: ${resource.description || 'No description'}\n`;
+          
+          // Include content for small resources
+          if (resource.content && typeof resource.content === 'string' && resource.content.length < 1000) {
+            try {
+              const parsedContent = JSON.parse(resource.content);
+              if (parsedContent.domain) {
+                contextPrompt += `  Domain: ${parsedContent.domain}\n`;
+              }
+              if (parsedContent.title) {
+                contextPrompt += `  Title: ${parsedContent.title}\n`;
+              }
+              if (parsedContent.category) {
+                contextPrompt += `  Category: ${parsedContent.category}\n`;
+              }
+            } catch {
+              // If not JSON, include first 200 chars of content
+              contextPrompt += `  Content: ${resource.content.substring(0, 200)}...\n`;
+            }
+          }
+        }
+      }
+      
+      // Add available tools information
+      if (mcpContext.tools && mcpContext.tools.length > 0) {
+        contextPrompt += '\nAvailable Tools:\n';
+        for (const tool of mcpContext.tools) {
+          contextPrompt += `- ${tool.name}: ${tool.description}\n`;
+        }
+      }
+      
+      // Add metadata information
+      if (mcpContext.metadata) {
+        contextPrompt += `\nContext Metadata:\n`;
+        contextPrompt += `- Version: ${mcpContext.metadata.version}\n`;
+        contextPrompt += `- Source: ${mcpContext.metadata.source}\n`;
+        if (mcpContext.metadata.capabilities) {
+          const enabledCapabilities = mcpContext.metadata.capabilities
+            .filter((cap: any) => cap.enabled)
+            .map((cap: any) => cap.name);
+          if (enabledCapabilities.length > 0) {
+            contextPrompt += `- Capabilities: ${enabledCapabilities.join(', ')}\n`;
+          }
+        }
+      }
+
+      return contextPrompt;
+    } catch (error) {
+      console.warn('[AIService] Failed to build MCP context prompt:', error);
+      return null;
+    }
   }
 
   /**

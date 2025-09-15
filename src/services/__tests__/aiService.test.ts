@@ -444,4 +444,327 @@ describe('AIError', () => {
     const error = new AIError('Test error', 'TEST_CODE');
     expect(error.retryable).toBe(false);
   });
-});
+});  /
+/ ============================================================================
+  // ENHANCED AI SERVICE TESTS FOR MCP CONTEXT SUPPORT
+  // ============================================================================
+
+  describe('Enhanced AI Service with MCP Context', () => {
+    beforeEach(() => {
+      aiService = new AIService({
+        apiKey: 'test-key',
+        model: 'gpt-4o-mini',
+        provider: 'openai'
+      });
+    });
+
+    describe('MCP Context Integration', () => {
+      it('should build prompts with MCP context for custom tasks', async () => {
+        const mcpContext = {
+          resources: [
+            {
+              uri: 'mcp://website-context/example.com',
+              name: 'Website Context',
+              description: 'Current website analysis',
+              mimeType: 'application/json',
+              content: JSON.stringify({
+                domain: 'example.com',
+                category: 'productivity',
+                title: 'Test Page'
+              })
+            }
+          ],
+          tools: [
+            {
+              name: 'extract-text',
+              description: 'Extract text from page',
+              inputSchema: { type: 'object' },
+              handler: async () => ({ success: true })
+            }
+          ],
+          prompts: [],
+          metadata: {
+            version: '1.0.0',
+            timestamp: new Date(),
+            source: 'agentic-chrome-extension',
+            capabilities: [
+              { name: 'resource-management', version: '1.0.0', enabled: true }
+            ]
+          }
+        };
+
+        const request: AIRequest = {
+          prompt: 'Processed custom prompt with variables injected',
+          context: createMockWebsiteContext(),
+          pageContent: createMockPageContent(),
+          taskType: TaskType.ANALYZE_CONTENT,
+          outputFormat: OutputFormat.PLAIN_TEXT,
+          constraints: createMockSecurityConstraints(),
+          taskId: 'test-task-1',
+          timestamp: new Date(),
+          mcpContext // Add MCP context to request
+        } as any;
+
+        // Mock the API call to capture the final prompt
+        let capturedPrompt = '';
+        vi.spyOn(aiService as any, 'makeAPICall').mockImplementation(async (apiRequest) => {
+          capturedPrompt = apiRequest.messages[0].content;
+          return {
+            choices: [{
+              message: {
+                content: 'Test response'
+              }
+            }]
+          };
+        });
+
+        await aiService.processRequest(request);
+
+        // Verify MCP context is included in the prompt
+        expect(capturedPrompt).toContain('Processed custom prompt with variables injected');
+        expect(capturedPrompt).toContain('Structured Context (MCP)');
+        expect(capturedPrompt).toContain('Available Resources:');
+        expect(capturedPrompt).toContain('Website Context: Current website analysis');
+        expect(capturedPrompt).toContain('Available Tools:');
+        expect(capturedPrompt).toContain('extract-text: Extract text from page');
+        expect(capturedPrompt).toContain('Context Metadata:');
+        expect(capturedPrompt).toContain('Version: 1.0.0');
+        expect(capturedPrompt).toContain('Source: agentic-chrome-extension');
+        expect(capturedPrompt).toContain('Capabilities: resource-management');
+      });
+
+      it('should fallback to basic context when MCP context is not available', async () => {
+        const request: AIRequest = {
+          prompt: 'Custom task prompt',
+          context: createMockWebsiteContext(),
+          pageContent: createMockPageContent(),
+          taskType: TaskType.ANALYZE_CONTENT,
+          outputFormat: OutputFormat.PLAIN_TEXT,
+          constraints: createMockSecurityConstraints(),
+          taskId: 'test-task-1',
+          timestamp: new Date()
+          // No MCP context
+        };
+
+        let capturedPrompt = '';
+        vi.spyOn(aiService as any, 'makeAPICall').mockImplementation(async (apiRequest) => {
+          capturedPrompt = apiRequest.messages[0].content;
+          return {
+            choices: [{
+              message: {
+                content: 'Test response'
+              }
+            }]
+          };
+        });
+
+        await aiService.processRequest(request);
+
+        // Verify basic context is used instead
+        expect(capturedPrompt).toContain('Custom task prompt');
+        expect(capturedPrompt).toContain('Page Context:');
+        expect(capturedPrompt).toContain('Website Context:');
+        expect(capturedPrompt).not.toContain('Structured Context (MCP)');
+      });
+
+      it('should handle MCP context with small resource content', async () => {
+        const mcpContext = {
+          resources: [
+            {
+              uri: 'mcp://page-content/example.com',
+              name: 'Page Content',
+              description: 'Extracted page content',
+              mimeType: 'application/json',
+              content: JSON.stringify({
+                domain: 'example.com',
+                title: 'Test Page Title',
+                category: 'productivity'
+              })
+            }
+          ],
+          tools: [],
+          prompts: [],
+          metadata: {
+            version: '1.0.0',
+            timestamp: new Date(),
+            source: 'test',
+            capabilities: []
+          }
+        };
+
+        const request: AIRequest = {
+          prompt: 'Test prompt',
+          context: createMockWebsiteContext(),
+          taskType: TaskType.GENERATE_TEXT,
+          outputFormat: OutputFormat.PLAIN_TEXT,
+          constraints: createMockSecurityConstraints(),
+          taskId: 'test-task-1',
+          timestamp: new Date(),
+          mcpContext
+        } as any;
+
+        let capturedPrompt = '';
+        vi.spyOn(aiService as any, 'makeAPICall').mockImplementation(async (apiRequest) => {
+          capturedPrompt = apiRequest.messages[0].content;
+          return {
+            choices: [{
+              message: {
+                content: 'Test response'
+              }
+            }]
+          };
+        });
+
+        await aiService.processRequest(request);
+
+        // Verify resource content is included
+        expect(capturedPrompt).toContain('Domain: example.com');
+        expect(capturedPrompt).toContain('Title: Test Page Title');
+        expect(capturedPrompt).toContain('Category: productivity');
+      });
+
+      it('should handle MCP context building errors gracefully', async () => {
+        const invalidMcpContext = {
+          resources: null, // Invalid structure
+          tools: [],
+          prompts: [],
+          metadata: null
+        };
+
+        const request: AIRequest = {
+          prompt: 'Test prompt',
+          context: createMockWebsiteContext(),
+          taskType: TaskType.GENERATE_TEXT,
+          outputFormat: OutputFormat.PLAIN_TEXT,
+          constraints: createMockSecurityConstraints(),
+          taskId: 'test-task-1',
+          timestamp: new Date(),
+          mcpContext: invalidMcpContext
+        } as any;
+
+        let capturedPrompt = '';
+        vi.spyOn(aiService as any, 'makeAPICall').mockImplementation(async (apiRequest) => {
+          capturedPrompt = apiRequest.messages[0].content;
+          return {
+            choices: [{
+              message: {
+                content: 'Test response'
+              }
+            }]
+          };
+        });
+
+        // Should not throw error, should fallback to basic context
+        const response = await aiService.processRequest(request);
+
+        expect(response).toBeDefined();
+        expect(capturedPrompt).toContain('Test prompt');
+        expect(capturedPrompt).toContain('Page Context:'); // Fallback context
+      });
+
+      it('should log MCP context information for debugging', async () => {
+        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        const mcpContext = {
+          resources: [{ uri: 'test', name: 'test', content: 'test' }],
+          tools: [{ name: 'test-tool', description: 'test', inputSchema: { type: 'object' }, handler: async () => ({}) }],
+          prompts: [],
+          metadata: { version: '1.0.0', timestamp: new Date(), source: 'test', capabilities: [] }
+        };
+
+        const request: AIRequest = {
+          prompt: 'Test prompt',
+          context: createMockWebsiteContext(),
+          taskType: TaskType.GENERATE_TEXT,
+          outputFormat: OutputFormat.PLAIN_TEXT,
+          constraints: createMockSecurityConstraints(),
+          taskId: 'test-task-1',
+          timestamp: new Date(),
+          mcpContext
+        } as any;
+
+        vi.spyOn(aiService as any, 'makeAPICall').mockResolvedValue({
+          choices: [{ message: { content: 'Test response' } }]
+        });
+
+        await aiService.processRequest(request);
+
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[AIService] Final prompt for task test-task-1:')
+        );
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[AIService] Has MCP context: true')
+        );
+
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe('Enhanced Prompt Building', () => {
+      it('should prioritize processed prompts from PromptManager for custom tasks', async () => {
+        const request: AIRequest = {
+          prompt: 'This is a processed prompt with {{domain}} replaced with example.com',
+          context: createMockWebsiteContext({ domain: 'example.com' }),
+          pageContent: createMockPageContent({ title: 'Test Page' }),
+          taskType: TaskType.ANALYZE_CONTENT,
+          outputFormat: OutputFormat.PLAIN_TEXT,
+          constraints: createMockSecurityConstraints(),
+          taskId: 'custom-task-1',
+          timestamp: new Date()
+        };
+
+        let capturedPrompt = '';
+        vi.spyOn(aiService as any, 'makeAPICall').mockImplementation(async (apiRequest) => {
+          capturedPrompt = apiRequest.messages[0].content;
+          return {
+            choices: [{
+              message: {
+                content: 'Test response'
+              }
+            }]
+          };
+        });
+
+        await aiService.processRequest(request);
+
+        // The processed prompt should be the primary instruction
+        expect(capturedPrompt).toContain('This is a processed prompt with {{domain}} replaced with example.com');
+        expect(capturedPrompt).toContain('Page Context:');
+        expect(capturedPrompt).toContain('Domain: example.com');
+        expect(capturedPrompt).toContain('Title: Test Page');
+      });
+
+      it('should use system prompts for generic requests without taskId', async () => {
+        const request: AIRequest = {
+          prompt: 'Generic user request',
+          context: createMockWebsiteContext(),
+          pageContent: createMockPageContent(),
+          taskType: TaskType.GENERATE_TEXT,
+          outputFormat: OutputFormat.MARKDOWN,
+          constraints: createMockSecurityConstraints(),
+          timestamp: new Date()
+          // No taskId - generic request
+        };
+
+        let capturedPrompt = '';
+        vi.spyOn(aiService as any, 'makeAPICall').mockImplementation(async (apiRequest) => {
+          capturedPrompt = apiRequest.messages[0].content;
+          return {
+            choices: [{
+              message: {
+                content: 'Test response'
+              }
+            }]
+          };
+        });
+
+        await aiService.processRequest(request);
+
+        // Should include system prompt for generic requests
+        expect(capturedPrompt).toContain('You are an AI assistant helping users with web-based tasks');
+        expect(capturedPrompt).toContain('Generate helpful, relevant text content');
+        expect(capturedPrompt).toContain('Respond in Markdown format');
+        expect(capturedPrompt).toContain('Generic user request');
+      });
+    });
+  });

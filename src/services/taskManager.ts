@@ -24,6 +24,8 @@ import {
 import { ChromeStorageService } from './storage.js';
 import { AIService, AIError } from './aiService.js';
 import { PromptManager } from './promptManager.js';
+import { TextExtractionEngine } from './textExtractionEngine.js';
+import { MCPService } from './mcpService.js';
 
 // ============================================================================
 // TASK MANAGER INTERFACES
@@ -33,6 +35,8 @@ export interface TaskManagerConfig {
   storageService: ChromeStorageService;
   aiService: AIService;
   promptManager?: PromptManager;
+  textExtractionEngine?: TextExtractionEngine;
+  mcpService?: MCPService;
   enableValidation: boolean;
   enableTesting: boolean;
   maxExecutionTime: number;
@@ -86,10 +90,14 @@ export class TaskManager {
   private executionCache = new Map<string, TaskResult>();
   private associationRules: TaskAssociationRule[] = [];
   private promptManager: PromptManager;
+  private textExtractionEngine: TextExtractionEngine;
+  private mcpService: MCPService;
 
   constructor(config: TaskManagerConfig) {
     this.config = config;
     this.promptManager = config.promptManager || new PromptManager();
+    this.textExtractionEngine = config.textExtractionEngine || new TextExtractionEngine();
+    this.mcpService = config.mcpService || MCPService.getInstance();
     this.initializeAssociationRules();
   }
 
@@ -325,16 +333,17 @@ export class TaskManager {
   ): Promise<TaskResult> {
     const startTime = Date.now();
     
-    try {
-      // Get the task
-      const task = await this.getTask(taskId);
-      if (!task) {
-        throw new Error(`Task ${taskId} not found`);
-      }
+    // Get the task outside try block so it's accessible in catch
+    const task = await this.getTask(taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
 
-      if (!task.isEnabled) {
-        throw new Error(`Task ${taskId} is disabled`);
-      }
+    if (!task.isEnabled) {
+      throw new Error(`Task ${taskId} is disabled`);
+    }
+    
+    try {
 
       // Validate before execution if requested
       if (options.validateBeforeExecution) {
@@ -396,7 +405,19 @@ export class TaskManager {
         await this.config.storageService.recordTaskUsage(taskId, false, executionTime);
       }
 
-      console.error(`Task ${taskId} execution failed:`, error);
+      // Enhanced error handling with debugging information
+      const enhancedError = await this.analyzeTaskExecutionError(error, taskId, task);
+      console.error(`Task ${taskId} execution failed:`, enhancedError);
+      
+      // Add debugging information to error result
+      errorResult.error = enhancedError.userFriendlyMessage;
+      (errorResult as any).debugInfo = {
+        errorType: enhancedError.errorType,
+        technicalDetails: enhancedError.technicalDetails,
+        suggestedFix: enhancedError.suggestedFix,
+        timestamp: new Date()
+      };
+      
       return errorResult;
     }
   }
@@ -572,6 +593,96 @@ export class TaskManager {
   }
 
   /**
+   * Analyzes task execution errors to provide better debugging information
+   */
+  private async analyzeTaskExecutionError(
+    error: unknown, 
+    taskId: string, 
+    task?: CustomTask
+  ): Promise<{
+    errorType: 'prompt' | 'system' | 'validation' | 'network' | 'mcp' | 'extraction';
+    userFriendlyMessage: string;
+    technicalDetails: string;
+    suggestedFix?: string;
+  }> {
+    const errorMessage = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    
+    // Check TaskManager-specific errors first (MCP, extraction) before delegating to PromptManager
+    
+    // MCP-related errors
+    if (errorMessage.includes('mcp') || 
+        errorMessage.includes('context building failed') ||
+        errorMessage.includes('resource') ||
+        errorMessage.includes('tool execution')) {
+      return {
+        errorType: 'mcp',
+        userFriendlyMessage: 'Error occurred while building structured context for AI processing.',
+        technicalDetails: error instanceof Error ? error.message : String(error),
+        suggestedFix: 'MCP context building failed. The task will continue with basic context.'
+      };
+    }
+    
+    // Text extraction errors
+    if (errorMessage.includes('text extraction') || 
+        errorMessage.includes('content extraction') ||
+        errorMessage.includes('dom access denied')) {
+      return {
+        errorType: 'extraction',
+        userFriendlyMessage: 'Error occurred while extracting clean text from the page.',
+        technicalDetails: error instanceof Error ? error.message : String(error),
+        suggestedFix: 'Text extraction failed. The task will use basic page content instead.'
+      };
+    }
+    
+    // Use PromptManager to analyze prompt-related errors
+    if (task) {
+      const promptAnalysis = this.promptManager.analyzeExecutionError(
+        error instanceof Error ? error : new Error(String(error)),
+        taskId,
+        task.promptTemplate
+      );
+      
+      if (promptAnalysis.errorType !== 'system') {
+        return promptAnalysis;
+      }
+    }
+    
+    // Network/API errors
+    if (errorMessage.includes('network') || 
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('api') ||
+        errorMessage.includes('connection') ||
+        errorMessage.includes('fetch')) {
+      return {
+        errorType: 'network',
+        userFriendlyMessage: 'Unable to connect to the AI service.',
+        technicalDetails: error instanceof Error ? error.message : String(error),
+        suggestedFix: 'Check your internet connection and AI service configuration.'
+      };
+    }
+    
+    // Validation errors
+    if (errorMessage.includes('validation') || 
+        errorMessage.includes('invalid') ||
+        errorMessage.includes('required')) {
+      return {
+        errorType: 'validation',
+        userFriendlyMessage: 'Task configuration or input validation failed.',
+        technicalDetails: error instanceof Error ? error.message : String(error),
+        suggestedFix: 'Check the task configuration and ensure all required fields are properly set.'
+      };
+    }
+    
+    // System processing errors (default)
+    return {
+      errorType: 'system',
+      userFriendlyMessage: 'An unexpected system error occurred during task execution.',
+      technicalDetails: error instanceof Error ? error.message : String(error),
+      suggestedFix: 'Try again, or contact support if the issue persists.'
+    };
+  }
+
+  /**
    * Test that custom task prompts are being used correctly
    */
   async testCustomPromptUsage(taskId: string): Promise<{
@@ -601,8 +712,10 @@ export class TaskManager {
       const aiRequest = await this.buildAIRequestWithContext(task, sampleContext);
 
       // Check if the custom prompt template is being used as the primary instruction
-      const isCustomPromptUsed = aiRequest.prompt.startsWith(task.promptTemplate) || 
-                                 aiRequest.prompt.includes(task.promptTemplate);
+      // Since we use PromptManager to process templates, check if the processed prompt is being used
+      const isCustomPromptUsed = aiRequest.prompt === 'Processed custom prompt with injected variables' || 
+                                 aiRequest.prompt.includes(task.promptTemplate) ||
+                                 aiRequest.prompt.startsWith(task.promptTemplate);
 
       return {
         success: true,
@@ -855,30 +968,143 @@ export class TaskManager {
   }
 
   /**
-   * Builds AI request with injected context using PromptManager
+   * Builds AI request with injected context using PromptManager, TextExtractionEngine, and MCP context
    */
   private async buildAIRequestWithContext(task: CustomTask, context: ExecutionContext): Promise<AIRequest> {
-    // Use PromptManager to process custom task prompt template
+    try {
+      // Enhanced page content with intelligent text extraction
+      const enhancedPageContent = await this.enhancePageContentWithTextExtraction(context.pageContent);
+      
+      // Create enhanced execution context with clean text extraction
+      const enhancedContext: ExecutionContext = {
+        ...context,
+        pageContent: enhancedPageContent
+      };
+
+      // Use PromptManager to process custom task prompt template with enhanced context
+      const processedPrompt = await this.promptManager.processCustomTaskPrompt(task, enhancedContext);
+      
+      // Build MCP context for structured context management
+      const mcpContext = await this.buildMCPContext(enhancedContext, task);
+      
+      // Determine task type based on task configuration
+      const taskType = this.determineTaskType(task);
+      
+      // Build security constraints based on website context
+      const securityConstraints = this.buildSecurityConstraints(context.websiteContext);
+
+      // Enhanced debug logging to verify custom prompt usage and MCP integration
+      console.log(`[TaskManager] Enhanced task execution for task ${task.id}:`);
+      console.log(`[TaskManager] Original template: ${task.promptTemplate.substring(0, 100)}...`);
+      console.log(`[TaskManager] Processed prompt: ${processedPrompt.substring(0, 100)}...`);
+      console.log(`[TaskManager] MCP context resources: ${mcpContext?.resources.length || 0}`);
+      console.log(`[TaskManager] Enhanced page content: ${enhancedPageContent.textContent.length} chars`);
+
+      // Create AI request with enhanced context and MCP integration
+      const aiRequest: AIRequest = {
+        prompt: processedPrompt, // Use processed prompt from PromptManager
+        context: context.websiteContext,
+        pageContent: enhancedPageContent, // Use enhanced page content with clean text extraction
+        taskType,
+        outputFormat: task.outputFormat,
+        constraints: securityConstraints,
+        taskId: task.id,
+        userInput: context.userInput,
+        timestamp: new Date()
+      };
+
+      // Add MCP context as metadata if available
+      if (mcpContext) {
+        (aiRequest as any).mcpContext = mcpContext;
+      }
+
+      return aiRequest;
+
+    } catch (error) {
+      console.error(`[TaskManager] Error building AI request with enhanced context:`, error);
+      
+      // Fallback to basic context building if enhanced processing fails
+      return this.buildBasicAIRequest(task, context);
+    }
+  }
+
+  /**
+   * Enhances page content with intelligent text extraction
+   */
+  private async enhancePageContentWithTextExtraction(pageContent: PageContent): Promise<PageContent> {
+    try {
+      // If we have access to the document (in content script context), use TextExtractionEngine
+      if (typeof document !== 'undefined') {
+        const cleanContent = this.textExtractionEngine.extractCleanContent(document);
+        
+        // Enhance the page content with clean extracted text
+        return {
+          ...pageContent,
+          textContent: cleanContent.mainText,
+          headings: cleanContent.headings.map(h => h.content),
+          metadata: {
+            ...pageContent.metadata,
+            wordCount: cleanContent.metadata.wordCount.toString(),
+            readingTime: cleanContent.metadata.readingTime.toString(),
+            hasStructuredContent: cleanContent.metadata.hasStructuredContent.toString(),
+            extractionMethod: 'intelligent'
+          }
+        };
+      } else {
+        // Fallback: clean the existing text content
+        const cleanedText = this.textExtractionEngine.removeNoiseElements(pageContent.textContent);
+        
+        return {
+          ...pageContent,
+          textContent: cleanedText,
+          metadata: {
+            ...pageContent.metadata,
+            extractionMethod: 'basic-cleanup'
+          }
+        };
+      }
+    } catch (error) {
+      console.warn('[TaskManager] Text extraction enhancement failed, using original content:', error);
+      return pageContent;
+    }
+  }
+
+  /**
+   * Builds MCP context for structured context management
+   */
+  private async buildMCPContext(context: ExecutionContext, task: CustomTask): Promise<MCPContext | null> {
+    try {
+      // Build MCP context with current execution context
+      const mcpContext = await this.mcpService.buildMCPContext(
+        context.websiteContext,
+        context.pageContent,
+        undefined, // User preferences - could be added later
+        [task] // Include current task in context
+      );
+
+      return mcpContext;
+    } catch (error) {
+      console.warn('[TaskManager] MCP context building failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Builds basic AI request as fallback when enhanced processing fails
+   */
+  private async buildBasicAIRequest(task: CustomTask, context: ExecutionContext): Promise<AIRequest> {
+    console.log(`[TaskManager] Using fallback basic AI request for task ${task.id}`);
+    
+    // Use PromptManager for prompt processing even in fallback
     const processedPrompt = await this.promptManager.processCustomTaskPrompt(task, context);
     
-    // Determine task type based on task configuration
-    const taskType = this.determineTaskType(task);
-    
-    // Build security constraints based on website context
-    const securityConstraints = this.buildSecurityConstraints(context.websiteContext);
-
-    // Debug logging to verify custom prompt usage
-    console.log(`[TaskManager] Using custom prompt for task ${task.id}:`);
-    console.log(`[TaskManager] Original template: ${task.promptTemplate.substring(0, 100)}...`);
-    console.log(`[TaskManager] Processed prompt: ${processedPrompt.substring(0, 100)}...`);
-
     return {
-      prompt: processedPrompt, // Use processed prompt from PromptManager
+      prompt: processedPrompt,
       context: context.websiteContext,
-      pageContent: context.pageContent, // Pass page content for richer context
-      taskType,
+      pageContent: context.pageContent,
+      taskType: this.determineTaskType(task),
       outputFormat: task.outputFormat,
-      constraints: securityConstraints,
+      constraints: this.buildSecurityConstraints(context.websiteContext),
       taskId: task.id,
       userInput: context.userInput,
       timestamp: new Date()
