@@ -5,9 +5,11 @@ import {
   SecurityLevel,
   CustomPattern,
   PrivacySettings,
-  AIConfiguration
+  AIConfiguration,
+  MCPServerConfig
 } from '../types';
 import { ChromeStorageService } from '../services/storage';
+import { mcpServerManager, MCPServerStatus } from '../services/mcpServerManager';
 
 // ============================================================================
 // INTERFACES
@@ -828,6 +830,372 @@ const AIConfigurationManager: React.FC<AIConfigurationManagerProps> = ({
 };
 
 // ============================================================================
+// COMPONENT: MCP Server Configuration Management
+// ============================================================================
+
+interface MCPServerManagerProps {
+  servers: MCPServerConfig[];
+  onSave: (server: MCPServerConfig) => void;
+  onDelete: (serverName: string) => void;
+  onToggleEnabled: (serverName: string, enabled: boolean) => void;
+}
+
+const MCPServerManager: React.FC<MCPServerManagerProps> = ({
+  servers,
+  onSave,
+  onDelete,
+  onToggleEnabled
+}) => {
+  const [showForm, setShowForm] = useState(false);
+  const [editingServer, setEditingServer] = useState<MCPServerConfig | null>(null);
+  const [serverStatuses, setServerStatuses] = useState<Record<string, MCPServerStatus>>({});
+  const [formData, setFormData] = useState({
+    name: '',
+    url: '',
+    apiKey: '',
+    timeout: 5000,
+    retryAttempts: 3,
+    enabled: true,
+    capabilities: [] as string[]
+  });
+
+  // Load server statuses on mount
+  useEffect(() => {
+    loadServerStatuses();
+    
+    // Set up periodic status updates
+    const interval = setInterval(loadServerStatuses, 10000); // Every 10 seconds
+    return () => clearInterval(interval);
+  }, [servers]);
+
+  const loadServerStatuses = async () => {
+    try {
+      const connections = mcpServerManager.getAllConnections();
+      const statuses: Record<string, MCPServerStatus> = {};
+      
+      for (const connection of connections) {
+        statuses[connection.config.name] = connection.status;
+      }
+      
+      setServerStatuses(statuses);
+    } catch (error) {
+      console.error('Failed to load server statuses:', error);
+    }
+  };
+
+  const handleAdd = () => {
+    setEditingServer(null);
+    setFormData({
+      name: '',
+      url: '',
+      apiKey: '',
+      timeout: 5000,
+      retryAttempts: 3,
+      enabled: true,
+      capabilities: ['tools', 'resources']
+    });
+    setShowForm(true);
+  };
+
+  const handleEdit = (server: MCPServerConfig) => {
+    setEditingServer(server);
+    setFormData({
+      name: server.name,
+      url: server.url,
+      apiKey: '', // Never display existing API key for security
+      timeout: server.timeout || 5000,
+      retryAttempts: server.retryAttempts || 3,
+      enabled: server.enabled,
+      capabilities: [...server.capabilities]
+    });
+    setShowForm(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.url) return;
+
+    // When editing, preserve existing API key if user left it empty (for security)
+    const serverToSave: MCPServerConfig = {
+      name: formData.name,
+      url: formData.url,
+      apiKey: formData.apiKey.trim() || (editingServer?.apiKey || ''),
+      timeout: formData.timeout,
+      retryAttempts: formData.retryAttempts,
+      enabled: formData.enabled,
+      capabilities: formData.capabilities
+    };
+
+    onSave(serverToSave);
+    setShowForm(false);
+    setEditingServer(null);
+  };
+
+  const handleCancel = () => {
+    setShowForm(false);
+    setEditingServer(null);
+  };
+
+  const handleCapabilityToggle = (capability: string) => {
+    const newCapabilities = formData.capabilities.includes(capability)
+      ? formData.capabilities.filter(c => c !== capability)
+      : [...formData.capabilities, capability];
+    
+    setFormData({ ...formData, capabilities: newCapabilities });
+  };
+
+  const handleTestConnection = async (server: MCPServerConfig) => {
+    try {
+      // Add temporary connection for testing
+      await mcpServerManager.addServerConnection(server);
+      await mcpServerManager.connectToServer(server.name);
+      
+      // Update status
+      await loadServerStatuses();
+      
+      alert(`Successfully connected to ${server.name}`);
+    } catch (error) {
+      alert(`Failed to connect to ${server.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const getStatusColor = (status: MCPServerStatus) => {
+    switch (status) {
+      case MCPServerStatus.CONNECTED:
+        return '#22c55e'; // green
+      case MCPServerStatus.CONNECTING:
+        return '#f59e0b'; // yellow
+      case MCPServerStatus.ERROR:
+        return '#ef4444'; // red
+      default:
+        return '#6b7280'; // gray
+    }
+  };
+
+  const getStatusText = (status: MCPServerStatus) => {
+    switch (status) {
+      case MCPServerStatus.CONNECTED:
+        return '✓ Connected';
+      case MCPServerStatus.CONNECTING:
+        return '⏳ Connecting';
+      case MCPServerStatus.ERROR:
+        return '❌ Error';
+      default:
+        return '⚪ Disconnected';
+    }
+  };
+
+  if (showForm) {
+    return (
+      <div className="mcp-server-form">
+        <div className="form-header">
+          <h4>{editingServer ? 'Edit MCP Server' : 'Add MCP Server'}</h4>
+          <button className="btn btn-secondary btn-small" onClick={handleCancel}>
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="form-content">
+          <div className="form-group">
+            <label htmlFor="server-name">Server Name *</label>
+            <input
+              id="server-name"
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g., Local MCP Server"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="server-url">Server URL *</label>
+            <input
+              id="server-url"
+              type="url"
+              value={formData.url}
+              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+              placeholder="http://localhost:3000"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="server-apikey">API Key</label>
+            <input
+              id="server-apikey"
+              type="password"
+              value={formData.apiKey}
+              onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+              placeholder={editingServer ? "Leave empty to keep existing key" : "Optional authentication key"}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="server-timeout">
+              Connection Timeout: {formData.timeout}ms
+            </label>
+            <input
+              id="server-timeout"
+              type="range"
+              min="1000"
+              max="30000"
+              step="1000"
+              value={formData.timeout}
+              onChange={(e) => setFormData({ ...formData, timeout: parseInt(e.target.value) })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="server-retries">
+              Retry Attempts: {formData.retryAttempts}
+            </label>
+            <input
+              id="server-retries"
+              type="range"
+              min="0"
+              max="10"
+              step="1"
+              value={formData.retryAttempts}
+              onChange={(e) => setFormData({ ...formData, retryAttempts: parseInt(e.target.value) })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Capabilities</label>
+            <div className="capability-checkboxes">
+              {['tools', 'resources', 'prompts', 'streaming'].map(capability => (
+                <label key={capability} className="capability-item">
+                  <input
+                    type="checkbox"
+                    checked={formData.capabilities.includes(capability)}
+                    onChange={() => handleCapabilityToggle(capability)}
+                  />
+                  <span>{capability.charAt(0).toUpperCase() + capability.slice(1)}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="setting-item">
+              <input
+                type="checkbox"
+                checked={formData.enabled}
+                onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
+              />
+              <span>Enable this server</span>
+            </label>
+          </div>
+
+          <div className="form-actions">
+            <button type="button" className="btn btn-secondary" onClick={handleCancel}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary">
+              {editingServer ? 'Update Server' : 'Add Server'}
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mcp-servers">
+      <h4>MCP Server Connections</h4>
+      <p className="setting-description">
+        Configure external MCP (Model Context Protocol) servers to enhance AI capabilities with additional tools and resources.
+      </p>
+
+      <div className="server-add-section">
+        <button className="btn btn-primary" onClick={handleAdd}>
+          + Add MCP Server
+        </button>
+      </div>
+
+      {servers.length === 0 ? (
+        <div className="empty-state">
+          <p>No MCP servers configured. Add one to extend AI capabilities!</p>
+        </div>
+      ) : (
+        <div className="server-list">
+          {servers.map(server => (
+            <div key={server.name} className={`server-item ${server.enabled ? 'enabled' : 'disabled'}`}>
+              <div className="server-info">
+                <h5>{server.name}</h5>
+                <div className="server-meta">
+                  <span className="server-url">{server.url}</span>
+                  <div className="server-status" style={{ color: getStatusColor(serverStatuses[server.name] || MCPServerStatus.DISCONNECTED) }}>
+                    {getStatusText(serverStatuses[server.name] || MCPServerStatus.DISCONNECTED)}
+                  </div>
+                </div>
+                <div className="server-capabilities">
+                  {server.capabilities.map(cap => (
+                    <span key={cap} className="capability-badge">{cap}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="server-actions">
+                <label className="server-toggle">
+                  <input
+                    type="checkbox"
+                    checked={server.enabled}
+                    onChange={(e) => onToggleEnabled(server.name, e.target.checked)}
+                  />
+                  <span>Enabled</span>
+                </label>
+                
+                <button
+                  className="btn btn-secondary btn-small"
+                  onClick={() => handleTestConnection(server)}
+                  disabled={!server.enabled}
+                >
+                  Test
+                </button>
+                
+                <button
+                  className="btn btn-secondary btn-small"
+                  onClick={() => handleEdit(server)}
+                >
+                  Edit
+                </button>
+                
+                <button
+                  className="btn btn-danger btn-small"
+                  onClick={() => {
+                    if (confirm(`Delete MCP server "${server.name}"?`)) {
+                      onDelete(server.name);
+                    }
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mcp-info">
+        <h5>About MCP Servers</h5>
+        <p>
+          MCP (Model Context Protocol) servers provide additional tools and resources that can be used by AI models.
+          Common examples include file system access, database connections, API integrations, and specialized processing tools.
+        </p>
+        <ul>
+          <li><strong>Tools:</strong> Executable functions that AI can call</li>
+          <li><strong>Resources:</strong> Data sources and content repositories</li>
+          <li><strong>Prompts:</strong> Reusable prompt templates</li>
+          <li><strong>Streaming:</strong> Real-time data processing capabilities</li>
+        </ul>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -836,7 +1204,7 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'categories' | 'patterns' | 'privacy' | 'automation' | 'ai' | 'general'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'patterns' | 'privacy' | 'automation' | 'ai' | 'mcp' | 'general'>('categories');
   const [showPatternForm, setShowPatternForm] = useState(false);
   const [editingPattern, setEditingPattern] = useState<CustomPattern | undefined>();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -869,7 +1237,8 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
           },
           automationPermissions: {},
           aiProvider: 'openai',
-          theme: 'auto'
+          theme: 'auto',
+          mcpServers: []
         };
         setPreferences(defaultPrefs);
       }
@@ -953,6 +1322,72 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
     updatePreferences({
       activeAIConfigId: configId
     });
+  };
+
+  const handleMCPServerSave = async (server: MCPServerConfig) => {
+    if (!preferences) return;
+
+    try {
+      const existingServers = preferences.mcpServers || [];
+      const existingIndex = existingServers.findIndex(s => s.name === server.name);
+
+      let updatedServers: MCPServerConfig[];
+      if (existingIndex >= 0) {
+        updatedServers = [...existingServers];
+        updatedServers[existingIndex] = server;
+      } else {
+        updatedServers = [...existingServers, server];
+      }
+
+      updatePreferences({ mcpServers: updatedServers });
+
+      // Update the MCP server manager
+      if (server.enabled) {
+        await mcpServerManager.addServerConnection(server);
+      }
+    } catch (error) {
+      console.error('Failed to save MCP server:', error);
+      setError('Failed to save MCP server configuration');
+    }
+  };
+
+  const handleMCPServerDelete = async (serverName: string) => {
+    if (!preferences) return;
+
+    try {
+      const updatedServers = (preferences.mcpServers || []).filter(s => s.name !== serverName);
+      updatePreferences({ mcpServers: updatedServers });
+
+      // Remove from MCP server manager
+      await mcpServerManager.removeServerConnection(serverName);
+    } catch (error) {
+      console.error('Failed to delete MCP server:', error);
+      setError('Failed to delete MCP server');
+    }
+  };
+
+  const handleMCPServerToggle = async (serverName: string, enabled: boolean) => {
+    if (!preferences) return;
+
+    try {
+      const updatedServers = (preferences.mcpServers || []).map(server =>
+        server.name === serverName ? { ...server, enabled } : server
+      );
+      updatePreferences({ mcpServers: updatedServers });
+
+      // Update MCP server manager
+      if (enabled) {
+        const server = updatedServers.find(s => s.name === serverName);
+        if (server) {
+          await mcpServerManager.addServerConnection(server);
+        }
+      } else {
+        await mcpServerManager.removeServerConnection(serverName);
+      }
+    } catch (error) {
+      console.error('Failed to toggle MCP server:', error);
+      setError('Failed to update MCP server status');
+    }
   };
 
   const handlePatternSave = (patternData: Omit<CustomPattern, 'id'>) => {
@@ -1069,6 +1504,12 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
             AI
           </button>
           <button
+            className={`tab ${activeTab === 'mcp' ? 'active' : ''}`}
+            onClick={() => setActiveTab('mcp')}
+          >
+            MCP Servers
+          </button>
+          <button
             className={`tab ${activeTab === 'general' ? 'active' : ''}`}
             onClick={() => setActiveTab('general')}
           >
@@ -1170,6 +1611,15 @@ export const UserPreferencesComponent: React.FC<UserPreferencesProps> = ({ onClo
               onSave={handleAIConfigSave}
               onDelete={handleAIConfigDelete}
               onSetActive={handleAIConfigSetActive}
+            />
+          )}
+
+          {activeTab === 'mcp' && (
+            <MCPServerManager
+              servers={preferences.mcpServers || []}
+              onSave={handleMCPServerSave}
+              onDelete={handleMCPServerDelete}
+              onToggleEnabled={handleMCPServerToggle}
             />
           )}
 

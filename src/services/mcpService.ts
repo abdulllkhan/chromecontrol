@@ -14,6 +14,7 @@ import {
   CustomTask,
   ValidationUtils
 } from '../types/index.js';
+import { mcpServerManager } from './mcpServerManager.js';
 
 /**
  * MCP Service handles creation and management of MCP-compliant contexts
@@ -162,6 +163,7 @@ export class MCPService {
   private async buildTools(): Promise<MCPTool[]> {
     const tools: MCPTool[] = [];
 
+    // Built-in tools
     // Text extraction tool
     if (this.contextConfig.enabledTools.includes('text-extraction')) {
       tools.push({
@@ -188,7 +190,8 @@ export class MCPService {
         },
         metadata: {
           category: 'content-extraction',
-          requiresContentScript: true
+          requiresContentScript: true,
+          source: 'built-in'
         }
       });
     }
@@ -219,7 +222,8 @@ export class MCPService {
         },
         metadata: {
           category: 'page-analysis',
-          requiresPermissions: ['activeTab']
+          requiresPermissions: ['activeTab'],
+          source: 'built-in'
         }
       });
     }
@@ -249,9 +253,27 @@ export class MCPService {
         },
         metadata: {
           category: 'task-management',
-          requiresStorage: true
+          requiresStorage: true,
+          source: 'built-in'
         }
       });
+    }
+
+    // Add tools from connected MCP servers
+    try {
+      const externalTools = mcpServerManager.getAllAvailableTools();
+      for (const tool of externalTools) {
+        tools.push({
+          ...tool,
+          metadata: {
+            ...tool.metadata,
+            source: 'external-mcp-server'
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to load external MCP tools:', error);
+      // Continue with built-in tools only
     }
 
     return tools;
@@ -419,6 +441,70 @@ export class MCPService {
    */
   public getServerConfigs(): MCPServerConfig[] {
     return [...this.serverConfigs];
+  }
+
+  /**
+   * Execute an MCP tool (built-in or external)
+   */
+  public async executeTool(
+    toolName: string,
+    args: Record<string, unknown>,
+    context?: MCPContext
+  ): Promise<{ success: boolean; result?: unknown; error?: string }> {
+    try {
+      // First check if it's a built-in tool
+      const builtInTools = await this.buildTools();
+      const builtInTool = builtInTools.find(t => t.name === toolName && t.metadata?.source === 'built-in');
+      
+      if (builtInTool && builtInTool.handler) {
+        const result = await builtInTool.handler(args);
+        return { success: true, result };
+      }
+
+      // Try to execute on external MCP servers
+      const connections = mcpServerManager.getAllConnections();
+      for (const connection of connections) {
+        const tool = connection.availableTools.find(t => t.name === toolName);
+        if (tool) {
+          const result = await mcpServerManager.executeTool(
+            connection.config.name,
+            toolName,
+            args,
+            context
+          );
+          return result;
+        }
+      }
+
+      return {
+        success: false,
+        error: `Tool '${toolName}' not found in built-in tools or connected MCP servers`
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error executing tool'
+      };
+    }
+  }
+
+  /**
+   * Get fallback suggestions when MCP servers are unavailable
+   */
+  public getFallbackSuggestions(): string[] {
+    return mcpServerManager.getFallbackSuggestions();
+  }
+
+  /**
+   * Initialize MCP service with server manager
+   */
+  public async initialize(): Promise<void> {
+    try {
+      await mcpServerManager.initialize();
+    } catch (error) {
+      console.error('Failed to initialize MCP service:', error);
+      // Continue without MCP server connections
+    }
   }
 
   /**

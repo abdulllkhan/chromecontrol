@@ -1,5 +1,6 @@
 // Background service worker for the Agentic Chrome Extension
 import { mcpService } from '../services/mcpService.js';
+import { mcpServerManager } from '../services/mcpServerManager.js';
 import { WebsiteContext, PageContent, UserPreferences, CustomTask, MCPContext } from '../types/index.js';
 
 console.log('chromeControl background script loaded');
@@ -15,15 +16,31 @@ chrome.action.onClicked.addListener(async (tab) => {
 });
 
 // Initialize extension on install/startup
-chrome.runtime.onInstalled.addListener((details) => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   console.log('Agentic Chrome Extension installed:', details.reason);
   
   // Initialize default storage if needed
-  initializeDefaultStorage();
+  await initializeDefaultStorage();
+  
+  // Initialize MCP service and server manager
+  try {
+    await mcpService.initialize();
+    console.log('MCP service initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize MCP service:', error);
+  }
 });
 
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
   console.log('Agentic Chrome Extension startup');
+  
+  // Initialize MCP service on startup
+  try {
+    await mcpService.initialize();
+    console.log('MCP service initialized on startup');
+  } catch (error) {
+    console.error('Failed to initialize MCP service on startup:', error);
+  }
 });
 
 // Initialize default storage structure
@@ -76,6 +93,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       break;
     case 'UPDATE_MCP_CONFIG':
       handleMCPConfigUpdate(request, sender, sendResponse);
+      break;
+    case 'MCP_SERVER_CONNECT':
+      handleMCPServerConnect(request, sender, sendResponse);
+      break;
+    case 'MCP_SERVER_DISCONNECT':
+      handleMCPServerDisconnect(request, sender, sendResponse);
+      break;
+    case 'MCP_EXECUTE_TOOL':
+      handleMCPToolExecution(request, sender, sendResponse);
+      break;
+    case 'MCP_GET_SERVERS':
+      handleMCPGetServers(request, sender, sendResponse);
       break;
     default:
       sendResponse({ success: false, message: 'Unknown message type' });
@@ -200,6 +229,100 @@ async function handleMCPConfigUpdate(request: any, sender: chrome.runtime.Messag
   }
 }
 
+// MCP Server connection handler
+async function handleMCPServerConnect(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response: any) => void) {
+  try {
+    const { serverConfig } = request;
+    
+    await mcpServerManager.addServerConnection(serverConfig);
+    if (serverConfig.enabled) {
+      await mcpServerManager.connectToServer(serverConfig.name);
+    }
+    
+    sendResponse({ 
+      success: true, 
+      message: `MCP server ${serverConfig.name} connected successfully`
+    });
+  } catch (error) {
+    console.error('Failed to connect MCP server:', error);
+    sendResponse({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      message: 'Failed to connect MCP server'
+    });
+  }
+}
+
+// MCP Server disconnection handler
+async function handleMCPServerDisconnect(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response: any) => void) {
+  try {
+    const { serverName } = request;
+    
+    await mcpServerManager.disconnectFromServer(serverName);
+    await mcpServerManager.removeServerConnection(serverName);
+    
+    sendResponse({ 
+      success: true, 
+      message: `MCP server ${serverName} disconnected successfully`
+    });
+  } catch (error) {
+    console.error('Failed to disconnect MCP server:', error);
+    sendResponse({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      message: 'Failed to disconnect MCP server'
+    });
+  }
+}
+
+// MCP Tool execution handler
+async function handleMCPToolExecution(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response: any) => void) {
+  try {
+    const { toolName, args, context } = request;
+    
+    // Try to execute using MCP service first (includes both built-in and external tools)
+    const result = await mcpService.executeTool(toolName, args, context);
+    
+    sendResponse({ 
+      success: result.success, 
+      result: result.result,
+      error: result.error,
+      message: result.success ? 'Tool executed successfully' : 'Tool execution failed'
+    });
+  } catch (error) {
+    console.error('Failed to execute MCP tool:', error);
+    sendResponse({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      message: 'Failed to execute MCP tool'
+    });
+  }
+}
+
+// MCP Server status handler
+async function handleMCPGetServers(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response: any) => void) {
+  try {
+    const connections = mcpServerManager.getAllConnections();
+    const availableTools = mcpServerManager.getAllAvailableTools();
+    const availableResources = mcpServerManager.getAllAvailableResources();
+    
+    sendResponse({ 
+      success: true, 
+      connections,
+      availableTools,
+      availableResources,
+      message: 'MCP server information retrieved successfully'
+    });
+  } catch (error) {
+    console.error('Failed to get MCP server information:', error);
+    sendResponse({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      message: 'Failed to get MCP server information'
+    });
+  }
+}
+
 // Handle tab updates to trigger page analysis
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
@@ -208,4 +331,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       // Ignore errors if content script is not ready
     });
   }
+});
+
+// Cleanup on extension shutdown
+chrome.runtime.onSuspend.addListener(() => {
+  console.log('Agentic Chrome Extension suspending');
+  mcpServerManager.cleanup();
 });

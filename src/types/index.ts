@@ -216,6 +216,7 @@ export interface UserPreferences {
   };
   aiConfigurations?: AIConfiguration[];
   activeAIConfigId?: string;
+  mcpServers?: MCPServerConfig[];
 }
 
 export interface CustomPattern {
