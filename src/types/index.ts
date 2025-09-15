@@ -1058,7 +1058,9 @@ export interface ContentMetadata {
   readingTime: number;
   language?: string;
   extractedAt: Date;
-  source: string;
+  source?: string;
+  paragraphCount: number;
+  hasStructuredContent: boolean;
 }
 
 /**
